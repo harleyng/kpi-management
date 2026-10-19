@@ -63,8 +63,8 @@ describe('the simulated clock (contract rule 3, decision D-b)', () => {
   it('the gateway stamps writes from the same clock the screens read', async () => {
     const gateway = createMockGateway({ storage: null, latencyMs: 0, seed: testSeed });
     gateway.dev?.setNow('2027-04-20T03:00:00.000Z');
-    const hr = SYNTRA.user(SYNTRA.personas.hr);
-    const evidence = await gateway.actuals.addEvidence(SYNTRA.tenantId, hr, {
+    const admin = SYNTRA.user(SYNTRA.personas.admin);
+    const evidence = await gateway.actuals.addEvidence(SYNTRA.tenantId, admin, {
       goalId: (await gateway.goals.listGoals(SYNTRA.tenantId))[0].id,
       periodId: null,
       actualId: null,
@@ -73,7 +73,7 @@ describe('the simulated clock (contract rule 3, decision D-b)', () => {
       note: null,
     });
     expect(evidence.uploadedAt >= '2027-04-20T03:00:00.000Z' && evidence.uploadedAt < '2027-04-20T03:01:00.000Z').toBe(true);
-    expect(evidence.uploadedBy).toBe(hr);
+    expect(evidence.uploadedBy).toBe(admin);
     expect(gateway.clock.now() > evidence.uploadedAt).toBe(true);
   });
 });

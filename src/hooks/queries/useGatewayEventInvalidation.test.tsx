@@ -7,7 +7,7 @@ import { getDataGateway } from '@/integrations/data';
 import { useGatewayEventInvalidation } from './useGatewayEventInvalidation';
 
 const S = SYNTRA.tenantId;
-const hr = SYNTRA.user(SYNTRA.personas.hr);
+const admin = SYNTRA.user(SYNTRA.personas.admin);
 
 function setup(tenantId: string | null) {
   const client = new QueryClient();
@@ -24,7 +24,7 @@ const position = (code: string) => ({ code, name: code, jobLevel: 'Staff' as con
 describe('useGatewayEventInvalidation', () => {
   it('invalidates the roots that read the changed entity, for the session\'s tenant', async () => {
     const { invalidated } = setup(S);
-    await getDataGateway().org.savePosition(S, hr, position('INV-1'));
+    await getDataGateway().org.savePosition(S, admin, position('INV-1'));
     await tick();
     expect(invalidated()).toEqual(expect.arrayContaining([[S, 'positions'], [S, 'auditLog']]));
     expect(invalidated()).not.toContainEqual([S, 'goals']);
@@ -32,7 +32,7 @@ describe('useGatewayEventInvalidation', () => {
 
   it('flushes a burst of changes once per root', async () => {
     const { invalidated } = setup(S);
-    await Promise.all([getDataGateway().org.savePosition(S, hr, position('INV-2')), getDataGateway().org.savePosition(S, hr, position('INV-3'))]);
+    await Promise.all([getDataGateway().org.savePosition(S, admin, position('INV-2')), getDataGateway().org.savePosition(S, admin, position('INV-3'))]);
     await tick();
     const positions = invalidated().filter((k) => k[1] === 'positions');
     expect(positions.length).toBeLessThanOrEqual(2);
@@ -41,11 +41,11 @@ describe('useGatewayEventInvalidation', () => {
 
   it('hears nothing of another tenant, and follows a tenant switch', async () => {
     const { hook, invalidated } = setup(DEMO.tenantId);
-    await getDataGateway().org.savePosition(S, hr, position('INV-4'));
+    await getDataGateway().org.savePosition(S, admin, position('INV-4'));
     await tick();
     expect(invalidated()).toEqual([]);
     hook.rerender({ id: S });
-    await getDataGateway().org.savePosition(S, hr, position('INV-5'));
+    await getDataGateway().org.savePosition(S, admin, position('INV-5'));
     await tick();
     expect(invalidated()).toContainEqual([S, 'positions']);
   });
@@ -54,7 +54,7 @@ describe('useGatewayEventInvalidation', () => {
     const mounted = setup(S);
     mounted.hook.unmount();
     const idle = setup(null);
-    await getDataGateway().org.savePosition(S, hr, position('INV-6'));
+    await getDataGateway().org.savePosition(S, admin, position('INV-6'));
     await tick();
     expect(mounted.invalidated()).toEqual([]);
     expect(idle.invalidated()).toEqual([]);

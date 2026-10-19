@@ -2,6 +2,7 @@ import type { Delegation, FormType, GoalChangeItem, Id, WorkflowStep } from '@/d
 import { KpiError } from '@/lib/errorCatalog';
 import type { ChildInput, FormFilter, FormsGateway, PageRequest } from '../../types';
 import { eqOpt, inList, saveChildren, upsert } from '../rows';
+import { userResource } from '../authorize';
 import type { Runtime } from '../runtime';
 import { paginate } from './page';
 
@@ -23,7 +24,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
         .sort((a, b) => (a.workflowId === b.workflowId ? a.stepNo - b.stepNo : a.workflowId < b.workflowId ? -1 : 1)),
     ),
     saveWorkflow: rt.write(
-      'forms.saveWorkflow',
+      'forms.saveWorkflow', { permission: 'cycle.manage' },
       (tx, input: Parameters<FormsGateway['saveWorkflow']>[2], steps: readonly ChildInput<WorkflowStep, 'workflowId' | 'stepNo'>[]) => {
         const parent = upsert(tx, 'WorkflowTemplate', input, { create: () => ({}) });
         // Steps are numbered 1…n in the order given.
@@ -36,7 +37,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
     createLaunch: rt.deferred('forms.createLaunch', 'write', `${WORKFLOW_RULES} (recipients, skip rules, registration plans)`),
     cancelLaunch: rt.deferred('forms.cancelLaunch', 'write', `${WORKFLOW_RULES} (only a Scheduled launch)`),
     listLaunchRules: rt.read('forms.listLaunchRules', (tx) => tx.all('FormLaunchRule')),
-    saveLaunchRule: rt.write('forms.saveLaunchRule', (tx, input: Parameters<FormsGateway['saveLaunchRule']>[2]) =>
+    saveLaunchRule: rt.write('forms.saveLaunchRule', { permission: 'form.launch' }, (tx, input: Parameters<FormsGateway['saveLaunchRule']>[2]) =>
       upsert(tx, 'FormLaunchRule', input, { create: () => ({}) }),
     ),
 
@@ -76,7 +77,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
       tx.get('FormInstance', formId);
       return tx.all('GoalChangeItem').filter((i) => i.formId === formId);
     }),
-    saveGoalChangeItems: rt.write('forms.saveGoalChangeItems', (tx, formId: Id, items: readonly ChildInput<GoalChangeItem, 'formId'>[]) => {
+    saveGoalChangeItems: rt.write('forms.saveGoalChangeItems', 'workflow', (tx, formId: Id, items: readonly ChildInput<GoalChangeItem, 'formId'>[]) => {
       const form = tx.get('FormInstance', formId);
       if (form.formType !== 'GOAL_CHANGE') throw new KpiError('ERR-KPI-06', `form ${formId} is not a GOAL_CHANGE form`);
       return saveChildren(tx, 'GoalChangeItem', 'formId', formId, items);
@@ -86,7 +87,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
     listDelegations: rt.read('forms.listDelegations', (tx, userId?: Id) =>
       tx.all('Delegation').filter((d) => userId === undefined || d.fromUserId === userId || d.toUserId === userId),
     ),
-    saveDelegation: rt.write('forms.saveDelegation', (tx, input: Parameters<FormsGateway['saveDelegation']>[2]) => {
+    saveDelegation: rt.write('forms.saveDelegation', { permission: 'delegation.manage', resource: (tx) => userResource(tx, tx.ctx.actorUserId) }, (tx, input: Parameters<FormsGateway['saveDelegation']>[2]) => {
       const actor = tx.ctx.actorUserId as Id;
       // A user delegates their OWN steps: `fromUserId` is the actor, never the payload.
       if (input.id !== undefined && tx.get('Delegation', input.id).fromUserId !== actor) {
@@ -94,7 +95,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
       }
       return upsert(tx, 'Delegation', input, { create: (): Partial<Delegation> => ({ fromUserId: actor, revokedAt: null }) });
     }),
-    revokeDelegation: rt.write('forms.revokeDelegation', (tx, delegationId: Id) => {
+    revokeDelegation: rt.write('forms.revokeDelegation', { permission: 'delegation.manage', resource: (tx, delegationId) => userResource(tx, tx.find('Delegation', delegationId)?.fromUserId ?? null) }, (tx, delegationId: Id) => {
       const delegation = tx.get('Delegation', delegationId);
       if (delegation.revokedAt !== null) throw new KpiError('ERR-KPI-04', `delegation ${delegationId} is already revoked`);
       return tx.update('Delegation', { ...delegation, revokedAt: tx.now });

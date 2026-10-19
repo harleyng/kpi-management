@@ -21,7 +21,7 @@ const syntra = seed.tenants.find((t) => t.tenant.id === SYNTRA.tenantId) as Tena
 const demo = seed.tenants.find((t) => t.tenant.id === DEMO.tenantId) as TenantSeed;
 const D = DEMO.tenantId;
 const S = SYNTRA.tenantId;
-const demoActor = DEMO.user(DEMO.personas.hr);
+const demoActor = DEMO.user(DEMO.personas.admin);
 
 /** Every key of every Syntra row — no Demo answer may contain one. */
 const SYNTRA_IDS = new Set(COLLECTION_NAMES.flatMap((c) => syntra.rows[c].map((r) => keyOf(c, r as never))));
@@ -339,7 +339,7 @@ describe('tenant isolation — writes', () => {
     const { gateway } = newGateway();
     const heard: DomainEvent[] = [];
     gateway.events.subscribe(D, (e) => void heard.push(e));
-    await gateway.org.savePosition(S, SYNTRA.user(SYNTRA.personas.hr), { code: 'NEW', name: 'Mới', jobLevel: 'Staff', status: 'Active' });
+    await gateway.org.savePosition(S, SYNTRA.user(SYNTRA.personas.admin), { code: 'NEW', name: 'Mới', jobLevel: 'Staff', status: 'Active' });
     await flush();
     expect(heard).toEqual([]);
   });

@@ -16,7 +16,7 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
         .sort((a, b) => a.sortOrder - b.sortOrder),
     ),
     saveRatingScale: rt.write(
-      'results.saveRatingScale',
+      'results.saveRatingScale', { permission: 'rating.config' },
       (tx, input: Parameters<ResultsGateway['saveRatingScale']>[2], levels: readonly ChildInput<RatingLevel, 'ratingScaleId'>[]) => {
         const parent = upsert(tx, 'RatingScale', input, { create: () => ({}) });
         return { parent, children: saveChildren(tx, 'RatingLevel', 'ratingScaleId', parent.id, levels) };
@@ -26,10 +26,10 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
     listPayoutRules: rt.read('results.listPayoutRules', (tx, ratingScaleId?: Id) =>
       tx.all('PayoutRule').filter((r) => eqOpt(ratingScaleId, r.ratingScaleId)),
     ),
-    savePayoutRule: rt.write('results.savePayoutRule', (tx, input: Parameters<ResultsGateway['savePayoutRule']>[2]) =>
+    savePayoutRule: rt.write('results.savePayoutRule', { permission: 'rating.config' }, (tx, input: Parameters<ResultsGateway['savePayoutRule']>[2]) =>
       upsert(tx, 'PayoutRule', input, { create: () => ({}) }),
     ),
-    deletePayoutRule: rt.write('results.deletePayoutRule', (tx, payoutRuleId: Id) => {
+    deletePayoutRule: rt.write('results.deletePayoutRule', { permission: 'rating.config' }, (tx, payoutRuleId: Id) => {
       removeRow(tx, 'PayoutRule', payoutRuleId);
     }),
 
@@ -59,6 +59,9 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
         .filter((e) => eqOpt(periodId, e.periodId))
         .sort((a, b) => (a.exportedAt < b.exportedAt ? 1 : -1)),
     ),
-    exportPayroll: rt.deferred('results.exportPayroll', 'write', 'T6 4.6.4 (the payroll export file)'),
+    exportPayroll: rt.deferred('results.exportPayroll', 'write', 'T6 4.6.4 (the payroll export file)', {
+      track: 'T6',
+      auth: { permission: 'result.export' },
+    }),
   };
 }

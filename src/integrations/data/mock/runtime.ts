@@ -3,7 +3,7 @@ import type { AuditAction, EntityName, Id, IsoDateTime, Tenant } from '@/data/ty
 import { KpiDeferredError, KpiError } from '@/lib/errorCatalog';
 import type { DomainEvent, RowSnapshot } from '../types';
 import { auditRowOf, NOT_AUDITED } from './audit';
-import { authorizeActor } from './authorize';
+import { authorizeWrite, type Track, type WriteAuth } from './authorize';
 import { createBus, type DiagnosticSink, type EventBus } from './bus';
 import { createSimClock, type SimClock } from './clock';
 import { validateTransaction } from './integrity';
@@ -38,6 +38,13 @@ export interface Registry {
   deferred: Map<string, string>;
   /** Methods that work but whose refusal rule is not wired yet → the rule. */
   pendingGuards: Map<string, string>;
+  /**
+   * Deferred methods and pending guards a Phase 2 track owns (its WBS work package) → the track.
+   * Gate 1 requires every OTHER entry of `deferred` and `pendingGuards` to be gone.
+   */
+  trackOwned: Map<string, Track>;
+  /** Every user write's declared authorization (`authorize.ts`). */
+  auth: Map<string, WriteAuth<never[]>>;
 }
 
 function globToRegExp(pattern: string): RegExp {
@@ -51,7 +58,7 @@ const snapshot = (row: Row | null): RowSnapshot | null => (row === null ? null :
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class Runtime {
-  readonly registry: Registry = { methods: new Map(), deferred: new Map(), pendingGuards: new Map() };
+  readonly registry: Registry = { methods: new Map(), deferred: new Map(), pendingGuards: new Map(), trackOwned: new Map(), auth: new Map() };
   readonly persistence: Persistence;
   readonly clock: SimClock;
   readonly bus: EventBus;
@@ -170,8 +177,8 @@ export class Runtime {
    * failed and absent, or saved and announced — never saved and reported failed. Returns the events
    * to emit; the caller emits them after.
    */
-  private commit(tx: Tx, onBehalfOfUserId: Id | null = null): DomainEvent[] {
-    const events = this.eventsOf(tx, onBehalfOfUserId);
+  private commit(tx: Tx): DomainEvent[] {
+    const events = this.eventsOf(tx, tx.onBehalfOfUserId);
     for (const event of events) {
       if (event.type === 'entity.changed' && !NOT_AUDITED.has(event.entityName)) tx.insert('AuditLog', auditRowOf(event));
     }
@@ -223,12 +230,17 @@ export class Runtime {
     };
   }
 
-  /** A user write: `(tenantId, actorUserId, ...args)`. */
+  /**
+   * A user write: `(tenantId, actorUserId, ...args)`. `auth` is required — a write without a
+   * declared permission does not compile (`authorize.ts`).
+   */
   write<A extends unknown[], R>(
     name: string,
+    auth: NoInfer<WriteAuth<A>>,
     body: (tx: Tx, ...args: A) => R,
   ): (tenantId: Id, actorUserId: Id, ...args: A) => Promise<R> {
     this.register(name, 'write');
+    this.registry.auth.set(name, auth as WriteAuth<never[]>);
     return async (tenantId, actorUserId, ...args) => {
       const input = cloneDeep(args);
       let events: DomainEvent[];
@@ -236,7 +248,7 @@ export class Runtime {
       try {
         await this.preamble(name, 'write');
         const tx = this.newTx(tenantId, actorUserId);
-        authorizeActor(tx, actorUserId);
+        authorizeWrite(tx, actorUserId, name, auth, input);
         result = body(tx, ...input);
         events = this.commit(tx);
       } catch (error) {
@@ -267,19 +279,33 @@ export class Runtime {
     };
   }
 
-  /** A method whose result a rule computes, and the rule is not wired yet. */
-  deferred(name: string, kind: 'read' | 'write', owner: string): (...args: unknown[]) => Promise<never> {
+  /**
+   * A method whose result a rule computes, and the rule is not wired yet. After Gate 1 only a
+   * Phase 2 track's own work package may stay deferred (`track`); it still declares its `auth`.
+   */
+  deferred(
+    name: string,
+    kind: 'read' | 'write',
+    owner: string,
+    meta: { track?: Track; auth?: WriteAuth<never[]> } = {},
+  ): (...args: unknown[]) => Promise<never> {
     this.register(name, kind);
     this.registry.deferred.set(name, owner);
+    if (meta.track) this.registry.trackOwned.set(name, meta.track);
+    if (meta.auth) this.registry.auth.set(name, meta.auth);
     return async () => {
       await this.preamble(name, kind);
       throw new KpiDeferredError(kind, name, owner);
     };
   }
 
-  /** Records that `name` works but its refusal rule `rule` is not wired yet. */
-  pendingGuard(name: string, rule: string): void {
+  /**
+   * Records that `name` works but its refusal rule `rule` is not wired yet. After Gate 1 only a
+   * Phase 2 track's own work package may stay so (`track`).
+   */
+  pendingGuard(name: string, rule: string, track?: Track): void {
     this.registry.pendingGuards.set(name, rule);
+    if (track) this.registry.trackOwned.set(name, track);
   }
 
   // ─── Platform (the tenant list itself) ───────────────────────────────────────────────────────
@@ -314,6 +340,8 @@ export class Runtime {
         const home = [...this.tenants.values()].find((t) => t.collections.get('UserAccount')?.get(actorUserId)?.status === 'Active');
         if (!home) throw new KpiError('ERR-KPI-05', `user ${String(actorUserId)} cannot act here`);
         const now = this.clock.now();
+        // Tenant administration is `org.manage` in the actor's own tenant.
+        authorizeWrite(new Tx(home, this.globals, { tenantId: home.tenantId, now, actorUserId }), actorUserId, name, { permission: 'org.manage' }, []);
         const existing = input.id === undefined ? null : (this.globals.tenants.get(input.id) ?? null);
         if (input.id !== undefined && !existing) throw new KpiError('ERR-KPI-02', `tenant ${input.id} not found`);
         if (existing && home.tenantId !== existing.id) throw new KpiError('ERR-KPI-05', `user ${actorUserId} cannot act here`);

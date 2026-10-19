@@ -5,7 +5,7 @@ import { GATEWAY_GROUPS, SYNC_GATEWAY_GROUPS, type DomainEvent } from '../types'
 import { flush, newGateway, rejection } from './gateway.test-util';
 
 const S = SYNTRA.tenantId;
-const hr = SYNTRA.user(SYNTRA.personas.hr);
+const admin = SYNTRA.user(SYNTRA.personas.admin);
 const position = { code: 'P-NEW', name: 'Vị trí mới', jobLevel: 'Staff' as const, status: 'Active' as const };
 
 describe('mock runtime — the contract surface', () => {
@@ -30,7 +30,7 @@ describe('mock runtime — the contract surface', () => {
     for (const [name, owner] of gateway.registry.deferred) {
       const [group, method] = name.split('.');
       const fn = (gateway as unknown as Record<string, Record<string, (...a: unknown[]) => Promise<unknown>>>)[group][method];
-      const error = await rejection(fn(S, hr, {}));
+      const error = await rejection(fn(S, admin, {}));
       expect(error, name).toBeInstanceOf(KpiDeferredError);
       expect((error as KpiDeferredError).owner).toBe(owner);
       expect(error.code).toBe(gateway.registry.methods.get(name) === 'read' ? 'ERR-KPI-01' : 'ERR-KPI-03');
@@ -74,7 +74,7 @@ describe('mock runtime — per-call behaviour', () => {
     const { gateway } = newGateway();
     gateway.dev?.setFailureMode({ enabled: true, methodPattern: 'org.*' });
     expect((await rejection(gateway.org.listRoles(S))).code).toBe('ERR-KPI-01');
-    expect((await rejection(gateway.org.savePosition(S, hr, position))).code).toBe('ERR-KPI-03');
+    expect((await rejection(gateway.org.savePosition(S, admin, position))).code).toBe('ERR-KPI-03');
     await expect(gateway.library.listPerspectives(S)).resolves.toHaveLength(4);
     gateway.dev?.setFailureMode({ enabled: true });
     expect((await rejection(gateway.library.listPerspectives(S))).code).toBe('ERR-KPI-01');
@@ -87,7 +87,7 @@ describe('mock runtime — per-call behaviour', () => {
     const { gateway } = newGateway();
     const before = await gateway.org.listPositions(S);
     gateway.dev?.setFailureMode({ enabled: true, methodPattern: '*.save*' });
-    await rejection(gateway.org.savePosition(S, hr, position));
+    await rejection(gateway.org.savePosition(S, admin, position));
     gateway.dev?.setFailureMode({ enabled: false });
     expect(await gateway.org.listPositions(S)).toEqual(before);
   });
@@ -98,7 +98,7 @@ describe('mock runtime — per-call behaviour', () => {
     units[0].name = 'Đã sửa ngoài gateway';
     expect((await gateway.org.listOrgUnits(S))[0].name).not.toBe('Đã sửa ngoài gateway');
     const payload = { ...position };
-    const pending = gateway.org.savePosition(S, hr, payload);
+    const pending = gateway.org.savePosition(S, admin, payload);
     payload.name = 'Đổi sau khi gọi';
     expect((await pending).name).toBe('Vị trí mới');
   });
@@ -114,7 +114,7 @@ describe('mock runtime — per-call behaviour', () => {
     const goal = (await gateway.goals.listGoals(S, { ownerEmployeeId: SYNTRA.employee('E016') }))[0];
     const [t04] = (await gateway.goals.listPeriods(S, goal.goalPlanId === '' ? '' : SYNTRA.id('PerformanceCycle', '2027'))).filter((p) => p.label === 'T04');
     const input = (v: number) => ({ goalId: goal.id, periodId: t04.id, actualValue: v, actualText: null, note: null });
-    await Promise.all([gateway.actuals.recordActual(S, hr, input(1)), gateway.actuals.recordActual(S, hr, input(2))]);
+    await Promise.all([gateway.actuals.recordActual(S, admin, input(1)), gateway.actuals.recordActual(S, admin, input(2))]);
     const all = await gateway.actuals.listActuals(S, { goalIds: [goal.id], periodId: t04.id, currentOnly: false });
     expect(all).toHaveLength(2);
     expect(all.filter((a) => a.isCurrent)).toHaveLength(1);
@@ -126,11 +126,11 @@ describe('mock runtime — events', () => {
     const { gateway } = newGateway();
     const heard: DomainEvent[] = [];
     const unsubscribe = gateway.events.subscribe(S, (e) => void heard.push(e));
-    const saved = await gateway.org.savePosition(S, hr, position);
+    const saved = await gateway.org.savePosition(S, admin, position);
     expect(heard).toHaveLength(1);
-    expect(heard[0]).toMatchObject({ type: 'entity.changed', tenantId: S, entityName: 'JobPosition', entityId: saved.id, action: 'CREATE', actorUserId: hr, before: null });
+    expect(heard[0]).toMatchObject({ type: 'entity.changed', tenantId: S, entityName: 'JobPosition', entityId: saved.id, action: 'CREATE', actorUserId: admin, before: null });
     unsubscribe();
-    await gateway.org.savePosition(S, hr, { ...saved, name: 'Đổi tên' });
+    await gateway.org.savePosition(S, admin, { ...saved, name: 'Đổi tên' });
     expect(heard).toHaveLength(1);
   });
 
@@ -145,7 +145,7 @@ describe('mock runtime — events', () => {
       throw new Error('async boom');
     });
     gateway.events.subscribe(S, (e) => void heard.push(e.type));
-    await expect(gateway.org.savePosition(S, hr, position)).resolves.toMatchObject({ code: 'P-NEW' });
+    await expect(gateway.org.savePosition(S, admin, position)).resolves.toMatchObject({ code: 'P-NEW' });
     await flush();
     expect(heard).toEqual(['entity.changed']);
     expect(diagnostics).toHaveLength(2);
@@ -154,18 +154,18 @@ describe('mock runtime — events', () => {
   it('writes the audit entry IN the write\'s transaction — even with recordAudit failing', async () => {
     const { gateway } = newGateway();
     gateway.dev?.setFailureMode({ enabled: true, methodPattern: 'system.recordAudit' });
-    const saved = await gateway.org.savePosition(S, hr, position);
+    const saved = await gateway.org.savePosition(S, admin, position);
     gateway.dev?.setFailureMode({ enabled: false });
     const page = await gateway.system.listAuditLog(S, { entityName: 'JobPosition', entityId: saved.id });
     expect(page.items).toHaveLength(1);
-    expect(page.items[0]).toMatchObject({ userId: hr, action: 'CREATE', entityId: saved.id });
+    expect(page.items[0]).toMatchObject({ userId: admin, action: 'CREATE', entityId: saved.id });
   });
 
   it('recordAudit refuses an event of another tenant, and is idempotent', async () => {
     const { gateway } = newGateway();
     const heard: DomainEvent[] = [];
     gateway.events.subscribe(S, (e) => void heard.push(e));
-    await gateway.org.savePosition(S, hr, position);
+    await gateway.org.savePosition(S, admin, position);
     await flush();
     const event = heard[0] as Extract<DomainEvent, { type: 'entity.changed' }>;
     expect((await rejection(gateway.system.recordAudit(DEMO.tenantId, event))).code).toBe('ERR-KPI-06');
@@ -179,7 +179,7 @@ describe('mock runtime — errors are KpiError', () => {
   it('an unexpected throw in a write maps to ERR-KPI-03', async () => {
     const { gateway } = newGateway();
     // A Blob is required: a string makes the method throw its own KpiError…
-    expect((await rejection(gateway.system.uploadFile(S, hr, { fileName: 'a.txt', mimeType: 'text/plain', data: 'x' as unknown as Blob }))).code).toBe('ERR-KPI-06');
+    expect((await rejection(gateway.system.uploadFile(S, admin, { fileName: 'a.txt', mimeType: 'text/plain', data: 'x' as unknown as Blob }))).code).toBe('ERR-KPI-06');
     expect(new KpiError('ERR-KPI-03')).toBeInstanceOf(Error);
   });
 });

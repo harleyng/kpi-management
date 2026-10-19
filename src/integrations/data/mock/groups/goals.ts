@@ -11,6 +11,7 @@ import {
 import type { AlignmentFilter, ChildInput, GoalFilter, GoalPlanFilter, GoalScope, GoalsGateway } from '../../types';
 import { removeRow } from '../integrity';
 import { eqOpt, inList, saveChildren, upsert } from '../rows';
+import { goalResource, planIdResource, planResource } from '../authorize';
 import type { Runtime } from '../runtime';
 import type { Tx } from '../store';
 
@@ -41,7 +42,7 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
   return {
     listCycles: rt.read('goals.listCycles', (tx) => tx.all('PerformanceCycle')),
     getCycle: rt.read('goals.getCycle', (tx, cycleId: Id) => tx.get('PerformanceCycle', cycleId)),
-    saveCycle: rt.write('goals.saveCycle', (tx, input: Parameters<GoalsGateway['saveCycle']>[2]) =>
+    saveCycle: rt.write('goals.saveCycle', { permission: 'cycle.manage' }, (tx, input: Parameters<GoalsGateway['saveCycle']>[2]) =>
       upsert(tx, 'PerformanceCycle', input, { create: () => ({ status: CYCLE_INITIAL_STATUS }) }),
     ),
     setCycleStatus: rt.deferred('goals.setCycleStatus', 'write', 'Phase 1.5 cycleRules (Planning → Active → Evaluating → Closed)'),
@@ -52,11 +53,11 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
         .filter((p) => p.cycleId === cycleId)
         .sort((a, b) => (periodOrder(a) < periodOrder(b) ? -1 : 1));
     }),
-    savePeriods: rt.write('goals.savePeriods', (tx, cycleId: Id, periods: readonly ChildInput<CyclePeriod, 'cycleId'>[]) => {
+    savePeriods: rt.write('goals.savePeriods', { permission: 'cycle.manage' }, (tx, cycleId: Id, periods: readonly ChildInput<CyclePeriod, 'cycleId'>[]) => {
       tx.get('PerformanceCycle', cycleId);
       return saveChildren(tx, 'CyclePeriod', 'cycleId', cycleId, periods);
     }),
-    setPeriodLocked: rt.write('goals.setPeriodLocked', (tx, periodId: Id, locked: boolean) =>
+    setPeriodLocked: rt.write('goals.setPeriodLocked', { permission: 'cycle.manage' }, (tx, periodId: Id, locked: boolean) =>
       tx.update('CyclePeriod', { ...tx.get('CyclePeriod', periodId), isLocked: locked }),
     ),
 
@@ -73,7 +74,7 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
         ),
     ),
     getGoalPlan: rt.read('goals.getGoalPlan', (tx, goalPlanId: Id) => tx.get('GoalPlan', goalPlanId)),
-    createGoalPlan: rt.write('goals.createGoalPlan', (tx, input: Parameters<GoalsGateway['createGoalPlan']>[2]) =>
+    createGoalPlan: rt.write('goals.createGoalPlan', { permission: 'goalplan.edit', resource: (tx, input) => planResource(tx, input) }, (tx, input: Parameters<GoalsGateway['createGoalPlan']>[2]) =>
       upsert(tx, 'GoalPlan', { ...input, id: undefined }, { create: () => ({ status: GOAL_PLAN_INITIAL_STATUS, lockedAt: null }) }),
     ),
     lockGoalPlan: rt.deferred('goals.lockGoalPlan', 'write', 'Phase 1.5 goalPlanRules + workflowRules (lock, BR-KPI-14)'),
@@ -86,8 +87,8 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
         .filter((k) => k.goalPlanId === goalPlanId)
         .sort((a, b) => a.sortOrder - b.sortOrder);
     }),
-    saveKgi: rt.write('goals.saveKgi', (tx, input: Parameters<GoalsGateway['saveKgi']>[2]) => upsert(tx, 'Kgi', input, { create: () => ({}) })),
-    deleteKgi: rt.write('goals.deleteKgi', (tx, kgiId: Id) => {
+    saveKgi: rt.write('goals.saveKgi', { permission: 'goalplan.edit', resource: (tx, input) => planIdResource(tx, input.goalPlanId) }, (tx, input: Parameters<GoalsGateway['saveKgi']>[2]) => upsert(tx, 'Kgi', input, { create: () => ({}) })),
+    deleteKgi: rt.write('goals.deleteKgi', { permission: 'goalplan.edit', resource: (tx, kgiId) => planIdResource(tx, tx.find('Kgi', kgiId)?.goalPlanId) }, (tx, kgiId: Id) => {
       removeRow(tx, 'Kgi', kgiId);
     }),
 
@@ -104,10 +105,10 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
         .sort((a, b) => a.sortOrder - b.sortOrder),
     ),
     getGoal: rt.read('goals.getGoal', (tx, goalId: Id) => tx.get('Goal', goalId)),
-    saveGoal: rt.write('goals.saveGoal', (tx, input: Parameters<GoalsGateway['saveGoal']>[2]) =>
+    saveGoal: rt.write('goals.saveGoal', { permission: 'goalplan.edit', resource: (tx, input) => planIdResource(tx, input.goalPlanId) }, (tx, input: Parameters<GoalsGateway['saveGoal']>[2]) =>
       upsert(tx, 'Goal', input, { create: () => ({ status: GOAL_INITIAL_STATUS, replacesGoalId: null }) }),
     ),
-    deleteGoal: rt.write('goals.deleteGoal', (tx, goalId: Id) => {
+    deleteGoal: rt.write('goals.deleteGoal', { permission: 'goalplan.edit', resource: (tx, goalId) => goalResource(tx, goalId) }, (tx, goalId: Id) => {
       removeRow(tx, 'Goal', goalId);
     }),
 
@@ -115,7 +116,7 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
       const ids = goalIdsOf(tx, scope);
       return tx.all('GoalTargetLevel').filter((l) => ids.has(l.goalId));
     }),
-    setTargetLevels: rt.write('goals.setTargetLevels', (tx, goalId: Id, levels: readonly ChildInput<GoalTargetLevel, 'goalId'>[]) => {
+    setTargetLevels: rt.write('goals.setTargetLevels', { permission: 'goalplan.edit', resource: (tx, goalId) => goalResource(tx, goalId) }, (tx, goalId: Id, levels: readonly ChildInput<GoalTargetLevel, 'goalId'>[]) => {
       tx.get('Goal', goalId);
       return saveChildren(tx, 'GoalTargetLevel', 'goalId', goalId, levels);
     }),
@@ -131,10 +132,10 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
             eqOpt(filter.alignmentType, a.alignmentType),
         ),
     ),
-    saveAlignment: rt.write('goals.saveAlignment', (tx, input: Parameters<GoalsGateway['saveAlignment']>[2]) =>
+    saveAlignment: rt.write('goals.saveAlignment', { permission: 'goalplan.edit', resource: (tx, input) => goalResource(tx, input.childGoalId) }, (tx, input: Parameters<GoalsGateway['saveAlignment']>[2]) =>
       upsert(tx, 'GoalAlignment', input, { create: () => ({}) }),
     ),
-    deleteAlignment: rt.write('goals.deleteAlignment', (tx, alignmentId: Id) => {
+    deleteAlignment: rt.write('goals.deleteAlignment', { permission: 'goalplan.edit', resource: (tx, alignmentId) => goalResource(tx, tx.find('GoalAlignment', alignmentId)?.childGoalId) }, (tx, alignmentId: Id) => {
       removeRow(tx, 'GoalAlignment', alignmentId);
     }),
 
@@ -142,7 +143,7 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
       const ids = goalIdsOf(tx, scope);
       return tx.all('GoalPeriodTarget').filter((t) => ids.has(t.goalId));
     }),
-    setPeriodTargets: rt.write('goals.setPeriodTargets', (tx, goalId: Id, targets: readonly ChildInput<GoalPeriodTarget, 'goalId'>[]) => {
+    setPeriodTargets: rt.write('goals.setPeriodTargets', { permission: 'goalplan.edit', resource: (tx, goalId) => goalResource(tx, goalId) }, (tx, goalId: Id, targets: readonly ChildInput<GoalPeriodTarget, 'goalId'>[]) => {
       tx.get('Goal', goalId);
       return saveChildren(tx, 'GoalPeriodTarget', 'goalId', goalId, targets);
     }),

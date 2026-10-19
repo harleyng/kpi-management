@@ -7,12 +7,12 @@ import type { Runtime } from '../runtime';
 export function libraryGroup(rt: Runtime): LibraryGateway {
   return {
     listPerspectives: rt.read('library.listPerspectives', (tx) => tx.all('BscPerspective').sort((a, b) => a.sortOrder - b.sortOrder)),
-    savePerspective: rt.write('library.savePerspective', (tx, input: Parameters<LibraryGateway['savePerspective']>[2]) =>
+    savePerspective: rt.write('library.savePerspective', { permission: 'library.manage' }, (tx, input: Parameters<LibraryGateway['savePerspective']>[2]) =>
       upsert(tx, 'BscPerspective', input, { create: () => ({}) }),
     ),
 
     listMeasureUnits: rt.read('library.listMeasureUnits', (tx) => tx.all('MeasureUnit')),
-    saveMeasureUnit: rt.write('library.saveMeasureUnit', (tx, input: Parameters<LibraryGateway['saveMeasureUnit']>[2]) =>
+    saveMeasureUnit: rt.write('library.saveMeasureUnit', { permission: 'library.manage' }, (tx, input: Parameters<LibraryGateway['saveMeasureUnit']>[2]) =>
       upsert(tx, 'MeasureUnit', input, { create: () => ({}) }),
     ),
 
@@ -21,7 +21,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
       tx.all('CalcTier').filter((t) => eqOpt(calcMethodId, t.calcMethodId)),
     ),
     saveCalcMethod: rt.write(
-      'library.saveCalcMethod',
+      'library.saveCalcMethod', { permission: 'library.manage' },
       (tx, input: Parameters<LibraryGateway['saveCalcMethod']>[2], tiers: readonly ChildInput<CalcTier, 'calcMethodId'>[]) => {
         const parent = upsert(tx, 'CalcMethod', input, { create: () => ({}) });
         return { parent, children: saveChildren(tx, 'CalcTier', 'calcMethodId', parent.id, tiers) };
@@ -39,7 +39,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
         ),
     ),
     getKpiDefinition: rt.read('library.getKpiDefinition', (tx, kpiDefId: Id) => tx.get('KpiDefinition', kpiDefId)),
-    saveKpiDefinition: rt.write('library.saveKpiDefinition', (tx, input: Parameters<LibraryGateway['saveKpiDefinition']>[2]) =>
+    saveKpiDefinition: rt.write('library.saveKpiDefinition', { permission: 'library.manage' }, (tx, input: Parameters<LibraryGateway['saveKpiDefinition']>[2]) =>
       // `isSystem` is the seed's: a tenant-created item is never a standard one.
       upsert(tx, 'KpiDefinition', input, { create: () => ({ isSystem: false }) }),
     ),
@@ -49,7 +49,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
       tx.all('KpiTemplateItem').filter((i) => eqOpt(templateId, i.templateId)),
     ),
     saveKpiTemplate: rt.write(
-      'library.saveKpiTemplate',
+      'library.saveKpiTemplate', { permission: 'library.manage' },
       (tx, input: Parameters<LibraryGateway['saveKpiTemplate']>[2], items: readonly ChildInput<KpiTemplateItem, 'templateId'>[]) => {
         const parent = upsert(tx, 'KpiTemplate', input, { create: () => ({}) });
         return { parent, children: saveChildren(tx, 'KpiTemplateItem', 'templateId', parent.id, items) };

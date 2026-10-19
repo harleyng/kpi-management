@@ -22,7 +22,7 @@ export function systemGroup(rt: Runtime): SystemGateway {
   const blobKey = (tenantId: Id, fileId: Id) => `${tenantId}/${fileId}`;
 
   return {
-    uploadFile: rt.write('system.uploadFile', (tx, input: UploadFileInput) => {
+    uploadFile: rt.write('system.uploadFile', { permission: 'evidence.upload' }, (tx, input: UploadFileInput) => {
       if (!(input.data instanceof Blob)) throw new KpiError('ERR-KPI-06', 'file data must be a Blob');
       const id = newId();
       const row: FileObject = {
@@ -53,7 +53,7 @@ export function systemGroup(rt: Runtime): SystemGateway {
     }),
 
     listNotificationTemplates: rt.read('system.listNotificationTemplates', (tx) => tx.all('NotificationTemplate')),
-    saveNotificationTemplate: rt.write('system.saveNotificationTemplate', (tx, input: Parameters<SystemGateway['saveNotificationTemplate']>[2]) =>
+    saveNotificationTemplate: rt.write('system.saveNotificationTemplate', { permission: 'notification.manage' }, (tx, input: Parameters<SystemGateway['saveNotificationTemplate']>[2]) =>
       upsert(tx, 'NotificationTemplate', input, { create: () => ({}) }),
     ),
 
@@ -66,7 +66,7 @@ export function systemGroup(rt: Runtime): SystemGateway {
           page,
         ),
     ),
-    markNotificationRead: rt.write('system.markNotificationRead', (tx, notificationId: Id) => {
+    markNotificationRead: rt.write('system.markNotificationRead', 'actor', (tx, notificationId: Id) => {
       const notification = tx.get('Notification', notificationId);
       if (notification.recipientUserId !== tx.ctx.actorUserId) {
         throw new KpiError('ERR-KPI-05', `notification ${notificationId} is not addressed to this user`);

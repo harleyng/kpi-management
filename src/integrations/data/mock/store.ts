@@ -95,6 +95,11 @@ export class Tx {
   private readonly working = new Map<CollectionName, Table>();
   private readonly changeByKey = new Map<string, Change>();
   readonly events: PendingEvent[] = [];
+  /**
+   * The person the actor acts for (a proxy or a delegate) — set by the method body once a workflow
+   * rule has decided it, so the events and audit rows of the write name both people (BR-KPI-22).
+   */
+  onBehalfOfUserId: Id | null = null;
 
   constructor(
     readonly data: TenantData,
