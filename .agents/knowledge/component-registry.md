@@ -140,6 +140,32 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `ActualValue` / `SourceTypeTag` | A value (`—` when none, never 0) / where it came from (icon + label, muted — a category, not a status) |
 | `CycleSelect` / `MonthSelect` | The shared pickers (default: the Active cycle; the latest month ended) |
 | `ActualEntryTab` · `ActualImportTab` · `SyncTab` (+ `ScheduleText`) · `useCycleGoalData` | The three tabs of `/admin/actuals` and the composite read of a cycle's goals with one combined state |
+| `EvidenceAttach` (T5) | "N bằng chứng" popover for one goal in one period: list (file → `getFileUrl`, link), and attach a file or a link when `canAdd`; T4's evidence management (4.4.6) reuses it and adds removal |
+| `toastError` (T5) | `toastError(error)` — a failed write as a toast with the catalogue copy (`errorSpecOf`); the dev toolbar re-exports it |
+| `StatusBadge` additions (T5) | `DelegationStateBadge` (derived state), `PlanAdjustingBadge` ("Đang điều chỉnh") |
+
+## `src/components/forms/` (T5 — the form screens)
+
+| Component / hook | Purpose |
+|---|---|
+| `useFormLookups` | Names (people from the session directory — no second query), periods, cycles, steps for any forms screen |
+| `useFormDetail(formId)` | One form + plan + history + `formStanding` (what this user may do now) + `mayView` |
+| `FormsTable` | The list of forms (inbox, mine, team, HR): subject/type, period, step, step deadline, status + "Quá hạn" — `stepTiming` only, never actor resolution per row |
+| `FormStepStrip` · `FormHistory` | The numbered steps with their state in words · the recorded actions naming both people for proxy / delegation |
+| `FormActionBar` (+ `FormCommentDialog`) | Sticky foot: totals, blocker sentences (catalogue copy + rule data; link to the first row), `standing.actions`, "Lưu nháp"; saves unsaved edits then acts in ONE mutation; stale step → inline notice |
+| `EvaluationFormBody` · `GoalPlanFormBody` · `GoalChangeFormBody` | KPI_EVAL table (editable column next to the goal, `evaluationTotal`, evidence) · registration plan read-only (+ `StartAdjustmentButton`) · thin adjustment proposal editor |
+| `DelegationsPanel` | "Ủy quyền": list with derived state, create (`delegationIssues` first), revoke (`canRevokeDelegation`) |
+| `formCopy.ts` | Titles and the sentences around the rules' answers (`blockerSentences`, `readOnlySentence`, `actingAsSentence`, `returnedSentence`, `formatInUnit`) |
+
+## `src/components/launches/` (T5 — "Khởi chạy phiếu")
+
+| Component | Purpose |
+|---|---|
+| `LaunchesTab` + `LaunchPanel` | Launch list (open forms / cancel a Scheduled one) and the inline "Tạo đợt khởi chạy" panel (`validateLaunch`, `launchTimingIssues`, `cycleAllowsLaunch`) |
+| `LaunchRulesTab` | Recurring rules (inline on/off, edit dialog, `validateLaunchRule`) |
+| `AdminFormsTab` | Every form, keyset-paged by the gateway (Trang trước / Trang sau), filters incl. `?launch=` |
+| `WorkflowsTab` | Step settings per workflow with `validateWorkflow` inline and `workflowEditWarnings` |
+| `RecipientFilterFields` · `recipients.ts` | "Người nhận" ALL / FILTER fields · `EMPTY_RECIPIENT_FILTER`, `recipientSummary` |
 
 ## `src/contexts/`
 
@@ -204,6 +230,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `planAccessRules.ts` (T3) | Above goalPlan + workflow rules: `planEditability` / `planEditabilityFrom` (+ `PlanEditReason`, `UNKNOWN_EDITABILITY`), `submitAvailability(From)` (a `checkAction` dry run), `canSeeGoal` / `visibleGoals` (D2), `planReadiness`, `linkCandidatePlans`, `openRegistrationOf`, `planOwnerOf` |
 | `goalPlanImportRules.ts` (T3) | `GOAL_PLAN_IMPORT_COLUMNS`, `goalPlanImportIssues`, `goalPlanImportDrafts` + the `GoalPlanImportDraft` hand-off type for T4 (BR-KPI-26) |
 | `numberInput.ts` | `parseDecimalInput` (vi-VN `9.600.000.000` / `92,5`; blank → `null`, never 0), `formatDecimalInput` |
+| `formViewRules.ts` (T5) | `formStanding` (what a user may do on a form now — a composition of `workflowRules`, display hint), `submitCheckInput` (THE content-check builder, shared with the mock), `stepTiming`, `delegationState` / `isDelegationRevocable`, `goalDraftFromGoal` / `goalDraftFromKpi`, `workflowEditWarnings`, `actorDirectoryOf` — tested, incl. `formViewRules.parity.test.ts` against the seeded mock |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).
@@ -224,19 +251,17 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | File | Hooks |
 |---|---|
 | `org.ts` | Reads: `useOrgUnits`, `useEmployees(filter)`, `usePositions`, `useAssignments(filter)`, `useUserAccounts`, `useRoles`, `useRolePermissions`, `useUserRoles`, `usePermissions` (each with its `*Key`); `useOrgDirectory` / `useAccessDirectory` (data only when EVERY list loaded — pre-checks never run on a partial list). Writes (T1, one `useOrgMutation` shape: catalogue toast, `issuesOf(error)` for the form, roots invalidated on settle): `useSaveOrgUnit`, `useSavePosition`, `useSaveEmployee`, `useSaveAssignment`, `useSaveUserAccount`, `useSaveUserRole`, `useDeleteUserRole`, `useSetRolePermissions`, `useSaveTenant` (+ tenants), `useResignEmployee` (`ResignError.stage`) — tested |
-| `library.ts` | Reads `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits`, `useCalcMethods`, `useCalcTiers`, `useKpiTemplates`, `useKpiTemplateItems`, `useDataSources` (G4 read kept here until T4), `useLibraryGoalUsage` (root `goals`); writes `useSavePerspective`, `useSaveMeasureUnit`, `useSaveCalcMethod`, `useSaveKpiDefinition`, `useSaveKpiTemplate` — reject to the caller (`mutateAsync`), invalidate their root (+ `*Key`) |
-| `system.ts` (T7) | `useNotificationTemplates` / `useSaveNotificationTemplate`; `useNotifications(unreadOnly)` and `useAuditLog(filter, enabled)` (`useInfiniteQuery` over keyset pages); `useUnreadNotificationCount` (in-app only, `capped` past 500); `useMarkNotificationRead`, `useMarkAllNotificationsRead` (each on its own, rejects with the first failure); `useFile`, `useUploadFile`, `useOpenFile` |
-| `workflows.ts` (T7, read-only) | `useWorkflows(formType?)`, `useWorkflowSteps(workflowId?)` — T5 adds the writes |
-| `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
-| `actuals.ts` (T4) | Reads: `useDataSources`, `useConnections`, `useMappings`, `useSyncRuns`, `useActuals(filter)`, `useImportBatches`, `useImportBatch`, `useEvidence`, `useFileObject`. Writes: `useSaveDataSource`, `useSaveConnection`, `useRecordActual`, `useStageImport` (upload → stage, the file id kept per `File` for a retry, the failing step named), `useCommitImport`, `useRejectImport`, `useRunSync`, `useAddEvidence` (link or file), `useDeleteEvidence`, `useOpenFile` |
-| `goals.ts` (T4 reads; T3 owns) | `useCycles`, `usePeriods`, `useGoalPlans`, `useGoals`, `usePeriodTargets(goalIds)`, `usePeriodTargetsOfPlan` |
+| `library.ts` | Reads `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits`, `useCalcMethods`, `useCalcTiers`, `useKpiTemplates`, `useKpiTemplateItems`, `useLibraryGoalUsage` (root `goals`); writes `useSavePerspective`, `useSaveMeasureUnit`, `useSaveCalcMethod`, `useSaveKpiDefinition`, `useSaveKpiTemplate` — reject to the caller (`mutateAsync`), invalidate their root (+ `*Key`) |
+| `system.ts` (T7) | `useNotificationTemplates` / `useSaveNotificationTemplate`; `useNotifications(unreadOnly)` and `useAuditLog(filter, enabled)` (`useInfiniteQuery` over keyset pages); `useUnreadNotificationCount` (in-app only, `capped` past 500); `useMarkNotificationRead`, `useMarkAllNotificationsRead` (each on its own, rejects with the first failure); `useFile`, `useUploadFile`, `useOpenFile` · `useAuditEntries(filter)` (T3: one record's whole history, own `auditLog/all` key — never the paged key) |
+| `actuals.ts` (T4) | Reads: `useDataSources`, `useConnections`, `useMappings`, `useSyncRuns`, `useActuals(filter)`, `useImportBatches`, `useImportBatch`, `useEvidence`, `useFileObject`. Writes: `useSaveDataSource`, `useSaveConnection`, `useRecordActual`, `useStageImport` (upload → stage, the file id kept per `File` for a retry, the failing step named), `useCommitImport`, `useRejectImport`, `useRunSync`, `useAddEvidence` (link or file), `useDeleteEvidence`, `useOpenFile` · `useAttachEvidence` (T5: upload + record, for the evaluation form) |
 | `results.ts` (T4 read; T6 owns) | `usePeriodResults(filter)` |
 | `writeFeedback.ts` | `toastWriteError(error, step?)` — catalogue title + the rule's own reason (`issueText`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |
-| `goals.ts` (T3) | G3 reads with `*Key` (cycles, periods, plans, KGIs, goals, levels, splits, alignments); `useGoals` = VISIBLE goals (D2), `useGoalRows` = every row for aggregates; writes via `useGatewayWrite` (catalogue toast, refresh on every outcome); `useSaveGoal` (+ `PartialGoalSaveError`), `useCascadeGoal` (+ `CascadeOrphanError`), `useSubmitPlanForm`; composites `usePlanWorkspace`, `usePlanSummaries`, `usePlansEditability`, `useGoalLookups` |
-| `forms.ts` / `actuals.ts` / `system.ts` (T3 reads; T5 / T4 / T7 extend) | `useFormList`, `useWorkflowSteps`, `useDelegations` · `useDataSources` · `useAuditEntries` |
+| `goals.ts` (T3) | G3 reads with `*Key` (cycles, periods, plans, KGIs, goals, levels, splits, alignments); `useGoals` = VISIBLE goals (D2), `useGoalRows` = every row for aggregates; writes via `useGatewayWrite` (catalogue toast, refresh on every outcome); `useSaveGoal` (+ `PartialGoalSaveError`), `useCascadeGoal` (+ `CascadeOrphanError`), `useSubmitPlanForm`; composites `usePlanWorkspace`, `usePlanSummaries`, `usePlansEditability`, `useGoalLookups` · `useAllPeriods` (T5: every cycle's periods, to name a form's period). T4's actuals screens read `useGoals`; T5's form bodies read `useGoalRows` for their own plan |
 | `toasts.ts` | `toastWriteError` (catalogue copy, optional persistent), `toastSaved` |
+| `forms.ts` (T5) | Workflows, launches, launch rules, forms (paged), one form, actions, evaluation items, change items, inbox, delegations — reads with `*Key`; writes invalidate their roots; `useActOnForm` saves `UnsavedEdits` then acts · `useFormList(filter)` (T3: all pages at once, own `forms/all` key). T7's read-only `workflows.ts` was folded in here at the merge |
+| additions | `library.ts` `useCalcMethods`; `org.ts` `usePositions`; `session.ts` `useGatewayClock` (the gateway clock + tenant zone, re-read each render) |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |
 | `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
 

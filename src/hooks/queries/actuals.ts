@@ -229,6 +229,39 @@ export function useDeleteEvidence() {
   });
 }
 
+export type AttachEvidenceInput =
+  | { kind: 'file'; goalId: Id; periodId: Id; file: File; note: string | null }
+  | { kind: 'link'; goalId: Id; periodId: Id; url: string; note: string | null };
+
+/**
+ * The evaluation form's "attach evidence" (T5): a file (uploaded first, then recorded) or a link on a
+ * goal's period. The two writes are not one transaction: an upload whose record then fails leaves an
+ * unused file — the error still reaches the screen, which offers to try again (system-architect, T5; a
+ * database adapter will make it one). The caller toasts the failure.
+ */
+export function useAttachEvidence() {
+  const { tenantId, user } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AttachEvidenceInput) => {
+      const gateway = getDataGateway();
+      const fileId =
+        input.kind === 'file'
+          ? (await gateway.system.uploadFile(tenantId, user.id, { fileName: input.file.name, mimeType: input.file.type || 'application/octet-stream', data: input.file })).id
+          : null;
+      return gateway.actuals.addEvidence(tenantId, user.id, {
+        goalId: input.goalId,
+        periodId: input.periodId,
+        actualId: null,
+        fileId,
+        url: input.kind === 'link' ? input.url : null,
+        note: input.note,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [tenantId, 'evidence'] }),
+  });
+}
+
 /** Opens a stored file (a blob URL in the mock) in a new tab. */
 export function useOpenFile() {
   const { tenantId } = useSession();

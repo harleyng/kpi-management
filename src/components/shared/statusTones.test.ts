@@ -7,6 +7,8 @@ import {
 } from '@/data/types';
 import {
   CYCLE_STATUS_TONE,
+  DELEGATION_STATE_TONE,
+  PLAN_ADJUSTING_TONE,
   FORM_STATUS_TONE,
   GOAL_PLAN_STATUS_TONE,
   PERIOD_RESULT_STATUS_TONE,
@@ -49,6 +51,11 @@ describe('status tones match design-system.md', () => {
 
   it('Period result', () => {
     expect(PERIOD_RESULT_STATUS_TONE).toEqual({ Draft: 'muted', Final: 'info', Locked: 'positive' });
+  });
+
+  it('Delegation (derived): only one granting now is marked', () => {
+    expect(DELEGATION_STATE_TONE).toEqual({ Upcoming: 'muted', Active: 'info', Expired: 'muted', Revoked: 'muted' });
+    expect(PLAN_ADJUSTING_TONE).toBe('info');
   });
 
   it('Record: only Inactive is badged', () => {

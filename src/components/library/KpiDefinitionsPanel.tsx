@@ -9,7 +9,6 @@ import { LibraryStatusBadge } from '@/components/shared/StatusBadge';
 import { LIBRARY_STATUS_LABEL, LIBRARY_STATUSES, type KpiDefinition, type LibraryStatus } from '@/data/types';
 import {
   useCalcMethods,
-  useDataSources,
   useKpiDefinitions,
   useKpiTemplateItems,
   useKpiTemplates,
@@ -17,6 +16,7 @@ import {
   useMeasureUnits,
   usePerspectives,
 } from '@/hooks/queries/library';
+import { useDataSources } from '@/hooks/queries/actuals';
 import { activeTemplatesContaining, libraryUsage } from '@/lib/libraryRules';
 import { combineQueries } from '@/lib/queryState';
 import { matchesSearch } from '@/lib/search';

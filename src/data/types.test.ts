@@ -56,6 +56,7 @@ const LABELLED_SETS: [string, readonly string[], Record<string, string>][] = [
   ['GOAL_CHANGE_TYPES', domain.GOAL_CHANGE_TYPES, domain.GOAL_CHANGE_TYPE_LABEL],
   // Not a status, but the audit log (T7) shows every entity by name.
   ['ENTITY_NAMES', domain.ENTITY_NAMES, domain.ENTITY_NAME_LABEL],
+  ['DELEGATION_STATES', domain.DELEGATION_STATES, domain.DELEGATION_STATE_LABEL],
 ];
 
 /** Sets that are never shown as a status on their own — a subset, or developer-facing names. */

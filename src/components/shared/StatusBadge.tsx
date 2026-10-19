@@ -3,6 +3,7 @@ import { Clock, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   CYCLE_STATUS_LABEL,
+  DELEGATION_STATE_LABEL,
   EMPLOYMENT_STATUS_LABEL,
   GOAL_PLAN_STATUS_LABEL,
   GOAL_STATUS_LABEL,
@@ -15,6 +16,7 @@ import {
   SYNC_RUN_STATUS_LABEL,
   FORM_STATUS_LABEL,
   type CycleStatus,
+  type DelegationState,
   type EmploymentStatus,
   type FormStatus,
   type GoalPlanStatus,
@@ -29,6 +31,7 @@ import {
 } from '@/data/types';
 import {
   CYCLE_STATUS_TONE,
+  DELEGATION_STATE_TONE,
   EMPLOYMENT_STATUS_TONE,
   GOAL_PLAN_STATUS_TONE,
   GOAL_STATUS_TONE,
@@ -37,6 +40,8 @@ import {
   LIBRARY_STATUS_TONE,
   NOTIFICATION_STATUS_TONE,
   OVERDUE_LABEL,
+  PLAN_ADJUSTING_LABEL,
+  PLAN_ADJUSTING_TONE,
   PERIOD_RESULT_STATUS_TONE,
   RECORD_STATUS_TONE,
   SYNC_RUN_STATUS_TONE,
@@ -154,4 +159,14 @@ export function RecordStatusBadge({ status }: { status: RecordStatus }) {
   const tone = RECORD_STATUS_TONE[status];
   if (tone === null) return null;
   return <StatusBadge tone={tone}>{RECORD_STATUS_LABEL[status]}</StatusBadge>;
+}
+
+/** Where a delegation stands today — derived from its dates and `revokedAt` (`formViewRules`). */
+export function DelegationStateBadge({ state }: { state: DelegationState }) {
+  return <StatusBadge tone={DELEGATION_STATE_TONE[state]}>{DELEGATION_STATE_LABEL[state]}</StatusBadge>;
+}
+
+/** Beside a Locked plan's status while an adjustment form is open on it (BR-KPI-15). */
+export function PlanAdjustingBadge() {
+  return <StatusBadge tone={PLAN_ADJUSTING_TONE}>{PLAN_ADJUSTING_LABEL}</StatusBadge>;
 }

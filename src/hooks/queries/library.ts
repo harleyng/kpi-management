@@ -51,6 +51,7 @@ export function useMeasureUnits() {
   });
 }
 
+/** Methods with their tiers' root — the evaluation form reads a goal's method cap (`validateScoreInput`). */
 export const calcMethodsKey = (tenantId: string) => queryKey(tenantId, 'calcMethods');
 
 export function useCalcMethods() {
@@ -97,20 +98,6 @@ export function useKpiTemplateItems() {
   });
 }
 
-/**
- * Data sources — a definition's default source (BR-KPI-76). G4 is track T4's domain; this read lives
- * here until T4's hooks exist, and T4 may move it (keep `dataSourcesKey`'s root `dataSources`).
- */
-export const dataSourcesKey = (tenantId: string) => queryKey(tenantId, 'dataSources');
-
-export function useDataSources() {
-  const { tenantId } = useSession();
-  return useQuery({
-    queryKey: dataSourcesKey(tenantId),
-    queryFn: () => getDataGateway().actuals.listDataSources(tenantId),
-    staleTime: LIBRARY_STALE_MS,
-  });
-}
 
 /**
  * Every goal of the tenant (any status, any cycle) — only for `libraryRules.libraryUsage`, the

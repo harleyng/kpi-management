@@ -7,7 +7,7 @@ import {
   type WorkflowStep,
   type WorkflowTemplate,
 } from '@/data/types';
-import { useWorkflowSteps, useWorkflows } from '@/hooks/queries/workflows';
+import { useWorkflowSteps, useWorkflows } from '@/hooks/queries/forms';
 import { combineQueries } from '@/lib/queryState';
 import { effectiveOverdueBehaviour } from '@/lib/workflowRules';
 

@@ -98,11 +98,13 @@ export const NAV_GROUPS: NavGroup[] = [
 export const HOME_URL = '/my/kpi';
 
 /**
- * Routes of `App.tsx` that no menu item claims and every signed-in user may open: the root redirect
- * and the not-found page. Anything else must be a nav item — `navConfig.test.ts` fails otherwise, so a
- * new page can never be open to everyone by accident.
+ * Routes of `App.tsx` that no menu item claims and every signed-in user may open: the root redirect,
+ * the not-found page, and a form (`/forms/:formId`, T5) — reached from the inbox, the team list, HR's
+ * list and notifications, so no single menu item owns it; the page checks the record itself
+ * (`useFormDetail.mayView`) and the gateway decides every action. Anything else must be a nav item —
+ * `navConfig.test.ts` fails otherwise, so a new page can never be open to everyone by accident.
  */
-export const PUBLIC_PATHS: readonly string[] = ['/', '*'];
+export const PUBLIC_PATHS: readonly string[] = ['/', '*', '/forms/:formId'];
 
 /** Re-exported so the sidebar mark and the favicon agree on the product's glyph family. */
 export const PRODUCT_ICON = Activity;

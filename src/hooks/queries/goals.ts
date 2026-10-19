@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useSession } from '@/contexts/useSession';
 import type {
   BscPerspective,
@@ -105,6 +105,25 @@ export function usePeriods(cycleId: Id | null) {
   });
 }
 
+/**
+ * Every period of every cycle — what a list of forms needs to name each form's period (T5). One query
+ * per cycle under the same `periodsKey` the single-cycle hook uses (a handful of cycles per tenant).
+ */
+export function useAllPeriods(): { data: CyclePeriod[] | undefined; query: QueryState } {
+  const { tenantId } = useSession();
+  const cycles = useCycles();
+  const results = useQueries({
+    queries: (cycles.data ?? []).map((cycle) => ({
+      queryKey: periodsKey(tenantId, cycle.id),
+      queryFn: () => getDataGateway().goals.listPeriods(tenantId, cycle.id),
+      staleTime: CYCLE_STALE_MS,
+    })),
+  });
+  const query = combineQueries([cycles, ...results]);
+  const data = cycles.data && results.every((r) => r.data) ? results.flatMap((r) => r.data ?? []) : undefined;
+  return { data, query };
+}
+
 export function useGoalPlans(filter: GoalPlanFilter = {}, options: { enabled?: boolean } = {}) {
   const { tenantId } = useSession();
   const normalized = filter.ownerEmployeeIds ? { ...filter, ownerEmployeeIds: sortedIds(filter.ownerEmployeeIds) } : filter;
@@ -135,7 +154,11 @@ export function useKgis(goalPlanId: Id | null) {
 
 const normalizeGoalFilter = (filter: GoalFilter): GoalFilter => (filter.goalPlanIds ? { ...filter, goalPlanIds: sortedIds(filter.goalPlanIds) } : filter);
 
-/** EVERY goal row matching `filter` — for aggregates only (totals, buckets). Never render its names. */
+/**
+ * EVERY goal row matching `filter`, unfiltered by visibility — for aggregates (totals, buckets), and for a
+ * FORM's own plan, whose actors are already entitled to the whole plan (its weighted total needs every
+ * goal; T5). Anywhere else, never render its names — use `useGoals`.
+ */
 export function useGoalRows(filter: GoalFilter = {}, options: { enabled?: boolean } = {}) {
   const { tenantId } = useSession();
   const normalized = normalizeGoalFilter(filter);

@@ -546,6 +546,11 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Notification | Queued · Sent · Read · Failed | ERD |
 | Audit action | CREATE · UPDATE · DELETE · LOCK · UNLOCK | ERD |
 | Entity name | the 49 P1 entities, each labelled for the audit log (`ENTITY_NAME_LABEL`) | ERD + D1/D5/D7 |
+| Delegation state — **derived, never stored** | Upcoming · Active · Expired · Revoked (Sắp hiệu lực · Đang hiệu lực · Hết hạn · Đã thu hồi) — from the dates (tenant zone, inclusive) and `revokedAt`, against the gateway clock (`formViewRules.delegationState`) | T5, BR-KPI-21 |
+
+**Derived flags shown beside a status, never a status** (labels in `src/components/shared/statusTones.ts`):
+"Quá hạn" (`OVERDUE_LABEL`, a form past its step deadline — `workflowRules.isOverdue`) and
+"Đang điều chỉnh" (`PLAN_ADJUSTING_LABEL`, a Locked plan with an open GOAL_CHANGE form, BR-KPI-15).
 
 ## 6. Error catalogue
 

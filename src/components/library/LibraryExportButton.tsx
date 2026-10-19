@@ -6,13 +6,13 @@ import { useSession } from '@/contexts/useSession';
 import { BSC_PERSPECTIVE_LABEL } from '@/data/types';
 import {
   useCalcMethods,
-  useDataSources,
   useKpiDefinitions,
   useKpiTemplateItems,
   useKpiTemplates,
   useMeasureUnits,
   usePerspectives,
 } from '@/hooks/queries/library';
+import { useDataSources } from '@/hooks/queries/actuals';
 import { useOrgUnits, usePositions } from '@/hooks/queries/org';
 import { libraryExportRows, templateExportRows } from '@/lib/libraryRules';
 import { downloadBlob } from '@/lib/utils';

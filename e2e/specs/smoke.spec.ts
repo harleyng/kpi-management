@@ -37,7 +37,12 @@ const ROUTES: [path: string, title: string, built?: Landmark][] = [
 ];
 
 /** Routes whose page is built (no "Chưa xây dựng" placeholder any more) — add a track's routes as it lands. */
-const BUILT = new Set(['/system/org', '/system/users', '/my/kpi', '/team/kpi', '/admin/cycles', '/admin/actuals', '/system/data-sources']);
+const BUILT: ReadonlySet<string> = new Set([
+  '/system/org', '/system/users', // T1
+  '/my/kpi', '/team/kpi', '/admin/cycles', // T3
+  '/admin/actuals', '/system/data-sources', // T4
+  '/my/tasks', '/team/reviews', '/admin/launches', // T5
+]);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -121,6 +126,19 @@ test.describe('@smoke app shell', () => {
     await expect(dialog.getByText('Xem nhật ký hệ thống')).toBeVisible();
     await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
     await expect(page.getByText('Đã lưu quyền của vai trò.')).toBeVisible();
+  });
+
+  test('a form opens from HR\'s list of forms (/forms/:formId, T5)', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    await requireSession(page);
+    await becomeAdmin(page);
+    await page.goto('/admin/launches?tab=forms');
+    await page.getByRole('button', { name: /^Mở phiếu Đánh giá KPI của/ }).first().click();
+    await expect(page).toHaveURL(/\/forms\/[^/]+$/);
+    await expect(page.getByRole('heading', { level: 1, name: /^Đánh giá KPI — / })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Các bước của phiếu' })).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test('an unknown address shows the not-found page', async ({ page }) => {

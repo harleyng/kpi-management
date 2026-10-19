@@ -27,6 +27,7 @@ const UsersRolesPage = lazy(() => import('@/pages/UsersRolesPage'));
 const DataSourcesPage = lazy(() => import('@/pages/DataSourcesPage'));
 const NotificationTemplatesPage = lazy(() => import('@/pages/NotificationTemplatesPage'));
 const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
+const FormDetailPage = lazy(() => import('@/pages/FormDetailPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
 const App = () => (
@@ -60,6 +61,9 @@ const App = () => (
       <Route path="/system/data-sources" element={<DataSourcesPage />} />
       <Route path="/system/notification-templates" element={<NotificationTemplatesPage />} />
       <Route path="/system/audit-log" element={<AuditLogPage />} />
+
+      {/* One form, from any list — not a menu item; the page checks the record (T5) */}
+      <Route path="/forms/:formId" element={<FormDetailPage />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Route>

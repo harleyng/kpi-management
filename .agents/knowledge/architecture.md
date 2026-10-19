@@ -93,7 +93,7 @@ who holds every permission and sees all five groups.
 |---|---|---|---|
 | `/` | → redirects to `/my/kpi` | — | — |
 | `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
-| `/my/tasks` | Việc cần xử lý | Của tôi · — (all) | 4.5.5 (T5) |
+| `/my/tasks` | Việc cần xử lý — tabs Cần xử lý · Phiếu của tôi · Ủy quyền (`?tab=`) | Của tôi · — (all) | 4.5.5 (T5) |
 | `/my/results` | Kết quả của tôi | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
 | `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
@@ -101,7 +101,7 @@ who holds every permission and sees all five groups.
 | `/admin/cycles` | Chu kỳ — **built (T3)**: cycles, periods, the cycle's plans with lock / unlock / history, `?cycle=&plan=` | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
 | `/admin/library` | Thư viện KPI — tabs `?tab=` chi-tieu · danh-muc · phuong-phap; filters `q`, `vc`, `tt` in the URL | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 export (T2, built) |
 | `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
-| `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
+| `/admin/launches` | Khởi chạy phiếu — tabs Đợt khởi chạy · Lịch tự khởi chạy · Phiếu · Quy trình (the last only with `cycle.manage`); `?tab=` and `?launch=` in the URL | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
 | `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
 | `/admin/results` | Kết quả & lương | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
 | `/system/org` | Tổ chức | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
@@ -109,6 +109,7 @@ who holds every permission and sees all five groups.
 | `/system/data-sources` | Nguồn dữ liệu | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
 | `/system/notification-templates` | Mẫu thông báo | Hệ thống · `notification.manage` | 4.8.1–4.8.3 (T7) |
 | `/system/audit-log` | Nhật ký | Hệ thống · `audit.view` | 4.8.4 (T7) |
+| `/forms/:formId` | Phiếu (one form: registration, adjustment, evaluation) | not a menu item — `PUBLIC_PATHS`; the page checks the record (`useFormDetail.mayView`), the gateway decides every action | 4.5.2–4.5.4 (T5) |
 | `*` | Không tìm thấy trang | — | — |
 
 The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step. A route still on its

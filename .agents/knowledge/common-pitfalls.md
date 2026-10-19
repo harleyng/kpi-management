@@ -54,6 +54,16 @@ the period's dates, falling back to today — `actualEntryRules` uses the month'
 
 ESLint then fails `no-irregular-whitespace`. JavaScript's `\s` already matches U+00A0 — write `/\s/`, not
 a character class with the escape.
+## 2026-10-19 — A fresh browser's first seed clears the stored session choice
+
+**What happened.** A Playwright script set `kpi.session.v1` (the person to sign in as) before the first
+load; the first page showed that person, the next navigation showed the starting persona. On a browser
+with no `kpi.meta`, the mock seeds itself and clears every `kpi.*` key — including the session choice the
+store had already read into memory.
+**Rule.** In a script or E2E spec, either let the app seed first (open `/` once) or set the session key in
+an init script that runs on EVERY load; or switch person through the top-bar picker as the smoke spec does.
+
+---
 
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 

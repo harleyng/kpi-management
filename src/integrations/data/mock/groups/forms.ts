@@ -2,6 +2,7 @@ import type { Delegation, EvaluationItem, FormInstance, FormLaunch, FormStepActi
 import { cycleAllowsLaunch } from '@/lib/cycleRules';
 import { KpiError, type RuleIssue } from '@/lib/errorCatalog';
 import { COLUMN_FIELDS, validateScoreInput, type CanSubmitInput } from '@/lib/formRules';
+import { submitCheckInput } from '@/lib/formViewRules';
 import { applyGoalChanges, changeItemIssues, planStatusOnEnterStep } from '@/lib/goalPlanRules';
 import { resourceOfSubject } from '@/lib/permissionRules';
 import {
@@ -48,21 +49,17 @@ const SCORE_FIELDS = ['selfAchievementPct', 'selfComment', 'managerAchievementPc
 /** Read-only copies of the actual (BR-KPI-17): never writable through "Lưu nháp". */
 const SNAPSHOT_FIELDS = ['actualSnapshot', 'actualTextSnapshot'] as const;
 
-/** The content check `checkAction` runs on SUBMIT / APPROVE — always built, for the form's type. */
+/**
+ * The content check `checkAction` runs on SUBMIT / APPROVE — always built, for the form's type, by
+ * the same builder the screens use for their blockers (`formViewRules.submitCheckInput`).
+ */
 function submitCheckOf(tx: Tx, form: FormInstance, step: WorkflowStep, steps: readonly WorkflowStep[]): CanSubmitInput {
-  const planGoals = form.goalPlanId ? tx.all('Goal').filter((g) => g.goalPlanId === form.goalPlanId) : [];
-  const kgis = form.goalPlanId ? tx.all('Kgi').filter((k) => k.goalPlanId === form.goalPlanId) : [];
-  switch (form.formType) {
-    case 'KPI_EVAL': {
-      const items = tx.all('EvaluationItem').filter((i) => i.formId === form.id);
-      const goalIds = new Set(items.map((i) => i.goalId));
-      return { formType: 'KPI_EVAL', step, items, goals: tx.all('Goal').filter((g) => goalIds.has(g.id)) };
-    }
-    case 'GOAL_SETTING':
-      return { formType: 'GOAL_SETTING', stepNo: step.stepNo, steps, goals: planGoals, kgis };
-    case 'GOAL_CHANGE':
-      return { formType: 'GOAL_CHANGE', goals: planGoals, changeItems: tx.all('GoalChangeItem').filter((i) => i.formId === form.id), kgis };
-  }
+  return submitCheckInput(form, step, steps, {
+    goals: tx.all('Goal'),
+    kgis: tx.all('Kgi'),
+    items: tx.all('EvaluationItem'),
+    changeItems: tx.all('GoalChangeItem'),
+  });
 }
 
 export function formsGroup(rt: Runtime): FormsGateway {
