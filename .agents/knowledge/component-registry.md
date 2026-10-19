@@ -51,6 +51,32 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SearchInput` | Magnifier-in-a-field; the caller filters (with `foldDiacritics`) |
 | `SectionTitle` | A titled section inside a page body |
 | `CopyButton` | Hover-revealed copy-to-clipboard with an announced confirmation |
+| `EvidenceAttach` (T5) | "N bằng chứng" popover for one goal in one period: list (file → `getFileUrl`, link), and attach a file or a link when `canAdd`; T4's evidence management (4.4.6) reuses it and adds removal |
+| `toastError` (T5) | `toastError(error)` — a failed write as a toast with the catalogue copy (`errorSpecOf`); the dev toolbar re-exports it |
+| `StatusBadge` additions (T5) | `DelegationStateBadge` (derived state), `PlanAdjustingBadge` ("Đang điều chỉnh") |
+
+## `src/components/forms/` (T5 — the form screens)
+
+| Component / hook | Purpose |
+|---|---|
+| `useFormLookups` | Names (people from the session directory — no second query), periods, cycles, steps for any forms screen |
+| `useFormDetail(formId)` | One form + plan + history + `formStanding` (what this user may do now) + `mayView` |
+| `FormsTable` | The list of forms (inbox, mine, team, HR): subject/type, period, step, step deadline, status + "Quá hạn" — `stepTiming` only, never actor resolution per row |
+| `FormStepStrip` · `FormHistory` | The numbered steps with their state in words · the recorded actions naming both people for proxy / delegation |
+| `FormActionBar` (+ `FormCommentDialog`) | Sticky foot: totals, blocker sentences (catalogue copy + rule data; link to the first row), `standing.actions`, "Lưu nháp"; saves unsaved edits then acts in ONE mutation; stale step → inline notice |
+| `EvaluationFormBody` · `GoalPlanFormBody` · `GoalChangeFormBody` | KPI_EVAL table (editable column next to the goal, `evaluationTotal`, evidence) · registration plan read-only (+ `StartAdjustmentButton`) · thin adjustment proposal editor |
+| `DelegationsPanel` | "Ủy quyền": list with derived state, create (`delegationIssues` first), revoke (`canRevokeDelegation`) |
+| `formCopy.ts` | Titles and the sentences around the rules' answers (`blockerSentences`, `readOnlySentence`, `actingAsSentence`, `returnedSentence`, `formatInUnit`) |
+
+## `src/components/launches/` (T5 — "Khởi chạy phiếu")
+
+| Component | Purpose |
+|---|---|
+| `LaunchesTab` + `LaunchPanel` | Launch list (open forms / cancel a Scheduled one) and the inline "Tạo đợt khởi chạy" panel (`validateLaunch`, `launchTimingIssues`, `cycleAllowsLaunch`) |
+| `LaunchRulesTab` | Recurring rules (inline on/off, edit dialog, `validateLaunchRule`) |
+| `AdminFormsTab` | Every form, keyset-paged by the gateway (Trang trước / Trang sau), filters incl. `?launch=` |
+| `WorkflowsTab` | Step settings per workflow with `validateWorkflow` inline and `workflowEditWarnings` |
+| `RecipientFilterFields` · `recipients.ts` | "Người nhận" ALL / FILTER fields · `EMPTY_RECIPIENT_FILTER`, `recipientSummary` |
 
 ## `src/contexts/`
 
@@ -96,6 +122,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
 | `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
+| `formViewRules.ts` (T5) | `formStanding` (what a user may do on a form now — a composition of `workflowRules`, display hint), `submitCheckInput` (THE content-check builder, shared with the mock), `stepTiming`, `delegationState` / `isDelegationRevocable`, `goalDraftFromGoal` / `goalDraftFromKpi`, `workflowEditWarnings`, `actorDirectoryOf` — tested, incl. `formViewRules.parity.test.ts` against the seeded mock |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).
@@ -119,6 +146,10 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |
+| `forms.ts` (T5) | Workflows, launches, launch rules, forms (paged), one form, actions, evaluation items, change items, inbox, delegations — reads with `*Key`; writes invalidate their roots; `useActOnForm` saves `UnsavedEdits` then acts |
+| `goals.ts` (T5 reads) | `useCycles`, `usePeriods`, `useAllPeriods`, `useGoalPlans`, `useGoalPlan`, `useKgis`, `useGoals`, `useTargetLevels` — T3 adds the writes |
+| `actuals.ts` (T5 reads) | `useDataSources`, `useEvidence`, `useAttachEvidence` (upload + record), `useOpenFile` — T4 adds the rest |
+| additions | `library.ts` `useCalcMethods`; `org.ts` `usePositions`; `session.ts` `useGatewayClock` (the gateway clock + tenant zone, re-read each render) |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |
 | `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
 

@@ -40,3 +40,15 @@ export function useEmployees(filter: EmployeeFilter = {}) {
     staleTime: ORG_STALE_MS,
   });
 }
+
+/** Job positions — the launch recipients' "theo chức danh" filter (D5). */
+export const positionsKey = (tenantId: string) => queryKey(tenantId, 'positions');
+
+export function usePositions() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: positionsKey(tenantId),
+    queryFn: () => getDataGateway().org.listPositions(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}

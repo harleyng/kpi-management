@@ -44,3 +44,15 @@ export function useMeasureUnits() {
     staleTime: LIBRARY_STALE_MS,
   });
 }
+
+/** Methods with their tiers' root — the evaluation form reads a goal's method cap (`validateScoreInput`). */
+export const calcMethodsKey = (tenantId: string) => queryKey(tenantId, 'calcMethods');
+
+export function useCalcMethods() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: calcMethodsKey(tenantId),
+    queryFn: () => getDataGateway().library.listCalcMethods(tenantId),
+    staleTime: LIBRARY_STALE_MS,
+  });
+}

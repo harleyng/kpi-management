@@ -1,5 +1,6 @@
 import type {
   CycleStatus,
+  DelegationState,
   EmploymentStatus,
   FormStatus,
   GoalPlanStatus,
@@ -126,3 +127,22 @@ export function formTone(status: FormStatus, atMyStep: boolean): Tone {
  * derived from the deadline and the clock, so it is labelled here rather than in a state set.
  */
 export const OVERDUE_LABEL = 'Quá hạn';
+
+/**
+ * A delegation's derived state (`formViewRules.delegationState`): granting now is the person's
+ * attention (`info`, waiting on the delegate), the rest is history or not yet live.
+ */
+export const DELEGATION_STATE_TONE: Readonly<Record<DelegationState, Tone>> = {
+  Upcoming: 'muted',
+  Active: 'info',
+  Expired: 'muted',
+  Revoked: 'muted',
+};
+
+/**
+ * "Đang điều chỉnh" — a Locked plan with an open adjustment (GOAL_CHANGE). Derived from the open form
+ * (BR-KPI-15), never a plan status, so it is labelled here beside "Quá hạn" — a flag next to the
+ * plan's own status badge.
+ */
+export const PLAN_ADJUSTING_LABEL = 'Đang điều chỉnh';
+export const PLAN_ADJUSTING_TONE: Tone = 'info';

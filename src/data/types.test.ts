@@ -54,6 +54,7 @@ const LABELLED_SETS: [string, readonly string[], Record<string, string>][] = [
   ['NOTIFICATION_STATUSES', domain.NOTIFICATION_STATUSES, domain.NOTIFICATION_STATUS_LABEL],
   ['AUDIT_ACTIONS', domain.AUDIT_ACTIONS, domain.AUDIT_ACTION_LABEL],
   ['GOAL_CHANGE_TYPES', domain.GOAL_CHANGE_TYPES, domain.GOAL_CHANGE_TYPE_LABEL],
+  ['DELEGATION_STATES', domain.DELEGATION_STATES, domain.DELEGATION_STATE_LABEL],
 ];
 
 /** Sets that are never shown as a status on their own — a subset, or developer-facing names. */

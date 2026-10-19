@@ -6,6 +6,43 @@
 
 ---
 
+## 2026-10-19 — T5 screens: one form route, a display-hint rule layer, thin cuts
+
+**Decision.** Track T5 (WBS 4.5.1–4.5.5 + D5) is screens and hooks only — no contract, fixture,
+permission or stored-state change. Product owner (phase 1/2):
+1. One form page, `/forms/:formId`, in `PUBLIC_PATHS`; the page checks its own record (subject, current
+   assignee, someone in its history, `goalplan.view` / `form.proxy` over its owner) — reached from the
+   inbox, the team list, HR's list and (T7) notifications.
+2. `src/lib/formViewRules.ts` composes the existing workflow rules into "what may THIS user do now"
+   (`formStanding`), in the gateway's order (closed → plan not loaded → own review → ACTOR > DELEGATE >
+   PROXY on behalf of the first actor → frozen; CANCEL by the cancel right alone, sent as oneself). It
+   decides nothing new and is a DISPLAY HINT: a gateway refusal is always shown.
+3. The mock's `submitCheckOf` now calls `formViewRules.submitCheckInput`, so the screen's blockers and
+   `forms.act` build the content check from the same rows (a mock-internal refactor, not a contract change).
+4. Thin cuts: workflow configuration edits only step name / SLA / overdue / reminder / requires-comment
+   (a tab on "Khởi chạy phiếu", hidden without `cycle.manage`); the registration form shows the plan
+   read-only (T3 owns the editor); the adjustment editor is thin (CANCEL; MODIFY weight/target; ADD from
+   the library). The launch recipient preview is cut.
+5. Evidence on the evaluation form is read with ONE `listEvidence({ periodId })` and grouped by goal;
+   attaching = `system.uploadFile` then `actuals.addEvidence` (two writes, not atomic — retry on failure).
+
+**Why.** Two places deciding the same thing drift: a button the gateway refuses is a broken screen, a
+hidden button the gateway would accept is a stuck form — `formViewRules.parity.test.ts` runs every seeded
+open form against every relevant account on the mock, both directions, so it cannot happen silently.
+Computing `formStanding` per row of a 500-form list costs actor resolution per row, so lists show only
+`stepTiming` (step, deadline, overdue). A client recipient preview would re-run `resolveRecipients` on a
+client-assembled directory and could disagree with what the launch actually does; the contract does not
+return skipped people, so showing them needs a contract change (known gap for the PO).
+
+**Consequence.** Phase 5: per-user read filtering of forms and delegations is RLS's job (subject,
+assignees, delegates, managers, HR) — the client check is not a boundary; today every browser reads the
+tenant's delegations to resolve standings. `expectedStepId` does not catch a form returned and
+resubmitted back to the same step (low risk, noted). T3 adds a "Mở Goal Plan" link from the registration
+form once its editor route exists; T4 reuses `EvidenceAttach`; T7 links notifications to `/forms/:id`.
+
+**Updated alongside.** `architecture.md` (route table), `business-rules.md` §5 (derived flags),
+`component-registry.md`, `common-pitfalls.md`.
+
 ## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
 
 **Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or

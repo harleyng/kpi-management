@@ -31,6 +31,16 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/audit-log', 'Nhật ký'],
 ];
 
+/**
+ * Routes whose page a Phase 2 track has built — they no longer show the "Chưa xây dựng" placeholder.
+ * A track adds its routes here when it replaces the placeholder.
+ */
+const BUILT: ReadonlySet<string> = new Set([
+  // T5 — Phê duyệt & đánh giá
+  '/my/tasks',
+  '/team/reviews',
+  '/admin/launches',
+]);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -89,10 +99,23 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (!BUILT.has(path)) await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
+
+  test('a form opens from HR\'s list of forms (/forms/:formId, T5)', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    await requireSession(page);
+    await becomeAdmin(page);
+    await page.goto('/admin/launches?tab=forms');
+    await page.getByRole('button', { name: /^Mở phiếu Đánh giá KPI của/ }).first().click();
+    await expect(page).toHaveURL(/\/forms\/[^/]+$/);
+    await expect(page.getByRole('heading', { level: 1, name: /^Đánh giá KPI — / })).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Các bước của phiếu' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 
   test('an unknown address shows the not-found page', async ({ page }) => {
     await requireSession(page);

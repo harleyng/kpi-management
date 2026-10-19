@@ -1062,6 +1062,20 @@ export interface Delegation extends TenantScoped {
   revokedAt: IsoDateTime | null;
 }
 
+/**
+ * Where a delegation stands today — DERIVED, never stored (T5, `formViewRules.delegationState`):
+ * from its dates (tenant zone, both inclusive) and `revokedAt`, against the gateway clock. Like
+ * "Quá hạn" it can never disagree with the clock, so it is not a column.
+ */
+export const DELEGATION_STATES = ['Upcoming', 'Active', 'Expired', 'Revoked'] as const;
+export type DelegationState = (typeof DELEGATION_STATES)[number];
+export const DELEGATION_STATE_LABEL: Readonly<Record<DelegationState, string>> = {
+  Upcoming: 'Sắp hiệu lực',
+  Active: 'Đang hiệu lực',
+  Expired: 'Hết hạn',
+  Revoked: 'Đã thu hồi',
+};
+
 /** D7 — what an adjustment (GOAL_CHANGE) proposes for one goal (BR-KPI-15). */
 export const GOAL_CHANGE_TYPES = ['ADD', 'MODIFY', 'CANCEL'] as const;
 export type GoalChangeType = (typeof GOAL_CHANGE_TYPES)[number];

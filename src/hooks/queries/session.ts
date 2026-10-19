@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSession } from '@/contexts/useSession';
 import { getDataGateway } from '@/integrations/data';
 import type { Id, IsoDateTime } from '@/data/types';
 import { DEFAULT_LATENCY_MS, devActions } from '@/lib/devStore';
+import type { Clock } from '@/lib/isoDate';
 import type { SessionDirectory } from '@/lib/sessionRules';
 import { queryKey, TENANTS_KEY } from './keys';
 
@@ -104,4 +106,14 @@ export function useResetSeed() {
       return queryClient.resetQueries();
     },
   });
+}
+
+/**
+ * The gateway's clock in the tenant's zone, as the time-aware rules take it (`Clock`). Read on every
+ * render, like the session's "today": the dev toolbar's clock moves invalidate every query, so the
+ * screen re-renders and re-reads it — never `new Date()`.
+ */
+export function useGatewayClock(): Clock {
+  const { tenant } = useSession();
+  return { now: readGatewayNow(), tz: tenant.timezone };
 }
