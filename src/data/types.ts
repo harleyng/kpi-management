@@ -217,7 +217,7 @@ export type ScopeType = (typeof SCOPE_TYPES)[number];
 export const SCOPE_TYPE_LABEL: Readonly<Record<ScopeType, string>> = {
   Self: 'Bản thân',
   DirectReports: 'Cấp dưới trực tiếp',
-  OrgUnit: 'Đơn vị',
+  OrgUnit: 'Theo đơn vị',
   Tenant: 'Toàn công ty',
 };
 

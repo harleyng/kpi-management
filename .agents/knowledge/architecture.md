@@ -48,6 +48,10 @@ src/
 │   ├── ui/                 # shadcn primitives — NEVER edited directly; wrap or compose instead
 │   ├── layout/             # AppShell, AppSidebar, TopBar (+ "Dữ liệu giả lập" banner), SidebarAccount,
 │   │                       #   RouteErrorBoundary, navConfig (5 groups by role)
+│   ├── org/                # T1 "Tổ chức": OrgStructureTab, EmployeesTab (+ EmployeeSheet, AssignmentDialog,
+│   │                       #   ResignDialog, ImportActions), PositionsTab, TenantTab, UnitSheet
+│   ├── access/             # T1 "Người dùng & quyền": AccountsTab, AccountSheet, RoleAssignments,
+│   │                       #   PermissionMatrix, RolePermissionSheet, accessContext (rule inputs)
 │   └── shared/             # PageHeader, PlaceholderPanel, EmptyState, ErrorState(Card), ConfirmDialog,
 │                           #   StatusBadge (+ per-set badges, statusTones), DataTable, FormField,
 │                           #   EntityCombobox, KpiPicker, EmployeePicker, OrgUnitTree, Pagination,
@@ -59,7 +63,8 @@ src/
 │   ├── types.ts            # domain types (47 P1 tables + D1–D8) + FIXED STATE SETS with label maps
 │   └── fixtures/           # seed data — the CONTRACT between tracks (Phase 1.2)
 ├── hooks/
-│   └── queries/            # React Query hooks per domain — the only callers of getDataGateway()
+│   ├── queries/            # React Query hooks per domain — the only callers of getDataGateway()
+│   └── useSearchParamState.ts  # one URL query parameter as state (replace, not push)
 ├── integrations/
 │   ├── data/               # DataGateway: types.ts (contract), index.ts, mockGateway.ts + mock/ (Phase 1.2), supabaseGateway.ts (stub)
 │   └── insight/            # InsightGateway: the simulated AI assistant (Phase 3)
@@ -195,6 +200,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `workflowContext.ts` | The workflow methods' shared plumbing: `throwRefusal` / `throwIssues` / `throwDecision` (a rule's answer → `KpiError`), `refOrInvalid` (a payload id → ERR-KPI-06 worded like the integrity check), `directoryOf`, `entitlementCtx`, `assigneesFor`, `assertMayEdit` (EDIT standing + `editRefusal`), `assertPlanEditable` (`canEditPlan` with its context from the rows), `setPlanStatus` (the one plan-status write: LOCK / UNLOCK audit + `goalPlan.statusChanged`), `fireLaunch` (recipients → Draft plans → forms → evaluation items with actual snapshots → Launched → `form.launched`). Decides nothing |
 | `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
+| `groups/orgTx.ts` (T1) | The org writes at TRANSACTION level — `saveOrgUnitTx`, `savePositionTx`, `saveEmployeeTx`, `saveAssignmentTx`, `saveAccountTx`, `saveUserRoleTx`, `deleteUserRoleTx`, `setRolePermissionsTx`. `org.save*` call them, and T4's `commitImport` calls them for an OrgData batch (employees → assignments → accounts) — a method cannot call another. Each: write the rows → `validateTransaction` (references, owners, unique, CHECKs: a foreign id is refused like a missing one BEFORE any rule reads it) → `orgAdminRules` / `accessAdminRules` on the written state vs the stored row → `throwIssues`. Behaviours: **B1** a new primary assignment from D ends the running one on D − 1 (`transferPlan`); **B2** a new account of an employee gets EMPLOYEE / Self (`accountPlan`); **B3** a recorded last working day ends the assignments running past it (`resignationPlan`); `setRolePermissions` writes the DIFF only; every access change passes `accessIssues` (BR-KPI-72) |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
 `groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
@@ -221,6 +227,11 @@ Wired at Gate 1 — workflow lane: `setCycleStatus`, `lockGoalPlan`, `unlockGoal
 `revokeDelegation`. Scoring lane: `calculateResults`, `setAdjustment`, `finalizeResults`, `lockResults`;
 guards on `recordActual`, `saveCalcMethod`, `saveRatingScale`, `savePayoutRule`. Foundation: the
 permission check of every write (above).
+- **T1 guards (after Gate 1)** — the org writes enforce `business-rules.md` §10 through `groups/orgTx.ts`
+  (above) and `platform.saveTenant` enforces `orgAdminRules.tenantIssues` (valid zone, no self-suspend).
+  No method, signature or fixture changed: the frozen surface and seed hash are untouched, and
+  `fixtures/orgGuards.test.ts` pins that every seeded row stays editable. `integrity.assertReferencesResolve`
+  is the commit check's reference half, exported.
 - **Naming** — gateway methods use the short domain noun (`listPositions` for `JobPosition`,
   `listWorkflows` for `WorkflowTemplate`); the types keep the ERD names.
 
@@ -275,7 +286,7 @@ delta Phase 5 applies when it writes the SQL schema.
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed (**done 2026-10-19**, rules wired at Gate 1) · **1.3** session
 + permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (**done 2026-10-19**) →
-**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
+**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel (**T1 built 2026-10-19**, `track/t1`), each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 
 ---

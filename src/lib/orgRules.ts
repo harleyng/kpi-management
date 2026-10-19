@@ -67,6 +67,27 @@ export function wouldCreateUnitCycle(units: readonly OrgUnit[], unitId: Id, newP
   return newParentId === unitId || unitAncestry(newParentId, units).includes(unitId);
 }
 
+/**
+ * Making `managerId` the direct manager of `employeeId` on `date` would close a loop in the reporting
+ * line (A → B → A). Follows the primary lines (`managerOf`, the line the workflow uses) upward from the
+ * proposed manager; `assignments` should not contain the row being replaced. Cycle-safe on bad data.
+ */
+export function wouldCreateReportingCycle(
+  assignments: readonly EmployeeAssignment[],
+  employeeId: Id,
+  managerId: Id | null,
+  date: IsoDate,
+): boolean {
+  const seen = new Set<Id>();
+  let current = managerId;
+  while (current !== null && !seen.has(current)) {
+    if (current === employeeId) return true;
+    seen.add(current);
+    current = managerOf(current, assignments, date);
+  }
+  return false;
+}
+
 /** A `Resigned` employee with no recorded last day is treated as gone. */
 const leftWithoutDate = (e: Employee) => e.employmentStatus === 'Resigned' && e.leftOn === null;
 

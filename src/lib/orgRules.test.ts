@@ -12,6 +12,7 @@ import {
   scopeCoversEmployee,
   scopeSubjectOn,
   unitAncestry,
+  wouldCreateReportingCycle,
   wouldCreateUnitCycle,
 } from './orgRules';
 
@@ -171,5 +172,26 @@ describe('scopeSubjectOn / scopeCoversEmployee', () => {
     expect(scopeCoversEmployee(userRole({ scopeType: 'Tenant' }), gone, ctx('x'))).toBe(false);
     const lastDay = scopeSubjectOn(employee({ id: 'e1', leftOn: '2027-01-10' }), assignments, '2027-01-10');
     expect(lastDay.inScope).toBe(true);
+  });
+});
+
+describe('wouldCreateReportingCycle', () => {
+  const lines = [
+    assignment({ id: 'b', employeeId: 'b', managerEmployeeId: 'a' }),
+    assignment({ id: 'c', employeeId: 'c', managerEmployeeId: 'b' }),
+    assignment({ id: 'old', employeeId: 'a', managerEmployeeId: 'x', isPrimary: false }),
+  ];
+  it.each([
+    ['A reporting to B, who reports to A', 'a', 'b', true],
+    ['A reporting to C, two levels below A', 'a', 'c', true],
+    ['C reporting to A, above it', 'c', 'a', false],
+    ['nobody as manager', 'a', null, false],
+    ['someone with no line', 'a', 'z', false],
+  ] as const)('%s → %s', (_, employeeId, managerId, expected) => {
+    expect(wouldCreateReportingCycle(lines, employeeId, managerId, '2027-04-06')).toBe(expected);
+  });
+  it('stops on a loop already in the data', () => {
+    const loop = [assignment({ id: 'p', employeeId: 'p', managerEmployeeId: 'q' }), assignment({ id: 'q', employeeId: 'q', managerEmployeeId: 'p' })];
+    expect(wouldCreateReportingCycle(loop, 'z', 'p', '2027-04-06')).toBe(false);
   });
 });

@@ -88,3 +88,11 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 |---|---|
 | 21–22 | KGI → CSF → KPI |
 | — | The six implementation steps (strategy → KGI → CSF → KPI → targets → review) |
+
+### Organisation, people and permissions (Track T1)
+
+No source describes the org data rules (assignments, transfers, resignations, unit heads, ending units
+and positions, accounts, role guard rails) or tenant management. Every rule in `business-rules.md` §10
+(BR-KPI-65…73) is a **Syntra decision**, tagged `ASSUMPTION Q19`–`Q24`. The ERD gives only the tables
+(`ORG_UNIT`, `JOB_POSITION`, `EMPLOYEE`, `EMPLOYEE_ASSIGNMENT`, `USER_ACCOUNT`, `ROLE`, `USER_ROLE`).
+

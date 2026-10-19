@@ -30,12 +30,23 @@ function invalid(detail: string): KpiError {
   return new KpiError('ERR-KPI-06', detail);
 }
 
-function validateRow(tx: Tx, c: CollectionName, before: Row | null, after: Row, ctx: CheckContext): void {
-  const spec = SCHEMA[c];
-  for (const r of spec.refs) {
-    for (const id of valuesAt(after, r.path)) {
+/**
+ * The reference half of the commit check, for a guard that reads the rows a payload names BEFORE the
+ * commit (T1's org guards): every id must resolve in the tenant, worded exactly as at commit, so a
+ * rule never runs on — or names — another tenant's id.
+ */
+export function assertReferencesResolve(tx: Tx, c: CollectionName, row: object): void {
+  for (const r of SCHEMA[c].refs) {
+    for (const id of valuesAt(row, r.path)) {
       if (!exists(tx, r.to, id)) throw invalid(`${c}.${r.path}: ${r.to} ${id} not found`);
     }
+  }
+}
+
+function validateRow(tx: Tx, c: CollectionName, before: Row | null, after: Row, ctx: CheckContext): void {
+  const spec = SCHEMA[c];
+  assertReferencesResolve(tx, c, after);
+  for (const r of spec.refs) {
     if (before && r.kind === 'owner') {
       const was = valuesAt(before, r.path).join(',');
       const now = valuesAt(after, r.path).join(',');

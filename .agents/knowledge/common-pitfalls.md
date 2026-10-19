@@ -9,6 +9,14 @@
 
 ---
 
+## 2026-10-19 — A dialog rendered inside a form submits that form, even through a portal
+
+A Radix `Dialog` portals its DOM out of the sheet, but React events bubble through the REACT tree: a
+`<form onSubmit>` inside the dialog, rendered as a child of `EditSheet`'s form, also fires the sheet's
+`onSubmit`. Render dialogs as SIBLINGS of the sheet (`EmployeeSheet`), and `stopPropagation()` in the
+dialog's own submit. Related: a `<p>` (or `BlockedReason` before it became a span) inside
+`FormField`'s hint paragraph is invalid nesting and logs a console error the smoke test fails on.
+
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 
 `clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not

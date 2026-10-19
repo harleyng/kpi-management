@@ -9,6 +9,7 @@
  * form forward must not look alike, so approving confirms in the default colour while deleting
  * confirms in red.
  */
+import type { ReactNode } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,8 @@ interface ConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   body: string;
+  /** What exactly changes, under the body — a list ("Thêm: …", "Bỏ: …"). */
+  details?: ReactNode;
   confirmLabel: string;
   /** Defaults to "Hủy". Name the opposite of the action when "Hủy" would be ambiguous. */
   cancelLabel?: string;
@@ -43,6 +46,7 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   body,
+  details,
   confirmLabel,
   cancelLabel = 'Hủy',
   destructive = false,
@@ -56,6 +60,7 @@ export function ConfirmDialog({
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{body}</AlertDialogDescription>
         </AlertDialogHeader>
+        {details && <div className="text-sm">{details}</div>}
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction

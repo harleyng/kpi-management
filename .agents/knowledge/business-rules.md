@@ -42,7 +42,12 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 | **Proxy / ủy quyền** | Acting on someone else's step (HR as proxy) / a dated delegation of one's own step |
 | **Vai trò (role)** | EMPLOYEE · MANAGER · HR · CNB · BOD · ADMIN — a bundle of permissions, assigned to an account with a scope |
 | **Quyền (permission)** | One capability, `module.action` (`goalplan.lock`, `form.launch`) — §9. Never "who approves this step": that is the step's **actor** (người xử lý bước) |
-| **Phạm vi dữ liệu (scope)** | Whose data a role's permissions reach: Self · DirectReports · OrgUnit (+ children) · Tenant |
+| **Phạm vi dữ liệu (scope)** | Whose data a role's permissions reach: Bản thân (Self) · Cấp dưới trực tiếp · Theo đơn vị (+ đơn vị trực thuộc) · Toàn công ty |
+| **Đơn vị** | Any node of the org tree, whatever its type; "Phòng ban" is only the Department type. Not "Đơn vị tính" (unit of measure, T2) |
+| **Chức danh / Cấp bậc** | Job position (`JobPosition`) / its level (`JobLevel`: Giám đốc … Cộng tác viên). "Giám đốc" is a level, not the BOD role ("Ban điều hành") |
+| **Phân công chính / Kiêm nhiệm** | An employee's primary assignment (unit + position + direct manager, exactly one on any date) / a concurrent one (`isPrimary = false`) |
+| **Quản lý trực tiếp** | The `managerEmployeeId` of a primary assignment — the line the workflow follows. Not the MANAGER role ("Quản lý") |
+| **Điều chuyển** | A transfer: a new primary assignment from a date, which ends the running one the day before (BR-KPI-65) |
 
 ---
 
@@ -162,7 +167,11 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
   ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
   is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
-  pp. 150–155.* Being a step's actor is never a permission (BR-KPI-61).
+  pp. 150–155.* Being a step's actor is never a permission (BR-KPI-61). The line read is the **primary**
+  assignment's manager (`orgRules.managerOf`); a concurrent (kiêm nhiệm) manager is NOT a step actor,
+  although the DirectReports scope (BR-KPI-64) counts every assignment — so such a manager can see the
+  person but has no step to act on (noted at T1, unchanged; a Workflow-lane decision). A transfer (T1)
+  therefore moves the manager steps of open forms to the new manager.
 - **BR-KPI-21** — An action taken **as proxy or under delegation** records both the person who acted
   and the person acted for (and the delegation used). A delegation is valid only for its form type,
   between `validFrom` and `validTo`, and until it is revoked; it stops granting the right the moment it
@@ -325,7 +334,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Set | Values | Source |
 |---|---|---|
 | Record (master data) | Active · Inactive | ERD `status` of org unit, position, account, scale, connection |
-| Tenant | Active · Suspended | ERD |
+| Tenant | Active · Suspended | ERD — Suspended: BR-KPI-73 |
 | Org unit type | Company · Division · Department · Team | ERD "Company/Khoi/PhongBan/Nhom" |
 | Job level | Director · DeptHead · TeamLead · Specialist · Staff · Collaborator | ERD "GĐ/TP/TN/CV/NV/CTV" |
 | Employment | Probation · Official · Resigned | ERD "Thử việc/Chính thức/Nghỉ việc" |
@@ -392,6 +401,12 @@ Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
 | ERR-KPI-11 | Allocations + self-assigned exceed the parent target | inline | Phân giao vượt mục tiêu của chỉ tiêu cha |
 | ERR-KPI-12 | Achievement not computable from the data | inline | Chưa tính được % hoàn thành |
 | ERR-KPI-13 | Invalid scoring configuration (method, tiers, levels, rating scale, payout rule) | inline | Cấu hình tính điểm chưa hợp lệ |
+| ERR-KPI-14 | Ending / deactivating a unit or a position still in use (T1, BR-KPI-69, 70) | inline | Đang được sử dụng, chưa thể ngừng |
+| ERR-KPI-15 | A change that would leave no administrator, take `org.manage`/`user.manage` from ADMIN, lock the actor out, or suspend their own company (T1, BR-KPI-72, 73) | inline | Thao tác này sẽ làm mất quyền quản trị |
+| ERR-KPI-16 | An invalid direct manager: oneself, not employed over the assignment, or a reporting loop (T1, BR-KPI-66) | inline | Quan hệ báo cáo chưa hợp lệ |
+
+T1's rules raise these (and ERR-KPI-06) with a `detail` sub-code; `src/lib/orgIssueCopy.ts` holds the
+sentence shown for each one. Codes from other tracks start at ERR-KPI-17.
 
 Only ERR-KPI-01 and 03 are retried automatically (`isRetryable`). A failed write shows as a toast
 whatever the entry's surface. Rules return `RuleIssue { code, ref, detail, data }` lists (`ref` = the row
@@ -438,6 +453,12 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
+| Q19 | The org guards (assignments, managers, unit heads, ending units and positions, accounts) — no source describes them | §10 as written, a Syntra decision | BR-KPI-65…71 |
+| Q20 | Does a transfer re-route open forms? | Yes — the manager is resolved at the time of the action (BR-KPI-20) | BR-KPI-20, 65 |
+| Q21 | May a direct manager sit outside the employee's unit line? | Yes, with a warning on screen | BR-KPI-66 |
+| Q22 | May a unit with open Goal Plans be ended? | No — refused until the cycle is Closed | BR-KPI-69 |
+| Q23 | May someone with direct reports, or a unit head, resign? | Yes, with a warning; nothing is reassigned by itself | BR-KPI-67, 68 |
+| Q24 | Tenant management in P1? | Edit the current company only (name, code, time zone); no creating, no suspending (a company cannot suspend itself, and nothing could reactivate it) | BR-KPI-73 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 
@@ -497,3 +518,61 @@ The view codes and `delegation.manage` are scope-sensitive (S); `org.view` and `
 Tenant. **ADMIN holds every code** (product owner, 2026-10-19 — a deviation from plan §7.1, where ADMIN saw only
 "Hệ thống"). Permission ids are `perm.<code>`, the same in every tenant. Adding a code after Gate 1 is a Large
 change.
+
+## 10. Organisation and people (Track T1)
+
+Implemented in `src/lib/orgAdminRules.ts` and `src/lib/accessAdminRules.ts` (pure; the screens pre-check
+with them and `mock/groups/orgTx.ts` enforces them). **No source describes these rules** — every one is
+a Syntra decision (`ASSUMPTION Q19`–`Q24`). Each check is **transition-based**: it fires only on the
+change it is about, so a seeded row that predates a rule stays editable (`fixtures/orgGuards.test.ts`
+lists the one exception: E040, whose manager was hired after them).
+
+- **BR-KPI-65 — Assignments.** An assignment lies inside the employment (`hireDate`…`leftOn`), in an
+  Active unit that has not closed by its end, with an Active position; dates in order. An employee has
+  at most one primary assignment on any date (schema). **A transfer** — a new primary row from D, or a
+  row made primary — ends the running primary on D − 1 in the same write (B1); refused (06
+  `PRIMARY_OVERLAP`) when D is not after the running row's start, or another primary already follows.
+  A concurrent assignment ends nothing. A transfer with an end date is refused while the running row
+  extends past it (06 `TRANSFER_BOUNDED` — it would drop the tail). A past row is never rewritten: it is
+  ended and a new one added. The reporting-loop check (BR-KPI-66) looks at the start date only; a loop
+  that a LATER change elsewhere would create is not caught (accepted limit).
+- **BR-KPI-66 — Direct manager.** Not the person themself; employed on every day of the assignment;
+  no loop in the primary reporting line (`orgRules.wouldCreateReportingCycle`) — ERR-KPI-16. A manager
+  outside the employee's unit line is allowed, with a warning (Q21). No manager = the top of the line.
+- **BR-KPI-67 — Unit head.** Employed today and assigned to the unit or a unit below it (06
+  `HEAD_NOT_IN_UNIT`), checked when the head changes. The head is not derived from the reporting line.
+- **BR-KPI-68 — Resignation.** "Nghỉ việc" ⇔ a last working day (`leftOn` ≥ hire date). Recording the
+  last day ends the assignments that run past it, in the same write (B3); it is refused while an
+  assignment starts after it (06 `ASSIGNMENT_AFTER_LEFT_ON`). The login goes Inactive at once, even for
+  a last day in the future (the dialog says so). The screen first sets the
+  person's Active accounts Inactive, THEN records the resignation, so a failure never leaves someone who
+  has left with a live login. Nothing else changes by itself: direct reports, units headed and
+  delegations are listed as a warning (`resignationImpact`); open forms carry on (BR-KPI-24).
+- **BR-KPI-69 — Ending a unit** (Inactive or an end date). Refused (ERR-KPI-14) while it has an Active
+  sub-unit, an assignment running past the end, or a Goal Plan in a cycle that is not Closed. The root
+  unit never ends. A child's type ranks strictly below its parent's (Company > Division > Department >
+  Team; a level may be skipped). A unit cannot move under an Inactive parent.
+- **BR-KPI-70 — Positions.** A position cannot be stopped while an assignment in force today or later
+  uses it (ERR-KPI-14).
+- **BR-KPI-71 — Employees and accounts.** Employee code and email unique, case-insensitively. Login
+  unique case-insensitively (letters, digits, `.`, `_`, `-`). At most one **Active** account per employee
+  (an old Inactive one may stay); no Active account for someone who has left. The employee behind an
+  account never changes. A new account of an employee gets **EMPLOYEE / Self** in the same write (B2,
+  BR-KPI-62), and that row cannot be removed or changed; a system account (no employee) never holds
+  EMPLOYEE.
+- **BR-KPI-72 — Keeping the company administrable.** Refused (ERR-KPI-15) when a change — a role row
+  removed or narrowed, an account deactivated, a role's permissions edited — would leave no Active
+  account holding ADMIN with a company-wide scope, take `org.manage` or `user.manage` from ADMIN, or take
+  `user.manage` from the person making it. Only a LOSS is refused. A role other than EMPLOYEE never has
+  the Self scope; an OrgUnit scope names a unit. `setRolePermissions` writes only the difference.
+- **BR-KPI-73 — The company record.** Only the current company is edited (name, code, valid IANA time
+  zone). **Suspended** means nobody signs in to it (the session switcher lists Active companies only);
+  a company cannot suspend itself (ERR-KPI-15), and P1 has no switch for it (Q24).
+- **Import (WBS 4.1.7).** The template and the row validation are T1's (`orgImportRules`,
+  `src/lib/excel/`); staging and committing an OrgData batch are T4's shared framework (4.4.3), which
+  applies a clean batch through `orgTx` in the order employees → assignments → accounts, as of the
+  gateway clock: a known `employeeCode` (case-insensitive) updates name and email — refused on the row
+  for someone who has left (`EMPLOYEE_LEFT_IMPORT`); a new person's first assignment starts on the later
+  of their hire date and today; a changed unit /
+  position / manager is a transfer from that day; a `login` with no Active account creates one.
+
