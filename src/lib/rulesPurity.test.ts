@@ -13,7 +13,7 @@ const ruleFiles = readdirSync(dir).filter((f) => (/Rules\.ts$/.test(f) || f === 
 
 describe('rule modules read no clock and no randomness of their own', () => {
   it('finds the rule modules', () => {
-    expect(ruleFiles).toEqual(expect.arrayContaining(['calcRules.ts', 'scoreRules.ts', 'workflowRules.ts', 'resultRules.ts', 'actualRules.ts', 'isoDate.ts']));
+    expect(ruleFiles).toEqual(expect.arrayContaining(['calcRules.ts', 'cycleRules.ts', 'scoreRules.ts', 'workflowRules.ts', 'resultRules.ts', 'actualRules.ts', 'isoDate.ts']));
   });
 
   it.each(ruleFiles)('%s', (file) => {

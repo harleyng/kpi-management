@@ -92,7 +92,8 @@ describe('delete policies', () => {
     const { gateway } = newGateway();
     const heard: DomainEvent[] = [];
     gateway.events.subscribe(S, (e) => void heard.push(e));
-    const plan = SYNTRA.id('GoalPlan', cycleId, 'E016');
+    // E030's plan: Draft, its registration open at the employee's step — editable (E016's is Locked).
+    const plan = SYNTRA.id('GoalPlan', cycleId, 'E030');
     const [kgi] = await gateway.goals.listKgis(S, plan);
     const using = (await gateway.goals.listGoals(S, { goalPlanIds: [plan] })).filter((g) => g.kgiId === kgi.id);
     expect(using.length).toBeGreaterThan(0);

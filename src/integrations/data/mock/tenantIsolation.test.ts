@@ -4,7 +4,7 @@ import { seedId } from '@/data/fixtures/ids';
 import { COLLECTION_NAMES, type CollectionName, type TenantSeed } from '@/data/fixtures/types';
 import type { Goal, RecipientFilter } from '@/data/types';
 import { KpiDeferredError } from '@/lib/errorCatalog';
-import type { DataGateway, DomainEvent } from '../types';
+import type { DataGateway, DomainEvent, FormActionInput, NewLaunchInput, StartFormInput } from '../types';
 import { flush, newGateway, rejection, testSeed } from './gateway.test-util';
 import { SCHEMA, type RefSpec } from './schema';
 import { keyOf } from './store';
@@ -211,6 +211,87 @@ const OTHER = new Set([
   'system.recordNotification', 'system.recordAudit',
 ]);
 
+// ═══ Gate 1 workflow lane ════════════════════════════════════════════════════════════════════════
+// (a) Guards wired at Gate 1 answer BEFORE the reference check on Demo Co's rows: its plans are
+// Locked (plan edits → ERR-KPI-04), its only cycle Active (cycle edits → 04), its forms Completed
+// (form edits → 04). A reference case first makes the row writable the way a user would.
+// (b) The methods wired at Gate 1 (formerly deferred) get their own cases below.
+
+const demoWorkflow = (formType: string) => (demo.rows.WorkflowTemplate.find((w) => w.formType === formType) as { id: string }).id;
+const demoStaffPlan = DEMO.id('GoalPlan', 'D003');
+const FAR = '2099-12-31';
+
+async function unlockDemoPlans(gw: DataGateway): Promise<void> {
+  for (const plan of demo.rows.GoalPlan) await gw.goals.unlockGoalPlan(D, demoActor, plan.id, 'Kiểm thử cô lập dữ liệu', FAR);
+}
+
+type Row = Record<string, unknown>;
+type Prepare = (gw: DataGateway) => Promise<(row: Row) => Row>;
+const unlocked: Prepare = async (gw) => {
+  await unlockDemoPlans(gw);
+  return (row) => row;
+};
+const PREPARE: Partial<Record<CollectionName, Prepare>> = {
+  // An Active cycle is not editable (cycleRules): a NEW cycle carries the reference instead.
+  PerformanceCycle: async () => (row) => ({ ...row, id: undefined }),
+  Kgi: unlocked,
+  Goal: unlocked,
+  GoalAlignment: unlocked,
+  GoalPeriodTarget: unlocked,
+  // The seeded adjustment is Completed: open a new one on the (Locked) plan and propose there.
+  GoalChangeItem: async (gw) => {
+    const form = await gw.forms.startForm(D, demoActor, { workflowId: demoWorkflow('GOAL_CHANGE'), subjectEmployeeId: DEMO.employee('D003'), goalPlanId: demoStaffPlan, periodId: null, dueDate: FAR });
+    return (row) => ({ ...row, id: undefined, formId: form.id });
+  },
+};
+
+const demoForm = (key: string) => DEMO.id('FormInstance', key);
+const cancelInput = (o: Partial<FormActionInput> = {}): FormActionInput => ({
+  formId: demoForm('GS'), expectedStepId: dId('WorkflowStep'), action: 'CANCEL', comment: 'Hủy', onBehalfOfUserId: null, delegationId: null, ...o,
+});
+const startInput = (o: Partial<StartFormInput> = {}): StartFormInput => ({
+  workflowId: demoWorkflow('GOAL_CHANGE'), subjectEmployeeId: DEMO.employee('D003'), goalPlanId: demoStaffPlan, periodId: null, dueDate: FAR, ...o,
+});
+const launchInput = (o: Partial<NewLaunchInput> = {}): NewLaunchInput =>
+  ({
+    workflowId: demoWorkflow('KPI_EVAL'), name: 'Đánh giá', cycleId: DEMO.id('PerformanceCycle', '2027'), periodId: DEMO.id('CyclePeriod', 'T02'),
+    dueDays: 7, recipientMode: 'ALL', recipientFilter: null, timing: 'NOW', ...o,
+  }) as NewLaunchInput;
+const filterWith = (field: keyof RecipientFilter, id: string) => launchInput({ recipientMode: 'FILTER', recipientFilter: { ...EMPTY_FILTER, [field]: [id] } });
+
+/** Wired methods that name a row by id: another tenant's row answers ERR-KPI-02 like a missing one. */
+const WORKFLOW_ID_CALLS: Record<string, [CollectionName, ById]> = {
+  'forms.act': ['FormInstance', (gw, id) => gw.forms.act(D, demoActor, cancelInput({ formId: id }))],
+  'forms.saveEvaluationItems': ['FormInstance', (gw, id) => gw.forms.saveEvaluationItems(D, demoActor, id, [])],
+  'forms.cancelLaunch': ['FormLaunch', (gw, id) => gw.forms.cancelLaunch(D, demoActor, id)],
+  'forms.listInbox': ['UserAccount', (gw, id) => gw.forms.listInbox(D, id)],
+  'goals.lockGoalPlan': ['GoalPlan', (gw, id) => gw.goals.lockGoalPlan(D, demoActor, id)],
+  'goals.unlockGoalPlan': ['GoalPlan', (gw, id) => gw.goals.unlockGoalPlan(D, demoActor, id, 'Lý do', FAR)],
+  'goals.setCycleStatus': ['PerformanceCycle', (gw, id) => gw.goals.setCycleStatus(D, demoActor, id, 'Evaluating')],
+};
+
+/** Wired methods whose PAYLOAD names rows: each reference set to a Syntra id → ERR-KPI-06 like a missing one. */
+const WORKFLOW_PAYLOAD_REFS: [string, CollectionName, ById][] = [
+  ['forms.startForm workflowId', 'WorkflowTemplate', (gw, id) => gw.forms.startForm(D, demoActor, startInput({ workflowId: id }))],
+  ['forms.startForm subjectEmployeeId', 'Employee', (gw, id) => gw.forms.startForm(D, demoActor, startInput({ subjectEmployeeId: id }))],
+  ['forms.startForm goalPlanId', 'GoalPlan', (gw, id) => gw.forms.startForm(D, demoActor, startInput({ goalPlanId: id }))],
+  ['forms.startForm periodId', 'CyclePeriod', (gw, id) => gw.forms.startForm(D, demoActor, startInput({ periodId: id }))],
+  ['forms.act onBehalfOfUserId', 'UserAccount', (gw, id) => gw.forms.act(D, demoActor, cancelInput({ onBehalfOfUserId: id }))],
+  ['forms.act delegationId', 'Delegation', (gw, id) => gw.forms.act(D, demoActor, cancelInput({ delegationId: id }))],
+  ['forms.createLaunch workflowId', 'WorkflowTemplate', (gw, id) => gw.forms.createLaunch(D, demoActor, launchInput({ workflowId: id }))],
+  ['forms.createLaunch cycleId', 'PerformanceCycle', (gw, id) => gw.forms.createLaunch(D, demoActor, launchInput({ cycleId: id }))],
+  ['forms.createLaunch periodId', 'CyclePeriod', (gw, id) => gw.forms.createLaunch(D, demoActor, launchInput({ periodId: id }))],
+  ['forms.createLaunch recipientFilter.orgUnitIds', 'OrgUnit', (gw, id) => gw.forms.createLaunch(D, demoActor, filterWith('orgUnitIds', id))],
+  ['forms.createLaunch recipientFilter.positionIds', 'JobPosition', (gw, id) => gw.forms.createLaunch(D, demoActor, filterWith('positionIds', id))],
+  ['forms.createLaunch recipientFilter.employeeIds', 'Employee', (gw, id) => gw.forms.createLaunch(D, demoActor, filterWith('employeeIds', id))],
+];
+
+const WORKFLOW_COVERED = new Set([
+  ...Object.keys(WORKFLOW_ID_CALLS),
+  ...WORKFLOW_PAYLOAD_REFS.map(([name]) => name.split(' ')[0]),
+  'scheduler.runDue', // its own case below: a tick of one tenant touches nothing of another
+]);
+
 describe('tenant isolation — coverage', () => {
   it('covers every method of the contract', () => {
     const { gateway } = newGateway();
@@ -222,6 +303,7 @@ describe('tenant isolation — coverage', () => {
       ...Object.keys(SCORING_ID_WRITES),
       ...gateway.registry.deferred.keys(),
       ...OTHER,
+      ...WORKFLOW_COVERED,
     ]);
     const missing = [...gateway.registry.methods.keys()].filter((m) => !covered.has(m));
     expect(missing).toEqual([]);
@@ -285,7 +367,8 @@ describe('tenant isolation — writes', () => {
     const [, save] = SAVES[c] as [string, Save];
     const targetIds = ref.to === 'Permission' ? [] : syntra.rows[ref.to].map((r) => keyOf(ref.to as CollectionName, r as never));
     const { gateway } = newGateway();
-    await expectSameAsMissing((id) => save(gateway, actorFor(c), withRef(c, ref, id)), targetIds[0], 'ERR-KPI-06');
+    const writable = PREPARE[c] ? await (PREPARE[c] as Prepare)(gateway) : (row: Row) => row;
+    await expectSameAsMissing((id) => save(gateway, actorFor(c), writable(withRef(c, ref, id))), targetIds[0], 'ERR-KPI-06');
   });
 
   it.each(Object.entries(ID_WRITES))('%s on a Syntra row answers like a missing id (ERR-KPI-02)', async (_, [c, write]) => {
@@ -320,6 +403,7 @@ describe('tenant isolation — writes', () => {
     expect((await gateway.library.saveKpiDefinition(D, demoActor, def as never)).isSystem).toBe(true);
     const plan = { ...demoRow('GoalPlan'), status: 'Draft' };
     const goal = { ...demoRow('Goal'), status: 'Cancelled' };
+    await unlockDemoPlans(gateway); // Demo Co's plans are Locked (Gate 1 plan-edit guard)
     expect((await gateway.goals.saveGoal(D, demoActor, goal as never)).status).toBe('Active');
     expect(plan.status).toBe('Draft'); // (createGoalPlan always starts a plan in Draft — groups test)
   });
@@ -354,8 +438,56 @@ describe('tenant isolation — writes', () => {
 
   it('deferred methods reject with KpiDeferredError for every tenant (no isolation case to make yet)', async () => {
     const { gateway } = newGateway();
-    const call = gateway.forms.act as unknown as (...args: unknown[]) => Promise<unknown>;
-    expect(await rejection(call(D, demoActor, {}))).toBeInstanceOf(KpiDeferredError);
+    for (const name of gateway.registry.deferred.keys()) {
+      const [group, method] = name.split('.');
+      const call = (gateway as unknown as Record<string, Record<string, (...args: unknown[]) => Promise<unknown>>>)[group][method];
+      expect(await rejection(call(D, demoActor, {})), name).toBeInstanceOf(KpiDeferredError);
+    }
+  });
+});
+
+describe('tenant isolation — Gate 1 workflow lane (methods wired at Gate 1)', () => {
+  it.each(Object.entries(WORKFLOW_ID_CALLS))('%s with a Syntra id answers like a missing id (ERR-KPI-02)', async (_, [c, call]) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-02');
+  });
+
+  it.each(WORKFLOW_PAYLOAD_REFS)('%s = a Syntra id is refused like a missing id (ERR-KPI-06)', async (_, c, call) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-06');
+  });
+
+  it('a Demo Co inbox holds no Syntra form', async () => {
+    const { gateway } = newGateway();
+    for (const persona of Object.values(DEMO.personas)) expect(foreignIdsIn(await gateway.forms.listInbox(D, DEMO.user(persona)))).toEqual([]);
+  });
+
+  it('a scheduler tick of Demo Co touches, reports and announces nothing of Syntra', async () => {
+    const { gateway } = newGateway();
+    const heard: DomainEvent[] = [];
+    gateway.events.subscribe(S, (e) => void heard.push(e));
+    const before = await gateway.forms.listForms(S, {}, { limit: 500 });
+    gateway.dev?.setNow('2027-06-01T02:00:00.000Z'); // overdue steps, rule firings and reminders everywhere
+    const report = await gateway.scheduler.runDue(D);
+    await flush();
+    expect(foreignIdsIn(report)).toEqual([]);
+    expect(heard).toEqual([]);
+    expect(await gateway.forms.listForms(S, {}, { limit: 500 })).toEqual(before);
+    expect((await rejection(gateway.scheduler.runDue(NOWHERE))).code).toBe('ERR-KPI-02');
+  });
+
+  it('a Syntra actor cannot act, launch, lock or start a form in Demo Co (ERR-KPI-05)', async () => {
+    const { gateway } = newGateway();
+    const syntraHr = SYNTRA.user(SYNTRA.personas.hr);
+    for (const call of [
+      gateway.forms.act(D, syntraHr, cancelInput()),
+      gateway.forms.createLaunch(D, syntraHr, launchInput()),
+      gateway.goals.lockGoalPlan(D, syntraHr, demoStaffPlan),
+      gateway.forms.startForm(D, syntraHr, startInput()),
+      gateway.forms.saveEvaluationItems(D, syntraHr, demoForm('EVAL-T01'), []),
+    ]) {
+      expect((await rejection(call)).code).toBe('ERR-KPI-05');
+    }
   });
 });
 

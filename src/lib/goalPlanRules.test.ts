@@ -211,4 +211,11 @@ describe('adjustment — GOAL_CHANGE (BR-KPI-15)', () => {
     const items = [goalChange({ id: 'a', goalId: 'g1' }), goalChange({ id: 'b', goalId: 'g1' })];
     expect(changeItemIssues(current, items).map((i) => [i.ref, i.detail])).toEqual([['b', 'GOAL_CHANGED_TWICE']]);
   });
+
+  it('a draft ("Lưu nháp") may still lack its reason — only the submit requires it', () => {
+    const noReason = goalChange({ goalId: 'g1', changeType: 'CANCEL', reason: '' });
+    expect(changeItemIssues(current, [noReason], { draft: true })).toEqual([]);
+    expect(changeItemIssues(current, [{ ...noReason, goalId: 'missing' }], { draft: true }).map((i) => i.detail)).toEqual(['GOAL_NOT_ACTIVE']);
+    expect(changeItemIssues(current, [noReason]).map((i) => i.detail)).toEqual(['REASON_REQUIRED']);
+  });
 });

@@ -25,7 +25,17 @@ import {
 import type { CanSubmitInput } from './formRules';
 import {
   TRANSITIONS,
+  assigneesOf,
+  canCancelLaunch,
+  canRevokeDelegation,
+  canStartForm,
   checkAction,
+  delegationIssues,
+  editRefusal,
+  editStanding,
+  launchTimingIssues,
+  markHandled,
+  validateLaunchRule,
   dueScheduledLaunches,
   entitlement,
   isDelegationValid,
@@ -650,5 +660,188 @@ describe('launches (BR-KPI-19, D5)', () => {
       expect(launchRuleFirings([launchRule({ periodType: 'Quarter' })], months, cycles, [], now)).toEqual([]);
       expect(launchRuleFirings([launchRule()], months, cycles, [{ launchRuleId: 'lr1', periodId: 'T01' }], now)).toEqual([]);
     });
+  });
+});
+
+// ─── Gate 1 additions ──────────────────────────────────────────────────────────────────────────
+
+describe('editRefusal — 04 for the state, 05 for the person (BR-KPI-23)', () => {
+  const ctx = (o: Partial<EntitlementContext> = {}): EntitlementContext => ({
+    stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1', clock: CLOCK, ...o,
+  });
+  const me = { actorUserId: 'u-e1', onBehalfOfUserId: null, delegationId: null };
+  const registration = form({ formType: 'GOAL_SETTING', periodId: null, currentStepId: 's2' });
+  const detail = (r: ReturnType<typeof editRefusal>) => (r === null ? null : `${r.code} ${r.detail}`);
+
+  it.each([
+    ['allowed', registration, plan({ status: 'Draft' }), me, null],
+    ['closed form', { ...registration, status: 'Completed' as const, currentStepId: null }, plan(), me, 'ERR-KPI-04 FORM_CLOSED'],
+    ['step without EDIT', form({ currentStepId: 's1' }), null, me, 'ERR-KPI-04 EDIT_NOT_ALLOWED'],
+    ['frozen by an overdue LOCK', { ...registration, overdueHandledAt: CLOCK.now }, plan(), me, 'ERR-KPI-04 FROZEN'],
+    ['frozen by HR\'s lock', registration, plan({ status: 'Locked' }), me, 'ERR-KPI-04 FROZEN'],
+    ['not the step actor', registration, plan(), { ...me, actorUserId: 'u-m2' }, 'ERR-KPI-05 NOT_STEP_ACTOR'],
+  ] as const)('%s → %s', (_, f, p, actor, expected) => {
+    const steps = f.formType === 'GOAL_SETTING' ? reg : evaluationSteps();
+    expect(detail(editRefusal(f, steps, p, actor, ctx()))).toBe(expected);
+  });
+
+  it('mayEditAtCurrentStep is the boolean of editRefusal', () => {
+    expect(mayEditAtCurrentStep(registration, reg, plan(), me, ctx())).toBe(true);
+    expect(mayEditAtCurrentStep(registration, reg, plan({ status: 'Locked' }), me, ctx())).toBe(false);
+  });
+});
+
+describe('editStanding — who an edit is made as, when the call names nobody else', () => {
+  const ctx = (o: Partial<EntitlementContext> = {}): EntitlementContext => ({
+    stepActors: ['u-m1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1', clock: CLOCK, ...o,
+  });
+  const valid = delegation({ fromUserId: 'u-m1', toUserId: 'u-m2', validFrom: '2027-02-01', validTo: '2027-02-10' });
+
+  it('a step actor edits as themself', () => {
+    expect(editStanding(form(), 'u-m1', ctx())).toEqual({ actorUserId: 'u-m1', onBehalfOfUserId: null, delegationId: null });
+  });
+
+  it('a delegate edits for the delegator under the valid delegation', () => {
+    expect(editStanding(form(), 'u-m2', ctx({ delegations: [valid] }))).toEqual({ actorUserId: 'u-m2', onBehalfOfUserId: 'u-m1', delegationId: 'd1' });
+    // expired: falls back to themself, which entitlement refuses
+    expect(editStanding(form(), 'u-m2', ctx({ delegations: [valid], clock: at('2027-02-11T03:00:00.000Z') }))).toMatchObject({ onBehalfOfUserId: null });
+  });
+
+  it('HR with the proxy right edits for the first step actor; never on their own form', () => {
+    expect(editStanding(form(), 'u-hr1', ctx({ actorMayProxy: true }))).toEqual({ actorUserId: 'u-hr1', onBehalfOfUserId: 'u-m1', delegationId: null });
+    expect(editStanding(form(), 'u-hr1', ctx({ actorMayProxy: true, stepActors: [] }))).toMatchObject({ onBehalfOfUserId: null });
+    expect(editStanding(form(), 'u-e1', ctx({ actorMayProxy: true }))).toMatchObject({ onBehalfOfUserId: null });
+  });
+});
+
+describe('markHandled and assigneesOf', () => {
+  it('REMIND only stamps overdueHandledAt; a closed form is left alone', () => {
+    expect(markHandled(form(), CLOCK)).toEqual({ overdueHandledAt: CLOCK.now });
+    expect(markHandled(form({ status: 'Cancelled' }), CLOCK)).toBeNull();
+  });
+
+  it('the assignees are the step actors plus their valid delegates', () => {
+    const d = delegation({ fromUserId: 'u-m1', toUserId: 'u-m2' });
+    expect(assigneesOf(form(), ['u-m1'], [d], CLOCK)).toEqual(['u-m1', 'u-m2']);
+    expect(assigneesOf(form(), ['u-m1'], [d], at('2027-03-01T03:00:00.000Z'))).toEqual(['u-m1']);
+    expect(assigneesOf(form({ status: 'Completed' }), ['u-m1'], [d], CLOCK)).toEqual([]);
+  });
+});
+
+describe('canStartForm — an adjustment, or a unit plan\'s registration, by hand', () => {
+  const locked = plan({ status: 'Locked' });
+  const unitPlan = plan({ id: 'plan-u', ownerType: 'OrgUnit', ownerOrgUnitId: 'sale', ownerEmployeeId: null, status: 'Draft' });
+  const base = (o: Partial<Parameters<typeof canStartForm>[1]> = {}): Parameters<typeof canStartForm>[1] => ({
+    formType: 'GOAL_CHANGE', plan: locked, planOwnerEmployeeId: 'e1', cycle: { status: 'Active' }, forms: [], clock: CLOCK, ...o,
+  });
+  const input = (o: Partial<Parameters<typeof canStartForm>[0]> = {}) => ({ subjectEmployeeId: 'e1', goalPlanId: 'plan1', periodId: null, dueDate: '2027-02-10', ...o });
+  const got = (issues: ReturnType<typeof canStartForm>) => issues.map((i) => `${i.code} ${i.detail}`);
+
+  it('starts an adjustment of a Locked plan for its owner', () => {
+    expect(canStartForm(input(), base())).toEqual([]);
+  });
+
+  it('allows one open adjustment per plan (ERR-KPI-04)', () => {
+    const open = [{ formType: 'GOAL_CHANGE' as const, goalPlanId: 'plan1', status: 'InProgress' as const }];
+    expect(got(canStartForm(input(), base({ forms: open })))).toEqual(['ERR-KPI-04 CHANGE_ALREADY_OPEN']);
+    const closed = [{ ...open[0], status: 'Completed' as const }];
+    expect(canStartForm(input(), base({ forms: closed }))).toEqual([]);
+  });
+
+  it.each([
+    ['an evaluation', input(), base({ formType: 'KPI_EVAL' }), 'ERR-KPI-06 NOT_STARTABLE'],
+    ['a plan not Locked', input(), base({ plan: plan({ status: 'Approved' }) }), 'ERR-KPI-04 PLAN_NOT_LOCKED'],
+    ['no plan', input({ goalPlanId: null }), base({ plan: null }), 'ERR-KPI-06 PLAN_REQUIRED'],
+    ['someone else as subject', input({ subjectEmployeeId: 'm1' }), base(), 'ERR-KPI-06 SUBJECT_NOT_OWNER'],
+    ['a past due date', input({ dueDate: '2027-02-02' }), base(), 'ERR-KPI-06 DUE_DATE_INVALID'],
+    ['a period', input({ periodId: 'T01' }), base(), 'ERR-KPI-06 PERIOD_NOT_ALLOWED'],
+    ['a Closed cycle', input(), base({ cycle: { status: 'Closed' } }), 'ERR-KPI-04 CYCLE_NOT_OPEN'],
+  ])('refuses %s', (_, i, ctx, expected) => {
+    expect(got(canStartForm(i, ctx))).toContain(expected);
+  });
+
+  it('a unit plan\'s registration: for its head, never an Employee plan, never a Locked one, one at a time', () => {
+    const reg0 = base({ formType: 'GOAL_SETTING', plan: unitPlan, planOwnerEmployeeId: 'm1', cycle: { status: 'Planning' } });
+    expect(canStartForm(input({ goalPlanId: 'plan-u', subjectEmployeeId: 'm1' }), reg0)).toEqual([]);
+    expect(got(canStartForm(input({ goalPlanId: 'plan-u', subjectEmployeeId: 'e1' }), reg0))).toEqual(['ERR-KPI-06 SUBJECT_NOT_OWNER']);
+    expect(got(canStartForm(input(), base({ formType: 'GOAL_SETTING', plan: plan() })))).toContain('ERR-KPI-06 EMPLOYEE_PLAN_BY_LAUNCH');
+    expect(got(canStartForm(input({ goalPlanId: 'plan-u', subjectEmployeeId: 'm1' }), { ...reg0, plan: { ...unitPlan, status: 'Locked' } }))).toEqual(['ERR-KPI-04 PLAN_LOCKED']);
+    const open = [{ formType: 'GOAL_SETTING' as const, goalPlanId: 'plan-u', status: 'Open' as const }];
+    expect(got(canStartForm(input({ goalPlanId: 'plan-u', subjectEmployeeId: 'm1' }), { ...reg0, forms: open }))).toEqual(['ERR-KPI-04 REGISTRATION_ALREADY_OPEN']);
+  });
+});
+
+describe('launch timing, cancellation and recurring rules', () => {
+  it('a SCHEDULED launch is in the future; RECURRING comes only from a rule; NOW is always fine', () => {
+    expect(launchTimingIssues({ timing: 'NOW', scheduledAt: '' }, CLOCK)).toEqual([]);
+    expect(launchTimingIssues({ timing: 'SCHEDULED', scheduledAt: '2027-02-03T03:00:01.000Z' }, CLOCK)).toEqual([]);
+    expect(launchTimingIssues({ timing: 'SCHEDULED', scheduledAt: CLOCK.now }, CLOCK).map((i) => i.detail)).toEqual(['SCHEDULE_IN_PAST']);
+    expect(launchTimingIssues({ timing: 'SCHEDULED', scheduledAt: 'tomorrow' }, CLOCK).map((i) => i.detail)).toEqual(['SCHEDULE_INVALID']);
+    expect(launchTimingIssues({ timing: 'RECURRING', scheduledAt: CLOCK.now }, CLOCK).map((i) => i.detail)).toEqual(['RECURRING_BY_RULE_ONLY']);
+  });
+
+  it('only a Scheduled launch can be cancelled', () => {
+    expect(canCancelLaunch(launch({ status: 'Scheduled' }))).toEqual({ ok: true });
+    expect(canCancelLaunch(launch({ status: 'Launched' }))).toEqual({ ok: false, code: 'ERR-KPI-04' });
+    expect(canCancelLaunch(launch({ status: 'Cancelled' }))).toEqual({ ok: false, code: 'ERR-KPI-04' });
+  });
+
+  it('a recurring rule launches the evaluation only, with whole days ≥ 0 and its filter', () => {
+    expect(validateLaunchRule(launchRule(), 'KPI_EVAL')).toEqual([]);
+    const details = (...args: Parameters<typeof validateLaunchRule>) => validateLaunchRule(...args).map((i) => i.detail);
+    expect(details(launchRule(), 'GOAL_SETTING')).toEqual(['RULE_KPI_EVAL_ONLY']);
+    expect(details(launchRule({ offsetDays: 1.5, dueDays: -1 }), 'KPI_EVAL')).toEqual(['OFFSET_DAYS_INVALID', 'DUE_DAYS_INVALID']);
+    expect(details(launchRule({ recipientMode: 'FILTER', recipientFilter: null }), 'KPI_EVAL')).toEqual(['FILTER_REQUIRED']);
+  });
+
+  it('launchRuleFirings also fires for an Evaluating cycle (its last period ends after it moved on)', () => {
+    const firings = launchRuleFirings([launchRule()], months2027(), [{ id: 'c2027', status: 'Evaluating' }], [], at('2027-02-01T03:00:00.000Z'));
+    expect(firings.map((f) => f.periodId)).toEqual(['T01']);
+    expect(launchRuleFirings([launchRule()], months2027(), [{ id: 'c2027', status: 'Closed' }], [], at('2027-02-01T03:00:00.000Z'))).toEqual([]);
+  });
+});
+
+describe('delegations — what saveDelegation and revokeDelegation refuse (BR-KPI-21)', () => {
+  const users = ['m1', 'm2', 'l2', 'hr1'].map((id) => user({ id: `u-${id}`, employeeId: id }));
+  const ctx = (o: Partial<Parameters<typeof delegationIssues>[1]> = {}): Parameters<typeof delegationIssues>[1] => ({ existing: [], users, editingId: null, clock: CLOCK, ...o });
+  const d = (o: Partial<ReturnType<typeof delegation>> = {}) => delegation({ fromUserId: 'u-m1', toUserId: 'u-m2', validFrom: '2027-02-05', validTo: '2027-02-10', ...o });
+  const details = (...args: Parameters<typeof delegationIssues>) => delegationIssues(...args).map((i) => i.detail);
+
+  it('accepts a delegation to an active colleague, today or later', () => {
+    expect(delegationIssues(d(), ctx())).toEqual([]);
+    expect(delegationIssues(d({ validFrom: '2027-01-20', validTo: '2027-02-03' }), ctx())).toEqual([]); // ends today
+  });
+
+  it.each([
+    [d({ toUserId: 'u-m1' }), ctx(), 'SELF_DELEGATION'],
+    [d({ toUserId: 'u-nobody' }), ctx(), 'TO_USER_INVALID'],
+    [d({ toUserId: 'u-l2' }), ctx({ users: users.map((u) => (u.id === 'u-l2' ? { ...u, status: 'Inactive' as const } : u)) }), 'TO_USER_INVALID'],
+    [d({ validTo: '2027-02-04', validFrom: '2027-02-05' }), ctx(), 'DATES_INVALID'],
+    [d({ validFrom: '2027-01-20', validTo: '2027-02-02' }), ctx(), 'VALID_TO_PAST'],
+    // u-m2 already hands their steps to l2 over the same days: m1 → m2 would chain into l2
+    [d(), ctx({ existing: [delegation({ id: 'x', fromUserId: 'u-m2', toUserId: 'u-l2', validFrom: '2027-02-08', validTo: '2027-02-20' })] }), 'DELEGATION_CHAIN'],
+    // u-m1 is hr1's delegate over those days: m1 may not pass it on
+    [d(), ctx({ existing: [delegation({ id: 'x', fromUserId: 'u-hr1', toUserId: 'u-m1', validFrom: '2027-02-01', validTo: '2027-02-05' })] }), 'DELEGATION_CHAIN'],
+    [d(), ctx({ existing: [delegation({ id: 'x', fromUserId: 'u-m1', toUserId: 'u-m2', validFrom: '2027-02-09', validTo: '2027-02-12' })] }), 'DELEGATION_DUPLICATE'],
+  ])('%# → %s (ERR-KPI-06)', (input, c, expected) => {
+    expect(details(input, c)).toContain(expected);
+  });
+
+  it('ignores revoked, non-overlapping, other-type delegations and the one being edited', () => {
+    const others = [
+      delegation({ id: 'r', fromUserId: 'u-m2', toUserId: 'u-l2', validFrom: '2027-02-01', validTo: '2027-02-28', revokedAt: '2027-02-02T00:00:00.000Z' }),
+      delegation({ id: 'n', fromUserId: 'u-m2', toUserId: 'u-l2', validFrom: '2027-02-11', validTo: '2027-02-28' }),
+      delegation({ id: 't', fromUserId: 'u-m2', toUserId: 'u-l2', formType: 'GOAL_SETTING', validFrom: '2027-02-01', validTo: '2027-02-28' }),
+      delegation({ id: 'self', fromUserId: 'u-m1', toUserId: 'u-m2', validFrom: '2027-02-01', validTo: '2027-02-28' }),
+    ];
+    expect(delegationIssues(d(), ctx({ existing: others, editingId: 'self' }))).toEqual([]);
+  });
+
+  it('the delegator or HR may revoke; twice is refused', () => {
+    const live = d();
+    expect(canRevokeDelegation(live, { actorUserId: 'u-m1', actorMayManage: false }, CLOCK)).toEqual({ ok: true });
+    expect(canRevokeDelegation(live, { actorUserId: 'u-hr1', actorMayManage: true }, CLOCK)).toEqual({ ok: true });
+    expect(canRevokeDelegation(live, { actorUserId: 'u-m2', actorMayManage: false }, CLOCK)).toEqual({ ok: false, code: 'ERR-KPI-05' });
+    expect(canRevokeDelegation({ ...live, revokedAt: '2027-02-02T00:00:00.000Z' }, { actorUserId: 'u-m1', actorMayManage: false }, CLOCK)).toEqual({ ok: false, code: 'ERR-KPI-04' });
   });
 });
