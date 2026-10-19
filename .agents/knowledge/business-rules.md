@@ -26,7 +26,7 @@
 > `periodTargetIssues`) and the cascade rules (`alignmentRules.goalAllocationIssues` / `cascadedGoalDraft`).
 > **Track T4 (2026-10-19)** added BR-KPI-53…57 and Q33–Q37: `src/lib/importRules.ts` (the shared import
 > framework), `actualImportRules.ts`, `actualEntryRules.ts`, and the sync / evidence rules in `actualRules.ts`.
-> **Track T6 (2026-10-19)** added the payroll export (BR-KPI-45, `src/lib/payrollRules.ts`, `ASSUMPTION
+> **Track T6 (2026-10-19)** added the payroll export (BR-KPI-81, `src/lib/payrollRules.ts`, `ASSUMPTION
 > Q38`, `Q39`) and the result screens; the glossary below gained the result and pay terms.
 
 ---
@@ -73,7 +73,7 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 | **Quy tắc quy đổi** | A payout rule: rating level → % hưởng lương KPI, for all, a unit or a position (BR-KPI-42) |
 | **% hưởng lương KPI** | The share of the KPI pay component a result earns (`payoutPct`). One term on every screen and in the file; not "% lương" |
 | **Chốt kết quả / khóa kết quả** | Draft → Final (rounded, frozen) / Final → Locked (BR-KPI-43). "Khóa kết quả" is NOT "khóa kỳ" (`CyclePeriod.isLocked`), and "chốt kết quả" is not the evaluation form's step 3 |
-| **Xuất file lương / lịch sử xuất file** | The payroll export (BR-KPI-45) / the list of past exports. Not "bảng lương" — the system holds no salary amounts |
+| **Xuất file lương / lịch sử xuất file** | The payroll export (BR-KPI-81) / the list of past exports. Not "bảng lương" — the system holds no salary amounts |
 
 ---
 
@@ -434,7 +434,7 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   Final result → 04. It does not touch `CyclePeriod.isLocked`. Once the cycle is **Closed**, nothing is
   calculated, adjusted or finalised (04 `CYCLE_CLOSED`), and finalising re-checks that the plan is still
   Approved / Locked (04 `NOT_ELIGIBLE`). Only finalised results are exported to
-  payroll — BR-KPI-45. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
+  payroll — BR-KPI-81. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
 - **BR-KPI-44** — `calculateResults` computes a **Draft** per Approved / Locked plan of the period's
   cycle (`resultRules.buildPeriodResults`); a Final or Locked result is never recomputed (returned
   unchanged); an existing Draft keeps its id and adjustment and gets fresh details. Refused once the
@@ -446,7 +446,7 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   months by the KPI's aggregation (`aggregatePeriodActuals`), the target likewise from the months' split
   targets; a goal flagged `rollUpFromChildren` sums its CASCADE children (`ASSUMPTION Q8`); NO_ACTUAL
   and NOT_COMPUTABLE stay null, never 0.
-- **BR-KPI-45** — **Payroll export** (`results.exportPayroll`, T6; `payrollRules.buildPayrollSheet`).
+- **BR-KPI-81** — **Payroll export** (`results.exportPayroll`, T6; `payrollRules.buildPayrollSheet`).
   **Who:** `result.export` (C&B, ADMIN) — HR finalises but does not export. **Which results:** the
   period's **Employee** results that are **Final or Locked** (`ASSUMPTION Q38`); Drafts and Company /
   OrgUnit results (no payout, BR-KPI-40) are never in the file, and the screen counts what it leaves out.
@@ -464,7 +464,7 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   snapshot; in the mock its bytes live in memory only, so after a reload the record stays and the file
   must be exported again (ERR-KPI-02). *Source: ERD `PAYROLL_EXPORT` (the log only); the sources are
   silent on the file, who exports and when — a Syntra decision (T6, product owner 2026-10-19).*
-- **BR-KPI-46** — **An employee sees their own result's figures only once it is Final or Locked**
+- **BR-KPI-82** — **An employee sees their own result's figures only once it is Final or Locked**
   (`resultView.isShownToEmployee`): a Draft may still be adjusted, so "Kết quả của tôi" shows it as
   "Đang tổng hợp", with no score, rating or payout anywhere on the page. *Source: Syntra decision (T6).*
 
@@ -730,7 +730,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q36 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
 | Q37 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
 | Q38 | Which results may be exported to payroll, and does exporting lock them? | Employee results that are Final OR Locked; exporting changes no status (locking stays HR's separate act) | BR-KPI-43, 45 |
-| Q39 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-45 |
+| Q39 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-81 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

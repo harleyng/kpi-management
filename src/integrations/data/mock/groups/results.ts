@@ -188,7 +188,7 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
         .filter((e) => eqOpt(periodId, e.periodId))
         .sort((a, b) => (a.exportedAt !== b.exportedAt ? (a.exportedAt < b.exportedAt ? 1 : -1) : a.id < b.id ? 1 : -1)),
     ),
-    // BR-KPI-45 — the file is rendered from `payrollRules.buildPayrollSheet` (stored numbers, never
+    // BR-KPI-81 — the file is rendered from `payrollRules.buildPayrollSheet` (stored numbers, never
     // recomputed); exporting writes the file and its record and changes no result.
     exportPayroll: rt.preparedWrite('results.exportPayroll', { permission: 'result.export' }, {
       prepare: (tx, periodId: Id) => {

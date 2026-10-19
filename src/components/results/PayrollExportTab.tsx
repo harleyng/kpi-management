@@ -19,7 +19,7 @@ interface PayrollExportTabProps {
 }
 
 /**
- * "Xuất file lương" (WBS 4.6.4, BR-KPI-45): what the file will hold, the export itself (C&B), and
+ * "Xuất file lương" (WBS 4.6.4, BR-KPI-81): what the file will hold, the export itself (C&B), and
  * every past export of the period. Exporting changes no result's status (`ASSUMPTION Q38`).
  */
 export function PayrollExportTab({ cycle, period }: PayrollExportTabProps) {

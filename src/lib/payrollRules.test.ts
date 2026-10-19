@@ -57,7 +57,7 @@ function sheetOf(d: PayrollData, periodId = 'T01') {
   return outcome.sheet;
 }
 
-describe('isPayrollResult (BR-KPI-45, ASSUMPTION Q38)', () => {
+describe('isPayrollResult (BR-KPI-81, ASSUMPTION Q38)', () => {
   it.each([
     ['Employee', 'Final', true],
     ['Employee', 'Locked', true],

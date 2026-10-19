@@ -94,7 +94,7 @@ who holds every permission and sees all five groups.
 | `/` | → redirects to `/my/kpi` | — | — |
 | `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/tasks` | Việc cần xử lý — tabs Cần xử lý · Phiếu của tôi · Ủy quyền (`?tab=`) | Của tôi · — (all) | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-46) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
+| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-82) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
 | `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
 | `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
@@ -242,7 +242,7 @@ guards: `saveCalcMethod` (`validateCalcMethod`), `saveRatingScale` (`validateRat
 `savePayoutRule` (`validatePayoutRule` + level in scale) — a reference that does not resolve is left to
 the integrity check, so a foreign id still answers like a missing one.
 
-`results.exportPayroll` (T6, BR-KPI-45) is the one method built on **`Runtime.preparedWrite`** — a user
+`results.exportPayroll` (T6, BR-KPI-81) is the one method built on **`Runtime.preparedWrite`** — a user
 write with async work between reading and committing: authorize → `prepare` on an uncommitted
 transaction (`buildPayrollSheet`) → `await produce` outside any transaction (render the workbook) → a
 fresh transaction that authorizes again and re-runs `prepare`; if the answer changed meanwhile (ignoring

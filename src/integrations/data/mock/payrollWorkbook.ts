@@ -4,7 +4,7 @@ import { toZonedLocalInput } from '@/lib/isoDate';
 import { PAYROLL_NOTE_LABEL, type PayrollSheet } from '@/lib/payrollRules';
 
 /**
- * The payroll file (BR-KPI-45, WBS 4.6.4) rendered from `payrollRules.buildPayrollSheet` — what a
+ * The payroll file (BR-KPI-81, WBS 4.6.4) rendered from `payrollRules.buildPayrollSheet` — what a
  * backend would render server-side, so it lives with the adapter. The ONLY module that imports
  * exceljs, and only dynamically: the library is a chunk of its own, never in the app's main bundle.
  *
@@ -14,7 +14,7 @@ import { PAYROLL_NOTE_LABEL, type PayrollSheet } from '@/lib/payrollRules';
 
 export const PAYROLL_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-/** Column headers, in order. Unit names live in the header, never in the cells (BR-KPI-45). */
+/** Column headers, in order. Unit names live in the header, never in the cells (BR-KPI-81). */
 export const PAYROLL_HEADERS = [
   'STT',
   'Mã NV',

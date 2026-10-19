@@ -1,5 +1,5 @@
 /**
- * The payroll hand-off — BR-KPI-45, WBS 4.6.4. Which results a payroll file carries and what each row
+ * The payroll hand-off — BR-KPI-81, WBS 4.6.4. Which results a payroll file carries and what each row
  * says, as pure functions over plain rows: the mock's `results.exportPayroll` builds its file from
  * `buildPayrollSheet`, and the export screen counts with `payrollPreview`, so the two always agree.
  *
@@ -30,7 +30,7 @@ import { subjectAssignment } from './resultRules';
 import { foldDiacritics } from './utils';
 
 /**
- * BR-KPI-45 (`ASSUMPTION Q38`) — a payroll file carries the period's EMPLOYEE results that are Final
+ * BR-KPI-81 (`ASSUMPTION Q38`) — a payroll file carries the period's EMPLOYEE results that are Final
  * or Locked. A Draft is not finalised; a Company / OrgUnit result has no payout (BR-KPI-40).
  */
 export const isPayrollResult = (result: Pick<PeriodResult, 'ownerType' | 'status'>): boolean =>
@@ -157,7 +157,7 @@ const byCodeThenId = (a: PayrollRow, b: PayrollRow): number => {
 };
 
 /**
- * `results.exportPayroll`'s whole decision (BR-KPI-45): one row per Employee result of the period that
+ * `results.exportPayroll`'s whole decision (BR-KPI-81): one row per Employee result of the period that
  * is Final or Locked, sorted by employee code. No such result → ERR-KPI-04 `NO_FINAL_RESULT`; an
  * unknown period → ERR-KPI-02. Exporting changes nothing, so a Closed cycle exports too.
  */

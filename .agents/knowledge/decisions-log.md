@@ -30,7 +30,8 @@ as an array.
 remain: `org.ts`, `writeFeedback.ts`, `toasts.ts`, `notify.ts`); one exceljs loader (four modules load it
 lazily — `excel.test.ts` allow-lists them); one `useOpenFile` (T4's mutation and T7's callback); T1's org
 import and T2's library import onto T4's framework. Phase 3 numbers its assumptions from Q40 and rules
-from BR-KPI-81.
+from BR-KPI-83. (Found after the merge: T6 and T7 had BOTH defined BR-KPI-45/46 in a gap below the
+base maximum; T6's payroll export and employee-visibility rules are now BR-KPI-81 / 82.)
 
 **Updated alongside.** `component-registry.md` (hooks table), `architecture.md` (route table, smoke
 `BUILT` set, deferrals: none), `business-rules.md` §8 (Q19–Q39 in order), `docs/flows/new-flow.md` §4C–4E.
@@ -275,14 +276,14 @@ form once its editor route exists; T4 reuses `EvidenceAttach`; T7 links notifica
 `component-registry.md`, `common-pitfalls.md`.
 ## 2026-10-19 — T6: payroll export takes Final or Locked Employee results, blank % never blocks, status never changes
 
-**Decision.** `results.exportPayroll` is wired (T6, BR-KPI-45): the period's Employee results that are
+**Decision.** `results.exportPayroll` is wired (T6, BR-KPI-81): the period's Employee results that are
 Final OR Locked (`ASSUMPTION Q38`) go into an `.xlsx` (exceljs, dynamically imported by
 `mock/payrollWorkbook.ts` only), every number copied from the stored result; a null payout is a blank cell
 with its reason (`ASSUMPTION Q39`); exporting changes no status, works in a Closed cycle and is repeatable.
 Async work in a mock write goes through the new `Runtime.preparedWrite` (authorize → prepare → await
 render → re-authorize and re-check → commit; `CHANGED_DURING_WRITE`). The rating scale is read-only until
 Q2 is answered; payout rules are editable. An employee sees a result's figures only once it is Final or
-Locked (BR-KPI-46). `primaryAssignmentOn` breaks same-day ties by id. The seed is untouched: no export is
+Locked (BR-KPI-82). `primaryAssignmentOn` breaks same-day ties by id. The seed is untouched: no export is
 seeded, freeze hash unchanged, so no other track is affected.
 
 **Why.** Requiring Locked would make C&B wait on a second HR act although a Final result is already

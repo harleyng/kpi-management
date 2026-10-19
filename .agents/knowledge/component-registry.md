@@ -195,7 +195,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `pagination.ts` | `paginate()`, `serverPageSlice()`, `DEFAULT_PAGE_SIZE`, `PAGE_SIZE_OPTIONS` — tested |
 | `utils.ts` | `cn`, `formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `foldDiacritics`, `downloadBlob`, `downloadUrl` (T6; revokes a blob URL on a timeout) (vi-VN, Asia/Ho_Chi_Minh) |
 | `toastError.ts` (T6) | `toastError(error)` — a failure toast in the catalogue's words (the dev toolbar re-exports it) |
-| `resultView.ts` (T6) | Display mapping for the result screens: `buildResultRows` (one join, Maps), `payoutState`, `statusCounts`, `isShownToEmployee` (BR-KPI-46), `draftSelection`, `formatPoints`, `UNKNOWN_OWNER` — tested |
+| `resultView.ts` (T6) | Display mapping for the result screens: `buildResultRows` (one join, Maps), `payoutState`, `statusCounts`, `isShownToEmployee` (BR-KPI-82), `draftSelection`, `formatPoints`, `UNKNOWN_OWNER` — tested |
 | `sidebarStore.ts` | Zustand: sidebar collapsed (persisted as `kpi.sidebar`) |
 | `devStore.ts` | Zustand, NOT persisted: the dev toolbar's mirror of the mock's settings (`clockOverridden`, `latencyMs`, `failure`), `DEFAULT_LATENCY_MS`, `LATENCY_CHOICES`, `devActions`, `hasActiveOverride` |
 | `permissionRules.ts` | `PERMISSION_CODES` / `PERMISSION_CATALOGUE`, `DEFAULT_ROLE_PERMISSIONS`, `DEFAULT_ROLE_SCOPE`, `permissionId`, `permissionRows`, `defaultRolePermissionRows`, `buildAccessProfile`, **`can`**, `resourceOfOwner`, `resourceOfSubject`, `roleCodesOf`, `visibleNavGroups`, `canOpenPath` — tested (`permissionFixtures.test-util.ts`) |
@@ -246,7 +246,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `goalPlanImportRules.ts` (T3) | `GOAL_PLAN_IMPORT_COLUMNS`, `goalPlanImportIssues`, `goalPlanImportDrafts` + the `GoalPlanImportDraft` hand-off type for T4 (BR-KPI-26) |
 | `numberInput.ts` | `parseDecimalInput` (vi-VN `9.600.000.000` / `92,5`; blank → `null`, never 0), `formatDecimalInput` |
 | `formViewRules.ts` (T5) | `formStanding` (what a user may do on a form now — a composition of `workflowRules`, display hint), `submitCheckInput` (THE content-check builder, shared with the mock), `stepTiming`, `delegationState` / `isDelegationRevocable`, `goalDraftFromGoal` / `goalDraftFromKpi`, `workflowEditWarnings`, `actorDirectoryOf` — tested, incl. `formViewRules.parity.test.ts` against the seeded mock |
-| `payrollRules.ts` (T6) | BR-KPI-45: `isPayrollResult`, `payoutNote` / `PAYROLL_NOTE_LABEL` (Q39), `payrollPreview`, `buildPayrollSheet` (stored numbers only), `payrollFileName` |
+| `payrollRules.ts` (T6) | BR-KPI-81: `isPayrollResult`, `payoutNote` / `PAYROLL_NOTE_LABEL` (Q39), `payrollPreview`, `buildPayrollSheet` (stored numbers only), `payrollFileName` |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).

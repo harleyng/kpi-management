@@ -348,7 +348,7 @@ function periodContext(data: ResultData, periodId: Id): { period: CyclePeriod; c
  * The primary assignment an Employee plan's payout is read for (BR-KPI-24, 42): the one in force on
  * their last working day in the period (`leftOn` when earlier than the period end), else the latest
  * primary one that started by the period end. The payroll file prints the same unit and position
- * (BR-KPI-45), read from the current assignment rows. `null` = not an Employee plan, or no assignment.
+ * (BR-KPI-81), read from the current assignment rows. `null` = not an Employee plan, or no assignment.
  */
 export function subjectAssignment(
   plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeId'>,

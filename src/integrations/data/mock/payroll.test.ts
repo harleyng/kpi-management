@@ -5,7 +5,7 @@ import { flush, newGateway, rejection } from './gateway.test-util';
 import { PAYROLL_MIME_TYPE } from './payrollWorkbook';
 
 /**
- * `results.exportPayroll` (T6, BR-KPI-45): what is written, what is refused, what is announced. What
+ * `results.exportPayroll` (T6, BR-KPI-81): what is written, what is refused, what is announced. What
  * the file SAYS is `payrollRules` (its own tests) and `payrollWorkbook` (round trip).
  */
 
