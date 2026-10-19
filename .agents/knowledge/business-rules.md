@@ -16,7 +16,7 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
-> **Track T4 (2026-10-19)** added BR-KPI-53…57 and Q19–Q23: `src/lib/importRules.ts` (the shared import
+> **Track T4 (2026-10-19)** added BR-KPI-53…57 and Q33–Q37: `src/lib/importRules.ts` (the shared import
 > framework), `actualImportRules.ts`, `actualEntryRules.ts`, and the sync / evidence rules in `actualRules.ts`.
 
 ---
@@ -411,17 +411,17 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   recorded; actuals are snapshots, and only the current one per goal and period counts. Recording an
   actual is refused by ONE rule (`actualRules.actualIssues` = `entryBlockers` + `valueIssues`) that
   manual entry, every import row and every API reading pass through, most important first: the goal's
-  plan is not **Approved / Locked** → ERR-KPI-04 `PLAN_NOT_APPROVED` (`ASSUMPTION Q21`); the period is
+  plan is not **Approved / Locked** → ERR-KPI-04 `PLAN_NOT_APPROVED` (`ASSUMPTION Q35`); the period is
   locked → 04 `PERIOD_LOCKED`; the plan's result for the period is already Final / Locked → 04
   `RESULT_FINAL`; the goal is not Active → 06 `GOAL_NOT_ACTIVE`; the period belongs to another cycle →
   06 `PERIOD_NOT_IN_CYCLE`; the period is a Quarter / Half / Year → 06 `PERIOD_NOT_MONTH` (actuals are
   **monthly**; a longer period adds its months up, so an own quarter actual can never override them —
-  `ASSUMPTION Q22`); the period has not started → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`); nothing
+  `ASSUMPTION Q36`); the period has not started → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`); nothing
   entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number and no text, a TEXT goal
   non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`. A negative number is accepted. Who may
   enter by hand follows §9: `actual.enter` = MANAGER (their units) · HR · C&B · ADMIN — **an employee
   does not enter actuals** in P1; they self-score with evidence on the evaluation form (`ASSUMPTION
-  Q19`). The detail codes' Vietnamese copy is `errorCatalog.ISSUE_DETAIL_COPY`. *Source: ERD
+  Q33`). The detail codes' Vietnamese copy is `errorCatalog.ISSUE_DETAIL_COPY`. *Source: ERD
   `GOAL_ACTUAL`; T4 Phase 1 (product owner, 2026-10-19).*
 - **BR-KPI-53** — **The actuals import** (WBS 4.4.3, `actualImportRules`). Template columns:
   `Mã chỉ tiêu được giao` · `Tên đăng nhập` · `Nhân viên` (reference) · `Mã KPI` · `Tên chỉ tiêu`,
@@ -458,7 +458,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 - **BR-KPI-56** — **The API sync** (WBS 4.4.5, simulated ERP Sale): started by hand (`actual.import`)
   for one **month**. An Inactive connection is refused (04) and records no run. For every Active goal of
   the month's cycle whose KPI the connection maps AND whose source is that connection's: if the current
-  number came from a person (manual or Excel) it is **kept and the goal skipped** (`ASSUMPTION Q23`);
+  number came from a person (manual or Excel) it is **kept and the goal skipped** (`ASSUMPTION Q37`);
   a goal with no numeric month target is skipped; otherwise the reading passes BR-KPI-52 and is
   recorded (`API`, no author) or logged as an error. Run status (`syncRunStatus`): loaded and no error →
   Succeeded; loaded and errors → PartiallyFailed; nothing loaded and errors, or nothing to load at all →
@@ -495,11 +495,11 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
-| Q19 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) | BR-KPI-52 |
-| Q20 | Can C&B upload the import file (`system.uploadFile` needs `evidence.upload`)? | Resolved: yes — a C&B account with an employee record holds EMPLOYEE (BR-KPI-62), whose `evidence.upload` covers a file upload. A C&B system account without an employee could not; none exists | BR-KPI-54, 57 |
-| Q21 | May actuals be recorded for a goal whose plan is not yet Approved / Locked? | No — refused (ERR-KPI-04 `PLAN_NOT_APPROVED`). A plan HR reopens takes no new actual until re-approved | BR-KPI-52 |
-| Q22 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
-| Q23 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
+| Q33 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) | BR-KPI-52 |
+| Q34 | Can C&B upload the import file (`system.uploadFile` needs `evidence.upload`)? | Resolved: yes — a C&B account with an employee record holds EMPLOYEE (BR-KPI-62), whose `evidence.upload` covers a file upload. A C&B system account without an employee could not; none exists | BR-KPI-54, 57 |
+| Q35 | May actuals be recorded for a goal whose plan is not yet Approved / Locked? | No — refused (ERR-KPI-04 `PLAN_NOT_APPROVED`). A plan HR reopens takes no new actual until re-approved | BR-KPI-52 |
+| Q36 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
+| Q37 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

@@ -35,7 +35,7 @@ describe('actualIssues — what recordActual, every import row and every sync re
     expect(actualIssues(input({ actual: { actualValue: 5, actualText: '  ' } }))).toEqual([]); // blank text is no text
   });
 
-  it('a plan that is not Approved / Locked → ERR-KPI-04 PLAN_NOT_APPROVED (ASSUMPTION Q21)', () => {
+  it('a plan that is not Approved / Locked → ERR-KPI-04 PLAN_NOT_APPROVED (ASSUMPTION Q35)', () => {
     for (const planStatus of ['Draft', 'Submitted', 'Returned'] as const) {
       expect(details({ planStatus })).toEqual(['ERR-KPI-04 PLAN_NOT_APPROVED']);
     }
@@ -60,7 +60,7 @@ describe('actualIssues — what recordActual, every import row and every sync re
     expect(details({ goalCycleId: 'c2026' })).toEqual(['ERR-KPI-06 PERIOD_NOT_IN_CYCLE']);
   });
 
-  it('a Quarter / Half / Year → ERR-KPI-06 PERIOD_NOT_MONTH (ASSUMPTION Q22: longer periods add their months up)', () => {
+  it('a Quarter / Half / Year → ERR-KPI-06 PERIOD_NOT_MONTH (ASSUMPTION Q36: longer periods add their months up)', () => {
     for (const periodType of ['Quarter', 'Half', 'Year'] as const) {
       expect(details({ period: { ...month, periodType } })).toEqual(['ERR-KPI-06 PERIOD_NOT_MONTH']);
     }
@@ -157,7 +157,7 @@ describe('canRejectImport — only a Validating batch (BR-KPI-54), still exporte
 describe('the API sync (BR-KPI-56)', () => {
   const source = (sourceType: GoalActual['sourceType']) => ({ sourceType });
 
-  it('keeps a person\'s number (manual or Excel) and replaces only its own earlier reading (ASSUMPTION Q23)', () => {
+  it('keeps a person\'s number (manual or Excel) and replaces only its own earlier reading (ASSUMPTION Q37)', () => {
     expect(syncKeepsHumanActual(null)).toBe(false);
     expect(syncKeepsHumanActual(source('API'))).toBe(false);
     expect(syncKeepsHumanActual(source('MANUAL'))).toBe(true);

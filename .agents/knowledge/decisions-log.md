@@ -8,16 +8,16 @@
 
 ## 2026-10-19 — Track T4: actuals enter by one rule, imports commit whole, the sync never overwrites a person
 
-**Decision.** Product owner (T4 Phase 1–2): an employee does not enter actuals (Q19); only Approved /
-Locked plans take actuals (Q21); actuals are monthly only (Q22); the API sync skips a goal whose current
-number a person entered (Q23). Manual entry, every Excel row and every API reading pass ONE rule
+**Decision.** Product owner (T4 Phase 1–2): an employee does not enter actuals (Q33); only Approved /
+Locked plans take actuals (Q35); actuals are monthly only (Q36); the API sync skips a goal whose current
+number a person entered (Q37). Manual entry, every Excel row and every API reading pass ONE rule
 (`actualRules.actualIssues` = `entryBlockers` + `valueIssues`). The import framework (`importRules`,
 `ImportUploadCard`, `ImportPreview`, `mock/imports.ts` handlers) is shared: a file with cell errors is
 stopped in the browser; a staged batch commits whole, re-validated at commit, or not at all; a corrected
 file is a new batch. Row-error details store the issue CODE (`ImportRowError.detail`), rendered by
 `issueText` from `ISSUE_DETAIL_COPY` — the frozen type was NOT widened (an optional field breaks the
 "`T | null`, never `?:`" convention and the seed hash). exceljs loads only inside `src/lib/excel.ts`.
-Q20 (C&B cannot upload the file) turned out moot: C&B's EMPLOYEE role holds `evidence.upload`.
+Q34 (C&B cannot upload the file) turned out moot: C&B's EMPLOYEE role holds `evidence.upload`.
 
 **Why.** Three paths with three copies of "may this number be recorded" drift on the first rule change —
 a quarter actual accepted by the import but refused by hand would silently override the summed months
@@ -30,7 +30,7 @@ way to tell which. Storing rendered Vietnamese in a batch would freeze today's c
 is PartiallyFailed on the seed (7 refused readings — a useful demo). T1/T2/T3 add their import type by a
 spec, a `src/lib/import<Thing>Rules.ts` validator and a handler; they delete their deferral.
 
-**Updated alongside.** `business-rules.md` (BR-KPI-52…57, Q19–Q23), `architecture.md` (Imports, mock
+**Updated alongside.** `business-rules.md` (BR-KPI-52…57, Q33–Q37), `architecture.md` (Imports, mock
 table, track deferrals), `component-registry.md`, `common-pitfalls.md`, `docs/flows/new-flow.md` (§4C,
 §6, §7), `docs/source-map.md` (HR pp. 24, 75–80), plan §5.3 note.
 

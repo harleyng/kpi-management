@@ -58,9 +58,9 @@ export function actualsGroup(rt: Runtime): ActualsGateway {
      * The simulated ERP Sale connector for one month (WBS 4.4.5, BR-KPI-56). The connection and the
      * period name rows of the tenant (another tenant's answers ERR-KPI-02 like a missing one); an
      * Inactive connection refuses with 04 and records NO run (nothing ran); a Quarter / Half / Year is
-     * 06 (actuals are monthly, `ASSUMPTION Q22`). Then, for each Active goal of the period's cycle
+     * 06 (actuals are monthly, `ASSUMPTION Q36`). Then, for each Active goal of the period's cycle
      * whose KPI the connection maps and whose source IS this connection's: a goal holding a person's
-     * number is skipped (`ASSUMPTION Q23`); else the ERP's reading is checked by `actualIssues` and
+     * number is skipped (`ASSUMPTION Q37`); else the ERP's reading is checked by `actualIssues` and
      * recorded (API) or logged as an error. One run row, started = finished = now; its status from
      * `syncRunStatus`.
      */

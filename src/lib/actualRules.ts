@@ -9,7 +9,7 @@ import { ruleIssue, type IssueDetail, type RuleIssue } from './errorCatalog';
 
 export { canRejectImport } from './importRules';
 
-/** A plan takes actuals only once it is agreed (`ASSUMPTION Q21`). */
+/** A plan takes actuals only once it is agreed (`ASSUMPTION Q35`). */
 export const PLAN_STATUSES_TAKING_ACTUALS: readonly GoalPlanStatus[] = ['Approved', 'Locked'];
 
 export interface ActualEntryInput {
@@ -34,14 +34,14 @@ const blank = (text: string | null) => text === null || text.trim() === '';
 /**
  * Why NOTHING can be entered for this goal and period, whatever the value — what the entry screen
  * shows before anyone types (most important first):
- * 1. the plan is not Approved / Locked → ERR-KPI-04 PLAN_NOT_APPROVED (`ASSUMPTION Q21`);
+ * 1. the plan is not Approved / Locked → ERR-KPI-04 PLAN_NOT_APPROVED (`ASSUMPTION Q35`);
  * 2. the period is locked for actuals → 04 PERIOD_LOCKED;
  * 3. the plan's result for the period is already Final / Locked → 04 RESULT_FINAL (BR-KPI-43);
  * 4. the goal is not Active (Changed / Cancelled) → 06 GOAL_NOT_ACTIVE;
  * 5. the period belongs to another cycle → 06 PERIOD_NOT_IN_CYCLE;
  * 6. the period is a Quarter / Half / Year → 06 PERIOD_NOT_MONTH — actuals are monthly and a longer
  *    period adds its months up (`aggregatePeriodActuals`), so an own quarter actual can never
- *    silently override them (`ASSUMPTION Q22`);
+ *    silently override them (`ASSUMPTION Q36`);
  * 7. the period has not started → 06 PERIOD_NOT_STARTED (`ASSUMPTION Q18`).
  */
 export function entryBlockers(input: Omit<ActualEntryInput, 'actual'>): RuleIssue[] {
@@ -93,7 +93,7 @@ export function currentActual<A extends Pick<GoalActual, 'goalId' | 'periodId' |
 
 /**
  * A sync never overwrites a number a person put there: when the current snapshot came from manual
- * entry or an Excel batch, the reading is skipped (`ASSUMPTION Q23`). Over its own earlier reading
+ * entry or an Excel batch, the reading is skipped (`ASSUMPTION Q37`). Over its own earlier reading
  * (API) the latest wins.
  */
 export function syncKeepsHumanActual(current: Pick<GoalActual, 'sourceType'> | null): boolean {

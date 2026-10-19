@@ -155,7 +155,7 @@ export function defaultCycle<C extends Pick<PerformanceCycle, 'status' | 'startD
   return byStart.find((c) => c.status === 'Active') ?? byStart.find((c) => c.status === 'Evaluating') ?? byStart[0] ?? null;
 }
 
-/** A cycle's months in order — actuals are entered per month only (`ASSUMPTION Q22`). */
+/** A cycle's months in order — actuals are entered per month only (`ASSUMPTION Q36`). */
 export function monthsOf<P extends Pick<CyclePeriod, 'periodType' | 'startDate'>>(periods: readonly P[]): P[] {
   return periods.filter((p) => p.periodType === 'Month').sort((a, b) => (a.startDate < b.startDate ? -1 : 1));
 }

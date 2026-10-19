@@ -58,7 +58,7 @@ describe('actuals.recordActual (WBS 4.4.2) — the matrix and the rules', () => 
     expect(history).toHaveLength(before.length + 1);
   });
 
-  it('an employee cannot enter actuals (ASSUMPTION Q19); a manager can, within their unit only', async () => {
+  it('an employee cannot enter actuals (ASSUMPTION Q33); a manager can, within their unit only', async () => {
     const { gateway } = newGateway();
     const [own] = await numericGoalsOf(gateway, 'E016');
     const input = { goalId: own.id, periodId: T03, actualValue: 1, actualText: null, note: null };
@@ -68,7 +68,7 @@ describe('actuals.recordActual (WBS 4.4.2) — the matrix and the rules', () => 
     expect((await rejection(gateway.actuals.recordActual(S, manager, { ...input, goalId: elsewhere.id }))).code).toBe('ERR-KPI-05');
   });
 
-  it('refuses a goal of a plan HR reopened (PLAN_NOT_APPROVED, Q21) and a quarter (PERIOD_NOT_MONTH, Q22)', async () => {
+  it('refuses a goal of a plan HR reopened (PLAN_NOT_APPROVED, Q35) and a quarter (PERIOD_NOT_MONTH, Q36)', async () => {
     const { gateway } = newGateway();
     const [reopened] = await numericGoalsOf(gateway, 'E017'); // Submitted since HR's unlock on 04-05
     const refused = await rejection(gateway.actuals.recordActual(S, hr, { goalId: reopened.id, periodId: T03, actualValue: 1, actualText: null, note: null }));
@@ -222,7 +222,7 @@ describe('actuals.runSync — the simulated ERP Sale connector (WBS 4.4.5, BR-KP
     expect(run.errorLog).toContain('Kế hoạch mục tiêu chưa được duyệt hoặc khóa');
   });
 
-  it('never overwrites a person\'s number: a goal with a manual T03 actual is skipped and logged (Q23)', async () => {
+  it('never overwrites a person\'s number: a goal with a manual T03 actual is skipped and logged (Q37)', async () => {
     const { gateway } = newGateway();
     const goals = await erpGoals(gateway);
     const plans = await gateway.goals.listGoalPlans(S, { cycleId: cycle, status: 'Locked' });
