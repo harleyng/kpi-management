@@ -167,9 +167,11 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   columns.*
 - **BR-KPI-41** — The **rating scale** maps a score range to a level. Default sample scale
   **A+ / A / B / C / D** (`ASSUMPTION Q2` — the DATX "TH KQ" sheet is broken with `#REF!`, so no real
-  scale is available yet).
+  scale is available yet). The seed's sample, contiguous from 0: A+ [110, 120] · A [100, 110) ·
+  B [90, 100) · C [70, 90) · D [0, 70).
 - **BR-KPI-42** — A **payout rule** maps a rating level to a % of the KPI salary component, optionally
-  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`).
+  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`): A+ 120% ·
+  A 100% · B 80% · C 50% · D 0% for everyone, and an OrgUnit rule paying Kinh doanh 130% for A+.
 - **BR-KPI-43** — Results move **Draft → Final → Locked**; only finalised results are exported to
   payroll, and the export is recorded. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
 
@@ -271,6 +273,9 @@ whatever the entry's surface. Rule-specific codes are added beside their rule in
 | Q10 | CMC's monthly work plan in P1? | No | BR-KPI-22 |
 | Q11 | Does P1 track "tự thực hiện" (what a manager personally achieved on a cascaded goal)? | No — shown as "—" | BR-KPI-07 |
 | Q12 | The permission catalogue, the default role → permission matrix and the default scopes? The sources are silent | §9 as written: union of roles, MANAGER = OrgUnit + children, company plan readable by all, BOD read-only, ADMIN holds everything | BR-KPI-60…64 |
+| Q14 | The DATX library sheet has weights that do not sum to 100%, blank or contradictory calculation methods, mixed rows and garbled targets — how is it read? | Cleaned as listed in `src/data/fixtures/README.md` ("DATX cleaning"): weights normalised, methods filled / corrected by meaning, mixed rows split, BSC perspective mapped by subject. HR to confirm "Tồn kho" / "Xả tồn" direction and the Kế toán opex definition | Seed, BR-KPI-06, 30, 34 |
+| Q15 | KPI frequency and aggregation (absent from DATX)? | Monthly; SUM for money, counts and volumes, AVG for ratios, LAST for headcount and stock | Seed, BR-KPI-11, 36 |
+| Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

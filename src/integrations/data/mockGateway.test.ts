@@ -1,25 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { KpiError } from '@/lib/errorCatalog';
+import { SYNTRA } from '@/data/fixtures';
 import { mockGateway } from './mockGateway';
 import { GATEWAY_GROUPS } from './types';
 
-describe('mockGateway (Phase 1.1 stub)', () => {
-  it('names itself the mock adapter', () => {
+describe('mockGateway (the app\'s default instance)', () => {
+  it('names itself the mock adapter and exposes every contract group plus the dev controls', () => {
     expect(mockGateway.adapter).toBe('mock');
-  });
-
-  it('exposes every contract group', () => {
     for (const group of GATEWAY_GROUPS) expect(mockGateway[group]).toBeDefined();
+    expect(mockGateway.dev).toBeDefined();
   });
 
-  it('rejects an async call with a coded error, the way a real adapter fails — never an empty list', async () => {
-    await expect(mockGateway.goals.listGoalPlans('tenant-a')).rejects.toBeInstanceOf(KpiError);
-    await expect(mockGateway.goals.listGoalPlans('tenant-a')).rejects.toThrow(/goals\.listGoalPlans is not implemented/);
-  });
-
-  it('throws on the synchronous groups', () => {
-    expect(() => mockGateway.events.subscribe('tenant-a', () => {})).toThrow(/events\.subscribe/);
-    expect(() => mockGateway.clock.now()).toThrow(/clock\.now/);
+  it('serves the seed (memory only under Vitest — no localStorage write)', async () => {
+    const tenants = await mockGateway.platform.listTenants();
+    expect(tenants.map((t) => t.name)).toEqual(['Syntra', 'Demo Co']);
+    expect((await mockGateway.org.listRoles(SYNTRA.tenantId)).length).toBe(6);
+    expect(localStorage.getItem('kpi.meta')).toBeNull();
   });
 
   it('stays invisible to tooling that probes objects (thenables, JSON, matchers)', async () => {

@@ -8,6 +8,7 @@ import { SessionProvider } from '@/contexts/SessionContext';
 import { isRetryable } from '@/lib/errorCatalog';
 import App from './App.tsx';
 import './index.css';
+import { GatewayEventBridge } from '@/components/layout/GatewayEventBridge';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')!).render(
         <Toaster />
         <BrowserRouter>
           <SessionProvider>
+            <GatewayEventBridge />
             <App />
           </SessionProvider>
         </BrowserRouter>

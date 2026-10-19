@@ -26,6 +26,7 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SessionScreens` | `SessionLoading` (shell skeleton) · `SessionError` (`errorSpecOf` + retry) · `SessionEmpty` ("Chưa có dữ liệu mẫu", reseed, other tenants) — rendered before a session exists, never call `useSession()` |
 | `AccessDenied` | The route guard's panel inside the shell: ERR-KPI-05 title + "Về trang chủ" |
 | `RouteErrorBoundary` | Catches render errors; reloads once on a stale chunk |
+| `GatewayEventBridge` | Renders nothing; mounted once inside `SessionProvider` (`main.tsx`) — runs `useGatewayEventInvalidation(tenantId)` |
 | `navConfig.ts` | `NAV_GROUPS` (5 groups, 17 items, a `permission` per item), `HOME_URL`, `PUBLIC_PATHS` — `navConfig.test.ts` pins plan §7.1 and route coverage |
 
 ## `src/components/shared/`
@@ -61,7 +62,7 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 
 | File | Purpose |
 |---|---|
-| `errorCatalog.ts` | `ERROR_CATALOG` (ERR-KPI-01…), `KpiError`, `errorSpecOf()` — tested |
+| `errorCatalog.ts` | `ERROR_CATALOG` (ERR-KPI-01…), `KpiError`, `KpiDeferredError` (a gateway method waiting for its rule — never retried), `isRetryable`, `errorSpecOf()` — tested |
 | `pagination.ts` | `paginate()`, `serverPageSlice()`, `DEFAULT_PAGE_SIZE`, `PAGE_SIZE_OPTIONS` — tested |
 | `utils.ts` | `cn`, `formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `foldDiacritics`, `downloadBlob` (vi-VN, Asia/Ho_Chi_Minh) |
 | `sidebarStore.ts` | Zustand: sidebar collapsed (persisted as `kpi.sidebar`) |
@@ -91,3 +92,13 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`) |
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed`, `readGatewayNow`, `canResetSeed` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
+| `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY` — tested |
+| `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
+
+## Mock adapter and seed (Phase 1.2) — for tests only outside `src/integrations/data/`
+
+| Item | What it does |
+|---|---|
+| `mock/gateway.test-util.ts` | `newGateway()` (fresh mock, `MemoryStorage`, no latency, shared seed), `rejection()`, `flush()` |
+| `@/data/fixtures` `SYNTRA` / `DEMO` | Seeded ids by readable key: `SYNTRA.user('E016')`, `SYNTRA.employee(…)`, `SYNTRA.unit('KD')`, `SYNTRA.id('Goal', …)`, `personas` |
+

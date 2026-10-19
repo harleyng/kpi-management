@@ -106,11 +106,33 @@ export class KpiError extends Error {
 }
 
 /**
+ * A gateway method whose behaviour depends on a rule that is not wired yet (Phase 1.2 → Gate 1).
+ * It keeps the read/write split of the generic codes — a read answers ERR-KPI-01, a write
+ * ERR-KPI-03 — so a screen shows its usual failure state, but it is never retried: it answers the
+ * same way until `owner` lands. The mock lists such methods in `DEFERRED_METHODS`.
+ */
+export class KpiDeferredError extends KpiError {
+  /** `group.method`, e.g. `forms.act`. */
+  readonly method: string;
+  /** What it waits for, e.g. `Phase 1.5 workflowRules`. */
+  readonly owner: string;
+
+  constructor(kind: 'read' | 'write', method: string, owner: string) {
+    super(kind === 'read' ? 'ERR-KPI-01' : 'ERR-KPI-03', `${method} requires ${owner}`);
+    this.name = 'KpiDeferredError';
+    this.method = method;
+    this.owner = owner;
+  }
+}
+
+/**
  * Whether trying the same call again could succeed. Only a failed read/write (ERR-KPI-01, 03) or an
  * uncoded error is transient; "not found", "wrong state", "not entitled" and "invalid input" will
- * answer the same way every time, and retrying them only delays the message the user needs.
+ * answer the same way every time, and retrying them only delays the message the user needs. A
+ * deferred method (`KpiDeferredError`) is not transient either.
  */
 export function isRetryable(error: unknown): boolean {
+  if (error instanceof KpiDeferredError) return false;
   if (!(error instanceof KpiError)) return true;
   return error.code === 'ERR-KPI-01' || error.code === 'ERR-KPI-03';
 }

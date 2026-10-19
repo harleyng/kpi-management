@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getDataGateway } from '@/integrations/data';
 import type { Id, IsoDateTime } from '@/data/types';
 import type { SessionDirectory } from '@/lib/sessionRules';
+import { queryKey, TENANTS_KEY } from './keys';
 
 /**
  * The reads the simulated session is built from (Phase 1.3).
@@ -16,10 +17,10 @@ import type { SessionDirectory } from '@/lib/sessionRules';
  *   `Promise.all` — never `allSettled`: a partial directory (roles without their permissions) would
  *   fail open or closed at random, so one failure fails the whole session, loudly.
  *   Invalidate it when accounts, user roles, role permissions, roles, org units, assignments or
- *   employees change (T1's writes; the 1.2 event → key map).
+ *   employees change — `useGatewayEventInvalidation` does it (`keys.ts`, root `sessionDirectory`).
  */
 
-export const tenantsKey = () => ['platform', 'tenants'] as const;
+export const tenantsKey = () => TENANTS_KEY;
 
 export function useTenants() {
   return useQuery({
@@ -29,7 +30,7 @@ export function useTenants() {
   });
 }
 
-export const sessionDirectoryKey = (tenantId: Id) => [tenantId, 'sessionDirectory'] as const;
+export const sessionDirectoryKey = (tenantId: Id) => queryKey(tenantId, 'sessionDirectory');
 
 const DIRECTORY_STALE_MS = 5 * 60 * 1000;
 

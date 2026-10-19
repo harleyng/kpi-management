@@ -19,6 +19,8 @@
  *      `ERR-KPI-06`. A cross-tenant foreign key is never writable.
  *    - Tenant-isolation tests cover reads AND writes. The one exception to the rule is `platform.*`,
  *      whose subject is the tenant itself.
+ *    - An unknown `tenantId` rejects ERR-KPI-02 on every method except `platform.listTenants` —
+ *      never an empty list.
  * 2. **Actor second.** Every user write takes `actorUserId` second — the signed-in user from
  *    `useSession()`. It is what `enteredBy`, `uploadedBy`, the audit log… record; "who did it" is
  *    never taken from the payload. System writes (`system.recordNotification`, `system.recordAudit`)
@@ -38,8 +40,10 @@
  *    other tracks react to. That is what the audit log (WBS 4.8.4) and cache invalidation hang on.
  * 7. **List-by-ids**: an omitted filter field does not filter; an EMPTY id list returns `[]`.
  *
- * Phase 1.1 fixed the SHAPE; Phase 1.2 implements it in the mock. After Gate 1 changing it is a
- * Large change (system-architect, and every track is told).
+ * Phase 1.1 fixed the SHAPE; Phase 1.2 implements it in the mock (`./mock/`). A method whose rule is
+ * not wired yet rejects with `KpiDeferredError` (`mockGateway.registry.deferred`); Gate 1 requires
+ * that list — and the pending guards — to be empty. After Gate 1 changing the contract is a Large
+ * change (system-architect, and every track is told).
  */
 
 import type {
@@ -153,9 +157,13 @@ export interface Aggregate<P, C> {
 
 /** Cursor pagination for the lists that grow without bound (forms, notifications, audit log). */
 export interface PageRequest {
-  /** Default 50, max 500. */
+  /** Default 50, max 500; outside 1…500 is ERR-KPI-06. */
   limit?: number;
-  /** `nextCursor` from the previous page; omitted = first page. */
+  /**
+   * `nextCursor` from the previous page; omitted = first page. A KEYSET cursor (the last row's sort
+   * key and id), so a row added between two reads never repeats or shifts the next page. An
+   * unreadable cursor is ERR-KPI-06.
+   */
   cursor?: string;
 }
 
@@ -414,10 +422,11 @@ export type DomainEventType = DomainEvent['type'];
 export type Unsubscribe = () => void;
 
 /**
- * A listener may be async. The bus awaits nothing but CATCHES a rejection and reports it (console
- * + the dev toolbar), so a failed audit write is visible, never swallowed. System listeners (T7)
- * are registered once, when the gateway is built — never in a React effect, which StrictMode runs
- * twice.
+ * A listener may be async. The bus awaits nothing but CATCHES a throw or a rejection and reports it
+ * (console.error in the mock; the 1.4 dev toolbar can read the same diagnostic sink), so a failed
+ * audit write is visible, never swallowed — and never fails the write that emitted the event.
+ * Events are emitted only after the write committed. System listeners (T7) are registered once,
+ * when the gateway is built — never in a React effect, which StrictMode runs twice.
  */
 export type DomainEventListener = (event: DomainEvent) => void | Promise<void>;
 
@@ -755,8 +764,11 @@ export interface SystemGateway {
 
   listAuditLog(tenantId: Id, filter?: AuditLogFilter, page?: PageRequest): Promise<Page<AuditLog>>;
   /**
-   * System write (T7 listener): the audit entry is built FROM the event — who, what, before/after,
-   * reason — so no caller can forge its author. Idempotent per event id. Does not emit.
+   * System write: the audit entry is built FROM the event — who, what, before/after, reason — so no
+   * caller can forge its author. Idempotent per event id (the entry's id IS the event id). Does not
+   * emit. An event of another tenant (`event.tenantId !== tenantId`) is ERR-KPI-06. The mock already
+   * writes each change's entry in the change's own transaction (so the two are saved together);
+   * this method stays for a listener- or trigger-based adapter, and is then a no-op on the mock.
    */
   recordAudit(tenantId: Id, event: EntityChangedEvent): Promise<AuditLog>;
 }
@@ -782,13 +794,17 @@ export interface EventsGateway {
 }
 
 /**
- * Mock-only controls (Phase 1.2), behind the dev toolbar. `undefined` on a real adapter, so a
- * screen must never depend on them.
+ * Mock-only controls (Phase 1.2), behind the dev toolbar (Phase 1.4). `undefined` on a real
+ * adapter, so a screen must never depend on them. `resetSeed` emits no events: whoever calls it
+ * clears or invalidates the whole query cache.
  */
 export interface DevControls {
   /** Reloads the fixtures for every tenant and clears the persisted copy. */
   resetSeed(): Promise<void>;
-  /** Moves the simulated clock; `null` returns to real time. */
+  /**
+   * Moves the simulated clock; `null` returns to the seed's moment (`SEED_NOW`), NOT to real time —
+   * real time (2026) lies before the seeded cycle (decision D-b, Phase 1.2).
+   */
   setNow(now: IsoDateTime | null): void;
   setLatency(ms: number): void;
   /** Make every call (or the calls whose `group.method` matches) reject with `KpiError`. */

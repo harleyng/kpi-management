@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ERROR_CATALOG, KpiError, errorSpecOf, isRetryable, type ErrorCode } from './errorCatalog';
+import { ERROR_CATALOG, KpiDeferredError, KpiError, errorSpecOf, isRetryable, type ErrorCode } from './errorCatalog';
 
 describe('ERROR_CATALOG', () => {
   const entries = Object.entries(ERROR_CATALOG) as [ErrorCode, (typeof ERROR_CATALOG)[ErrorCode]][];
@@ -58,5 +58,16 @@ describe('isRetryable', () => {
     for (const code of ['ERR-KPI-02', 'ERR-KPI-04', 'ERR-KPI-05', 'ERR-KPI-06'] as const) {
       expect(isRetryable(new KpiError(code))).toBe(false);
     }
+  });
+
+  it('never retries a method that is waiting for its rule, though it keeps the read/write code', () => {
+    const read = new KpiDeferredError('read', 'forms.listInbox', 'Phase 1.5 workflowRules');
+    const write = new KpiDeferredError('write', 'forms.act', 'Phase 1.5 workflowRules');
+    expect(read.code).toBe('ERR-KPI-01');
+    expect(write.code).toBe('ERR-KPI-03');
+    expect(write).toBeInstanceOf(KpiError);
+    expect(write.message).toBe('ERR-KPI-03: forms.act requires Phase 1.5 workflowRules');
+    expect(isRetryable(read)).toBe(false);
+    expect(isRetryable(write)).toBe(false);
   });
 });

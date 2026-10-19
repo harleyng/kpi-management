@@ -9,6 +9,19 @@
 
 ---
 
+## 2026-10-19 — Seed rows never pass through the gateway, so nothing validates them unless a test does
+
+The mock loads the seed straight into its tables — no transaction, no integrity check. A fixture that
+pointed at another tenant's row, a duplicate code or a step of the wrong workflow would load fine and fail
+only when a screen tried to write next to it. Worse, a seeded form 78 days past its due date looked
+correct until the first scheduler run locked it.
+
+**Rule.** `seed.test.ts` inserts every seeded row into a `Tx` and runs `validateTransaction` — the same
+check every write passes — and asserts the timeline (no step overdue and unhandled at the last tick but
+the one named). Change a fixture, run it.
+
+---
+
 ## 2026-10-19 — React Router v6 hands out a NEW `navigate` after every navigation
 
 `useNavigate()` (outside a data router) returns a function that depends on the current location, so a

@@ -78,7 +78,7 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 
 | Sheet | Contents | Feeds |
 |---|---|---|
-| "2. KPIs phòng ban" | Company and department KPI sets: KPI, weight, method ("% thực tế / mục tiêu" or "% mục tiêu / thực tế"), classification (BSC or Hiệu quả/Khối lượng/Chi phí), definition, target | Library seed (T2), Q4, Q5 |
+| "2. KPIs phòng ban" | Company and department KPI sets: KPI, weight, method ("% thực tế / mục tiêu" or "% mục tiêu / thực tế"), classification (BSC or Hiệu quả/Khối lượng/Chi phí), definition, target. **15 sets, 87 rows** (company + 14 units: Marketing, Ngành hàng Nội dung số, Ngành hàng Lối sống, Media, Tư vấn, CSKH, Mua hàng, Vận hành, Cửa hàng, Sản phẩm, Công nghệ, HCNS, Kế toán, Kế hoạch) → 54 definitions and 15 templates in the seed, cleaned as `ASSUMPTION Q14` (fixtures README) | Library seed (`src/data/fixtures/catalog.ts`), Q4, Q5, Q14 |
 | Department sheets (Marketing, HCNS, TC-KT, …) | "Mục tiêu chung (3–5) — KGI", the KPI set, SMART reminder, monthly target allocation | BR-KPI-02, 11; templates |
 | "TH KQ" | Result roll-up per employee: % KPI completion, % KPI pay, rating, rule violations, attendance — **broken with `#REF!`**, and holds real names | BR-KPI-40 (columns only); Q2. **Never copy its rows** |
 
