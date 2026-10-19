@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { FormField, RequiredLegend } from '@/components/shared/FormField';
 import { KpiPicker } from '@/components/shared/KpiPicker';
 import { SectionTitle } from '@/components/shared/SectionTitle';
@@ -107,18 +106,24 @@ interface GoalEditorPanelProps {
   readOnly: boolean;
   /** Why the plan cannot be edited, shown at the top of a read-only panel. */
   readOnlyReason: string | null;
-  onClose: () => void;
+  /** Cancel, or after a save (`savedGoalId` = the goal written). */
+  onClose: (savedGoalId?: string) => void;
   /** After a partial save created the goal: keep editing THAT goal (never create it twice). */
   onCreated: (goalId: string) => void;
+  /** Whether the form holds edits not saved yet — for the page's unsaved-changes guard. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
- * Add / edit one goal (plan §5.1, WBS 4.3.3, D1, D2): inline on the plan page (`?goal=…&mode=edit`),
- * not a modal. Picking a library KPI fills the fields the person has not touched yet. KRI type is
+ * Add / edit one goal (plan §5.1, WBS 4.3.3, D1, D2): the "Thông tin" tab of the goal page
+ * (`…/goals/:goalId`, `…/goals/new`), not a modal. Picking a library KPI fills the fields the person has not touched yet. KRI type is
  * hidden (`ASSUMPTION Q6`). The levels are a second write after the goal (`useSaveGoal`).
  */
-export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason, onClose, onCreated }: GoalEditorPanelProps) {
-  const [form, setForm] = useState<FormState>(() => initialState(goal, data));
+export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason, onClose, onCreated, onDirtyChange }: GoalEditorPanelProps) {
+  const [initial] = useState<FormState>(() => initialState(goal, data));
+  const [form, setForm] = useState<FormState>(initial);
+  const dirty = !readOnly && JSON.stringify(form) !== JSON.stringify(initial);
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   const [touched, setTouched] = useState<Set<Field>>(new Set());
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -229,9 +234,9 @@ export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason,
     save.mutate(
       { goal: input, levels: levelsChanged ? levels : undefined },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toastSaved(goal ? 'Đã lưu chỉ tiêu' : 'Đã thêm chỉ tiêu');
-          onClose();
+          onClose(saved.id);
         },
         onError: (error) => {
           if (error instanceof PartialGoalSaveError) {
@@ -251,13 +256,11 @@ export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason,
   return (
     <Card>
       <CardContent className="space-y-5 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <ArrowLeft aria-hidden />
-            Quay lại danh sách
-          </Button>
-          {!readOnly && <RequiredLegend />}
-        </div>
+        {!readOnly && (
+          <div className="flex justify-end">
+            <RequiredLegend />
+          </div>
+        )}
         <SectionTitle icon={Target} title={title}>
           {readOnly && readOnlyReason}
         </SectionTitle>
@@ -425,7 +428,7 @@ export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason,
         )}
         {!readOnly && (
           <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
-            <Button variant="outline" onClick={onClose} disabled={save.isPending}>
+            <Button variant="outline" onClick={() => onClose()} disabled={save.isPending}>
               Hủy
             </Button>
             <Button onClick={onSave} disabled={save.isPending || (submitted && !canSave)} aria-busy={save.isPending}>

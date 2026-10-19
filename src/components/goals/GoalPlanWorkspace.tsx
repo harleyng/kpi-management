@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ListChecks, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ListChecks, Plus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { SectionTitle } from '@/components/shared/SectionTitle';
@@ -10,119 +10,87 @@ import { useSession } from '@/contexts/useSession';
 import type { Goal } from '@/data/types';
 import { useDeleteGoal, useGoalLookups, usePlanWorkspace, type PlanWorkspaceData } from '@/hooks/queries/goals';
 import { toastSaved } from '@/hooks/queries/toasts';
-import { ERROR_CATALOG, errorSpecOf } from '@/lib/errorCatalog';
+import { errorSpecOf } from '@/lib/errorCatalog';
 import { combineQueries } from '@/lib/queryState';
 import { planOwnerOf } from '@/lib/planAccessRules';
 import { CascadeDialog } from './CascadeDialog';
-import { GoalEditorPanel } from './GoalEditorPanel';
-import { EDIT_REASON_COPY, planOwnerName } from './goalCopy';
+import { planOwnerName } from './goalCopy';
+import { goalPageUrl, inactiveGoalReason, planNotEditableReason, type GoalTab, type PlanReturnState } from './goalNav';
 import { GoalTable, type GoalRowActions } from './GoalTable';
 import { KgiSection } from './KgiSection';
-import { LinkGoalPanel } from './LinkGoalPanel';
-import { PeriodSplitPanel } from './PeriodSplitPanel';
 import { PlanHeader } from './PlanHeader';
 import { PlanLockActions } from './PlanLockActions';
 
-type PanelMode = 'view' | 'edit' | 'split' | 'link';
-const MODES: readonly PanelMode[] = ['view', 'edit', 'split', 'link'];
+/** Bring a goal row into view and put focus on its name (rows carry `id="goal-row-<id>"`; `<main>` scrolls). */
+function focusGoalRow(goalId: string) {
+  const row = document.getElementById(`goal-row-${goalId}`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+}
 
 interface GoalPlanWorkspaceProps {
   goalPlanId: string;
-  /** "← Quay lại danh sách" for a plan opened from a list (team, HR). */
-  onBack?: () => void;
+  /** The plan page's URL, derived once from the route by the page — goal pages open under it. */
+  basePath: string;
 }
 
 /**
- * One Goal Plan, end to end (WBS 4.3.2–4.3.5): header + readiness + "Gửi", KGI, the goal table, and
- * the inline goal panels (`?goal=<id|new>&mode=view|edit|split|link` — they keep the plan's URL, so a
- * reload or a shared link reopens the same panel). Every decision is the workspace's (rules).
+ * One Goal Plan, end to end (WBS 4.3.2–4.3.5): header + readiness + "Gửi", KGI and the goal table.
+ * A goal opens on its own page under `basePath` (Thông tin / Phân bổ theo kỳ / Liên kết) — the table
+ * is never replaced. Cascade and delete stay dialogs. Every decision is the workspace's (rules).
+ * The caller has already checked the person may see this plan on this route (`planRouteAllows`).
  */
-export function GoalPlanWorkspace({ goalPlanId, onBack }: GoalPlanWorkspaceProps) {
+export function GoalPlanWorkspace({ goalPlanId, basePath }: GoalPlanWorkspaceProps) {
   const workspace = usePlanWorkspace(goalPlanId);
   const lookups = useGoalLookups();
   const state = combineQueries([workspace.state, lookups.state]);
 
-  if (state.error) {
-    return (
-      <div className="space-y-3">
-        {onBack && <BackButton onBack={onBack} />}
-        <ErrorStateCard spec={errorSpecOf(state.error)} onAction={() => void state.refetch()} />
-      </div>
-    );
-  }
+  if (state.error) return <ErrorStateCard spec={errorSpecOf(state.error)} onAction={() => void state.refetch()} />;
   if (!workspace.data || !lookups.data) {
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Đang tải Goal Plan">
-        {onBack && <BackButton onBack={onBack} />}
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
     );
   }
-  return <LoadedWorkspace data={workspace.data} lookups={lookups.data} onBack={onBack} />;
+  return <LoadedWorkspace data={workspace.data} lookups={lookups.data} basePath={basePath} />;
 }
 
-function BackButton({ onBack }: { onBack: () => void }) {
-  return (
-    <Button variant="ghost" size="sm" onClick={onBack}>
-      <ArrowLeft aria-hidden />
-      Quay lại danh sách
-    </Button>
-  );
-}
-
-function LoadedWorkspace({ data, lookups, onBack }: { data: PlanWorkspaceData; lookups: NonNullable<ReturnType<typeof useGoalLookups>['data']>; onBack?: () => void }) {
+function LoadedWorkspace({ data, lookups, basePath }: { data: PlanWorkspaceData; lookups: NonNullable<ReturnType<typeof useGoalLookups>['data']>; basePath: string }) {
   const { user, can } = useSession();
-  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [cascadeFrom, setCascadeFrom] = useState<Goal | null>(null);
   const [deleting, setDeleting] = useState<Goal | null>(null);
   const remove = useDeleteGoal();
 
   const editable = data.editability.decision.ok;
-  const reason = EDIT_REASON_COPY[data.editability.reason];
-  const goalParam = params.get('goal');
-  const modeParam = params.get('mode') as PanelMode | null;
-  const mode: PanelMode | null = goalParam && modeParam && MODES.includes(modeParam) ? modeParam : null;
-  const panelGoal = goalParam && goalParam !== 'new' ? (data.goals.find((g) => g.id === goalParam) ?? null) : null;
+  const openGoal = (goalId: string | 'new', tab: GoalTab = 'info') => navigate(goalPageUrl(basePath, goalId, tab));
 
-  const openPanel = useCallback(
-    (goalId: string, m: PanelMode) =>
-      setParams((p) => {
-        const next = new URLSearchParams(p);
-        next.set('goal', goalId);
-        next.set('mode', m);
-        return next;
-      }),
-    [setParams],
-  );
-  const closePanel = useCallback(
-    () =>
-      setParams((p) => {
-        const next = new URLSearchParams(p);
-        next.delete('goal');
-        next.delete('mode');
-        return next;
-      }),
-    [setParams],
-  );
-  const focusGoal = (goalId: string) => {
-    closePanel();
-    window.setTimeout(() => document.getElementById(`goal-row-${goalId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
-  };
+  // Back from a goal page: bring its row into view — after the shell's own scroll reset and heading
+  // focus on navigation (AppShell, ~150 ms).
+  const returnFocus = (location.state as PlanReturnState | null)?.focusId ?? null;
+  useEffect(() => {
+    if (!returnFocus) return;
+    const timer = window.setTimeout(() => focusGoalRow(returnFocus), 200);
+    return () => window.clearTimeout(timer);
+  }, [returnFocus, location.key]);
 
   const ownerEmployeeId = planOwnerOf(data.plan, lookups.orgUnits);
   const mayCascade = ownerEmployeeId === user.employeeId || can('goalplan.lock');
-  const inactive = (goal: Goal) => (goal.status !== 'Active' ? 'Chỉ tiêu đã thay đổi hoặc đã hủy — chỉ còn để xem.' : null);
-  const notEditable = () => (editable ? null : (reason ?? 'Bạn không sửa được Goal Plan lúc này.'));
+  const inactive = inactiveGoalReason;
+  const notEditable = () => planNotEditableReason(data);
   const actions: GoalRowActions = {
-    open: (goal) => openPanel(goal.id, editable && goal.status === 'Active' ? 'edit' : 'view'),
-    edit: { run: (goal) => openPanel(goal.id, 'edit'), refusal: (goal) => notEditable() ?? inactive(goal) },
+    open: (goal) => openGoal(goal.id),
+    edit: { run: (goal) => openGoal(goal.id), refusal: (goal) => notEditable() ?? inactive(goal) },
     split: {
-      run: (goal) => openPanel(goal.id, 'split'),
+      run: (goal) => openGoal(goal.id, 'split'),
       refusal: (goal) => notEditable() ?? inactive(goal) ?? (goal.targetType !== 'NUMERIC' ? 'Mục tiêu dạng chữ không phân bổ theo kỳ.' : null),
     },
-    link: { run: (goal) => openPanel(goal.id, 'link'), refusal: (goal) => notEditable() ?? inactive(goal) },
+    link: { run: (goal) => openGoal(goal.id, 'link'), refusal: (goal) => notEditable() ?? inactive(goal) },
     cascade: mayCascade
       ? {
           run: (goal) => setCascadeFrom(goal),
@@ -144,63 +112,34 @@ function LoadedWorkspace({ data, lookups, onBack }: { data: PlanWorkspaceData; l
 
   const planName = `Goal Plan của ${planOwnerName(data.plan, lookups)}`;
   const addButton = editable ? (
-    <Button size="sm" onClick={() => openPanel('new', 'edit')}>
+    <Button size="sm" onClick={() => openGoal('new')}>
       <Plus aria-hidden />
       Thêm chỉ tiêu
     </Button>
   ) : null;
 
-  const panel =
-    mode === null ? null : mode === 'split' && panelGoal ? (
-      <PeriodSplitPanel data={data} lookups={lookups} goal={panelGoal} readOnly={!editable} onClose={closePanel} />
-    ) : mode === 'link' && panelGoal ? (
-      <LinkGoalPanel data={data} lookups={lookups} goal={panelGoal} readOnly={!editable} onClose={closePanel} />
-    ) : goalParam === 'new' || panelGoal ? (
-      <GoalEditorPanel
-        key={`${goalParam}-${mode}`}
-        data={data}
-        lookups={lookups}
-        goal={panelGoal}
-        readOnly={mode === 'view' || !editable || (panelGoal !== null && panelGoal.status !== 'Active')}
-        readOnlyReason={!editable ? reason : panelGoal && panelGoal.status !== 'Active' ? inactive(panelGoal) : null}
-        onClose={closePanel}
-        onCreated={(goalId) => openPanel(goalId, 'edit')}
-      />
-    ) : (
-      <div className="space-y-3">
-        <BackButton onBack={closePanel} />
-        <ErrorStateCard spec={ERROR_CATALOG['ERR-KPI-02']} />
-      </div>
-    );
-
   return (
     <div className="space-y-5">
-      {onBack && <BackButton onBack={onBack} />}
       <PlanHeader
         data={data}
         lookups={lookups}
-        onFocusGoal={focusGoal}
+        onFocusGoal={focusGoalRow}
         actions={<PlanLockActions plan={data.plan} cycle={data.cycle} registration={data.registration} planName={planName} />}
       />
 
-      {panel ?? (
-        <>
-          <KgiSection data={data} lookups={lookups} editable={editable} />
-          <section className="space-y-3" aria-labelledby="goals-title">
-            <div id="goals-title">
-              <SectionTitle icon={ListChecks} title="Chỉ tiêu" action={addButton} />
-            </div>
-            <GoalTable
-              data={data}
-              lookups={lookups}
-              query={{ isPending: false, fetchStatus: 'idle', error: null, refetch: () => undefined }}
-              actions={actions}
-              showBuckets={data.buckets.size > 0}
-              emptyAction={addButton}
-            />
-          </section>
-        </>
-      )}
+      <KgiSection data={data} lookups={lookups} editable={editable} />
+      <section className="space-y-3" aria-labelledby="goals-title">
+        <div id="goals-title">
+          <SectionTitle icon={ListChecks} title="Chỉ tiêu" action={addButton} />
+        </div>
+        <GoalTable
+          data={data}
+          lookups={lookups}
+          query={{ isPending: false, fetchStatus: 'idle', error: null, refetch: () => undefined }}
+          actions={actions}
+          showBuckets={data.buckets.size > 0}
+        />
+      </section>
 
       {cascadeFrom && <CascadeDialog data={data} lookups={lookups} parent={cascadeFrom} open onOpenChange={(o) => !o && setCascadeFrom(null)} />}
       <ConfirmDialog

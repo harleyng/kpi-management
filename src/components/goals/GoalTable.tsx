@@ -29,7 +29,6 @@ interface GoalTableProps {
   actions: GoalRowActions;
   /** Show the D3 bucket columns (a manager's plan that cascades). */
   showBuckets: boolean;
-  emptyAction?: React.ReactNode;
 }
 
 const ORDER = { Active: 0, Changed: 1, Cancelled: 2 } as const;
@@ -58,7 +57,7 @@ function MenuItem({ label, refusal, onSelect }: { label: string; refusal: string
  * footer — the plan summary from `goalPlanRules`, never summed here. Bucket columns (D3) are the
  * workspace's `allocationBuckets`.
  */
-export function GoalTable({ data, lookups, query, actions, showBuckets, emptyAction }: GoalTableProps) {
+export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTableProps) {
   const warningsByGoal = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const issue of [...data.readiness.blocking, ...data.readiness.warnings]) {
@@ -280,7 +279,6 @@ export function GoalTable({ data, lookups, query, actions, showBuckets, emptyAct
       query={query}
       getRowId={(goal) => goal.id}
       empty={data.hiddenCount > 0 ? `Goal Plan có ${data.hiddenCount} chỉ tiêu riêng tư bạn không xem được.` : 'Goal Plan chưa có chỉ tiêu nào.'}
-      emptyAction={emptyAction}
       pageSize={null}
       footer={rows.length > 0 ? footer : undefined}
     />

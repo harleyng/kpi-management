@@ -1,49 +1,37 @@
-import { useSearchParams } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CalcMethodsPanel } from '@/components/library/CalcMethodsPanel';
-import { CataloguesPanel } from '@/components/library/CataloguesPanel';
+import { PerspectivesSection, UnitsSection } from '@/components/library/CataloguesSections';
 import { KpiDefinitionsPanel } from '@/components/library/KpiDefinitionsPanel';
 import { LibraryActions } from '@/components/library/LibraryExportButton';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSession } from '@/contexts/useSession';
 
-const TABS = ['chi-tieu', 'danh-muc', 'phuong-phap'] as const;
-type Tab = (typeof TABS)[number];
+export type LibrarySection = 'definitions' | 'perspectives' | 'units' | 'calc-methods';
 
-/** Thư viện KPI — WBS 4.2.1 (danh mục), 4.2.2 (phương pháp tính), 4.2.3 (chỉ tiêu mẫu), 4.2.5 (xuất Excel). Track T2. */
-export default function KpiLibraryPage() {
+const SECTIONS: Record<LibrarySection, { title: string; description: string }> = {
+  definitions: { title: 'Chỉ tiêu mẫu', description: 'Chỉ tiêu dùng chung khi lập Goal Plan: định nghĩa, công thức, nguồn số liệu và phương pháp tính.' },
+  perspectives: { title: 'Viễn cảnh BSC', description: 'Bốn viễn cảnh là cố định. Có thể đổi tên hiển thị và thứ tự.' },
+  units: { title: 'Đơn vị đo', description: 'Đơn vị đang được chỉ tiêu hoặc mục tiêu dùng thì giữ nguyên mã.' },
+  'calc-methods': { title: 'Phương pháp tính', description: 'Cách quy đổi số thực tế thành % hoàn thành.' },
+};
+
+/** Thư viện KPI — WBS 4.2.1 (danh mục), 4.2.2 (phương pháp tính), 4.2.3 (chỉ tiêu mẫu), 4.2.5 (xuất Excel). Track T2; one sub-page per section. */
+export default function KpiLibraryPage({ section }: { section: LibrarySection }) {
   const { can } = useSession();
   const canManage = can('library.manage');
-  const [params, setParams] = useSearchParams();
-  const tab: Tab = TABS.includes(params.get('tab') as Tab) ? (params.get('tab') as Tab) : 'chi-tieu';
+  const { title, description } = SECTIONS[section];
 
   return (
     <>
-      <PageHeader
-        title="Thư viện KPI"
-        description="Chỉ tiêu mẫu, viễn cảnh BSC, đơn vị đo và phương pháp tính dùng chung khi lập Goal Plan."
-        actions={<LibraryActions />}
-      />
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setParams(value === 'chi-tieu' ? {} : { tab: value }, { replace: true })}
-        className="space-y-4"
-      >
-        <TabsList>
-          <TabsTrigger value="chi-tieu">Chỉ tiêu mẫu</TabsTrigger>
-          <TabsTrigger value="danh-muc">Danh mục</TabsTrigger>
-          <TabsTrigger value="phuong-phap">Phương pháp tính</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chi-tieu" className="mt-0">
-          <KpiDefinitionsPanel canManage={canManage} />
-        </TabsContent>
-        <TabsContent value="danh-muc" className="mt-0">
-          <CataloguesPanel canManage={canManage} />
-        </TabsContent>
-        <TabsContent value="phuong-phap" className="mt-0">
-          <CalcMethodsPanel canManage={canManage} />
-        </TabsContent>
-      </Tabs>
+      <PageHeader title={title} description={description} actions={<LibraryActions />} />
+      {section === 'definitions' ? (
+        <KpiDefinitionsPanel canManage={canManage} />
+      ) : section === 'perspectives' ? (
+        <PerspectivesSection canManage={canManage} />
+      ) : section === 'units' ? (
+        <UnitsSection canManage={canManage} />
+      ) : (
+        <CalcMethodsPanel canManage={canManage} />
+      )}
     </>
   );
 }

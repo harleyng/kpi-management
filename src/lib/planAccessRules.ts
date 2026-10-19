@@ -443,3 +443,38 @@ export function linkCandidatePlans(
   if (plan.ownerType !== 'Company') add(sameCycle.find((p) => p.ownerType === 'Company'));
   return result;
 }
+
+// ─── Which plan a route may show (sub-page routes) ─────────────────────────────────────────────
+
+/** The route family a Goal Plan page is mounted under — `/my/kpi/plans`, `/team/kpi/members`, … */
+export type PlanRouteKind = 'my' | 'members' | 'unit' | 'cycles';
+
+export interface PlanRouteContext {
+  /** `can('goalplan.view', resourceOfOwner(tenantId, plan))` — the caller's scope over the owner (BR-KPI-63 for Company). */
+  mayView: boolean;
+  /** The viewer's employee; `null` for a system account. */
+  viewerEmployeeId: Id | null;
+  /** The `:cycleId` of a `/admin/cycles/:cycleId/plans/:planId` route. */
+  routeCycleId?: Id | null;
+}
+
+/**
+ * May this route show this plan? A plan id is typed into a URL, and `getGoalPlan` checks only the
+ * tenant — so every plan page asks this before rendering anything of the plan. It needs the scope
+ * check (`mayView`) AND the route to fit the plan: `my` → the viewer's own Employee plan; `members`
+ * → an Employee plan; `unit` → an OrgUnit or Company plan; `cycles` → a plan of the route's cycle.
+ * A refusal is shown as "not found" (ERR-KPI-02), never as "forbidden" — it must not reveal the plan exists.
+ */
+export function planRouteAllows(plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeId' | 'cycleId'>, kind: PlanRouteKind, ctx: PlanRouteContext): boolean {
+  if (!ctx.mayView) return false;
+  switch (kind) {
+    case 'my':
+      return plan.ownerType === 'Employee' && ctx.viewerEmployeeId !== null && plan.ownerEmployeeId === ctx.viewerEmployeeId;
+    case 'members':
+      return plan.ownerType === 'Employee';
+    case 'unit':
+      return plan.ownerType === 'OrgUnit' || plan.ownerType === 'Company';
+    case 'cycles':
+      return ctx.routeCycleId != null && plan.cycleId === ctx.routeCycleId;
+  }
+}

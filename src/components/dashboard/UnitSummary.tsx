@@ -9,13 +9,13 @@ import { RatingValue } from '@/components/results/ResultCells';
 import { DeltaValue, Figure } from './DashboardFigures';
 
 /**
- * "Đường dẫn" — the units from the viewer's highest visible unit down to the one in focus. A manager's
+ * "Đường dẫn đơn vị" — the units from the viewer's highest visible unit down to the one in focus. A manager's
  * path starts at their own unit: there is no dead "Công ty" link above it.
  */
 export function UnitBreadcrumb({ model, focusId, onSelect }: { model: DashboardModel; focusId: Id; onSelect: (unitId: Id) => void }) {
   const path = unitPath(model, focusId);
   return (
-    <nav aria-label="Đường dẫn">
+    <nav aria-label="Đường dẫn đơn vị">
       <ol className="flex flex-wrap items-center gap-1 text-sm">
         {path.map((node, index) => {
           const last = index === path.length - 1;

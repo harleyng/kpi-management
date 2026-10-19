@@ -21,7 +21,7 @@ test.describe('@smoke Số liệu & import (T4)', () => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await become(page, 'Kha Thị Duyên', 'Nhân sự');
-    await page.goto('/admin/actuals');
+    await page.goto('/admin/actuals/entry');
     await expect(page.getByRole('combobox', { name: 'Kỳ', exact: true })).toHaveText(/T03/);
     await page.getByRole('button', { name: /chỉ tiêu chưa có số/ }).click(); // filter to the missing ones
     const row = page.getByRole('row').filter({ hasText: 'Chưa có số' }).first();
@@ -36,8 +36,9 @@ test.describe('@smoke Số liệu & import (T4)', () => {
 
   test('the seeded CRM batch cannot be committed and says why', async ({ page }) => {
     await become(page, 'Kha Thị Duyên', 'Nhân sự');
-    await page.goto('/admin/actuals?tab=import');
+    await page.goto('/admin/actuals/import');
     await page.getByRole('button', { name: 'Xem và ghi nhận' }).click();
+    await expect(page).toHaveURL(/\/admin\/actuals\/import\/[^/?]+/);
     await expect(page.getByText('Không tìm thấy người dùng nam.hv2')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Ghi nhận \d+ dòng$/ })).toBeDisabled();
     await expect(page.getByText(/Còn 2 dòng lỗi, chưa thể ghi nhận/)).toBeVisible();
@@ -45,12 +46,16 @@ test.describe('@smoke Số liệu & import (T4)', () => {
 
   test('a sync of a locked month (T01) fails and logs why', async ({ page }) => {
     await become(page, 'Kha Thị Duyên', 'Nhân sự');
-    await page.goto('/admin/actuals?tab=sync');
-    await page.getByRole('combobox', { name: 'Kỳ đồng bộ' }).click();
+    await page.goto('/admin/actuals/sync');
+    // The connection opens on its own page, which holds its run history.
+    await page.getByRole('table', { name: 'Kết nối API' }).getByRole('row').nth(1).getByRole('button').first().click();
+    await expect(page).toHaveURL(/\/admin\/actuals\/sync\/[^/?]+/);
+    await page.getByRole('button', { name: 'Chạy đồng bộ', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('combobox', { name: 'Kỳ đồng bộ' }).click();
     await page.getByRole('option', { name: 'T01' }).click();
-    await page.getByRole('button', { name: 'Chạy đồng bộ kỳ T01' }).click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Chạy đồng bộ' }).click();
-    await expect(page.getByText(/Lần chạy vừa xong: 0 chỉ tiêu cập nhật/)).toBeVisible();
+    await dialog.getByRole('button', { name: 'Chạy đồng bộ kỳ T01' }).click();
+    await expect(page.getByText(/Lần chạy vừa xong.*: 0 chỉ tiêu cập nhật/)).toBeVisible();
     await page.getByRole('row').filter({ hasText: 'T01' }).filter({ hasText: 'Thất bại' }).first().getByText(/dòng nhật ký/).click();
     await expect(page.getByText(/Kỳ đã khóa số liệu\./).first()).toBeVisible();
   });

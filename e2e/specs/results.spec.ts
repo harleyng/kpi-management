@@ -28,13 +28,17 @@ test.describe('@smoke T6 results', () => {
   test('C&B sees a period\'s results and exports the payroll file of a locked period', async ({ page }) => {
     const errors = collectErrors(page);
     await become(page, 'Tôn Văn Quân'); // E036, C&B
-    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Kết quả & lương', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Kết quả & lương' })).toBeVisible();
+    const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+    await nav.getByRole('button', { name: 'Kết quả & lương', exact: true }).click();
+    await nav.getByRole('link', { name: 'Kết quả theo kỳ', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Kết quả theo kỳ' })).toBeVisible();
 
     // T03 (the default: the latest month over) has unit results only.
     await expect(page.getByRole('table', { name: /Kết quả T03/ })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Xuất file lương' }).click();
+    // The sibling sub-page keeps the cycle and period.
+    await nav.getByRole('link', { name: 'Xuất file lương', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Xuất file lương' })).toBeVisible();
     await page.getByRole('combobox', { name: 'Kỳ', exact: true }).click();
     await page.getByRole('option', { name: /^T01/ }).click();
     await expect(page.getByText(/kết quả cá nhân sẽ có trong file/)).toBeVisible();
@@ -62,7 +66,7 @@ test.describe('@smoke T6 results', () => {
   test('HR finalises nothing when one result is blocked, and is told which', async ({ page }) => {
     const errors = collectErrors(page);
     await become(page, 'Kha Thị Duyên'); // E035, HR
-    await page.goto('/admin/results');
+    await page.goto('/admin/results/period');
     await page.getByRole('combobox', { name: 'Kỳ', exact: true }).click();
     await page.getByRole('option', { name: /^T02/ }).click();
     await expect(page.getByRole('table', { name: /Kết quả T02/ })).toBeVisible();
@@ -71,7 +75,7 @@ test.describe('@smoke T6 results', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Chốt kết quả' }).click();
     await expect(page.getByRole('alert').filter({ hasText: /Không chốt được: \d+ kết quả còn vướng/ })).toBeVisible();
     // HR holds result.finalize but not result.export.
-    await page.getByRole('tab', { name: 'Xuất file lương' }).click();
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Xuất file lương', exact: true }).click();
     await expect(page.getByText('Chỉ C&B xuất file lương.')).toBeVisible();
     expect(errors).toEqual([]);
   });

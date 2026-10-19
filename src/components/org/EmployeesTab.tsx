@@ -99,11 +99,6 @@ export function EmployeesTab() {
         query={query}
         getRowId={(r) => r.employee.id}
         empty="Chưa có nhân viên nào. Thêm nhân viên đầu tiên."
-        emptyAction={
-          <Button size="sm" onClick={() => setEmpParam('new')}>
-            Thêm nhân viên
-          </Button>
-        }
         isFiltered={isFiltered}
         onClearFilters={() => {
           setSearch('');
@@ -112,41 +107,43 @@ export function EmployeesTab() {
         }}
         pageResetKey={`${search}|${unitFilter}|${status}`}
         toolbar={
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchInput value={search} onChange={setSearch} placeholder="Tìm theo tên, mã hoặc email" className="w-64" />
-              <Select value={unitFilter} onValueChange={setUnitFilter}>
-                <SelectTrigger className="h-9 w-56" aria-label="Lọc theo đơn vị">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Mọi đơn vị</SelectItem>
-                  {data?.units
-                    .filter((u) => u.status === 'Active')
-                    .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-                    .map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
-                <SelectTrigger className="h-9 w-44" aria-label="Lọc theo trạng thái">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="working">Đang làm việc</SelectItem>
-                  <SelectItem value="left">Đã nghỉ việc</SelectItem>
-                  <SelectItem value={ALL}>Tất cả</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button size="sm" className="ml-auto" onClick={() => setEmpParam('new')} disabled={!data}>
-                <Plus aria-hidden />
-                Thêm nhân viên
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={search} onChange={setSearch} placeholder="Tìm theo tên, mã hoặc email" className="w-64" />
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="h-9 w-56" aria-label="Lọc theo đơn vị">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Mọi đơn vị</SelectItem>
+                {data?.units
+                  .filter((u) => u.status === 'Active')
+                  .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+                  .map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+              <SelectTrigger className="h-9 w-44" aria-label="Lọc theo trạng thái">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="working">Đang làm việc</SelectItem>
+                <SelectItem value="left">Đã nghỉ việc</SelectItem>
+                <SelectItem value={ALL}>Tất cả</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        }
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <ImportActions directory={data} />
+            <Button size="sm" onClick={() => setEmpParam('new')} disabled={!data}>
+              <Plus aria-hidden />
+              Thêm nhân viên
+            </Button>
           </div>
         }
       />

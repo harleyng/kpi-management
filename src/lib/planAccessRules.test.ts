@@ -3,7 +3,8 @@ import type { CycleStatus, FormInstance, GoalPlan, GoalPlanStatus } from '@/data
 import { TZ, calcMethod, delegation, form, goal, goals, kgi, level, months2027, periodTarget, plan, registrationSteps } from '@/test/builders';
 import type { Clock } from './isoDate';
 import { buildTenant } from './permissionFixtures.test-util';
-import { canSeeGoal, linkCandidatePlans, planEditability, planReadiness, submitAvailability, visibleGoals, type OpenRegistration, type PlanEditInput, type ReadinessContext } from './planAccessRules';
+import { can, resourceOfOwner } from './permissionRules';
+import { canSeeGoal, linkCandidatePlans, planEditability, planReadiness, planRouteAllows, submitAvailability, visibleGoals, type OpenRegistration, type PlanEditInput, type ReadinessContext } from './planAccessRules';
 import type { EntitlementContext } from './workflowRules';
 
 const CLOCK: Clock = { now: '2027-04-06T02:00:00.000Z', tz: TZ };
@@ -303,5 +304,72 @@ describe('linkCandidatePlans — where a goal may link up to', () => {
 
   it('missing plans are skipped', () => {
     expect(linkCandidatePlans(emp, [emp, company], ctx).map((x) => x.id)).toEqual(['company']);
+  });
+});
+
+describe('planRouteAllows — a typed plan id never opens someone else\'s plan', () => {
+  const ctx = (o: Partial<Parameters<typeof planRouteAllows>[2]> = {}) => ({ mayView: true, viewerEmployeeId: 'e1', routeCycleId: null, ...o });
+  const mine = plan({ ownerEmployeeId: 'e1' });
+  const colleague = plan({ id: 'p2', ownerEmployeeId: 'e2' });
+  const unitPlan = plan({ id: 'pu', ownerType: 'OrgUnit', ownerEmployeeId: null, ownerOrgUnitId: 'u1' });
+  const companyPlan = plan({ id: 'pc', ownerType: 'Company', ownerEmployeeId: null, ownerOrgUnitId: 'root' });
+
+  it.each([
+    ['my: my own plan', mine, 'my', ctx(), true],
+    ['my: a colleague\'s plan, even with scope over it', colleague, 'my', ctx(), false],
+    ['my: a unit plan', unitPlan, 'my', ctx(), false],
+    ['my: a system account has no own plan', mine, 'my', ctx({ viewerEmployeeId: null }), false],
+    ['members: an Employee plan in scope', colleague, 'members', ctx(), true],
+    ['members: a unit plan', unitPlan, 'members', ctx(), false],
+    ['unit: an OrgUnit plan', unitPlan, 'unit', ctx(), true],
+    ['unit: the Company plan', companyPlan, 'unit', ctx(), true],
+    ['unit: an Employee plan', mine, 'unit', ctx(), false],
+    ['cycles: a plan of the route\'s cycle', mine, 'cycles', ctx({ routeCycleId: 'c2027' }), true],
+    ['cycles: a plan of another cycle', mine, 'cycles', ctx({ routeCycleId: 'c2026' }), false],
+    ['cycles: no cycle in the route', mine, 'cycles', ctx(), false],
+  ] as const)('%s → %s', (_name, p, kind, c, expected) => {
+    expect(planRouteAllows(p, kind, c)).toBe(expected);
+  });
+
+  it.each(['my', 'members', 'unit', 'cycles'] as const)('%s: refused without goalplan.view over the owner', (kind) => {
+    const p = kind === 'unit' ? unitPlan : mine;
+    expect(planRouteAllows(p, kind, ctx({ mayView: false, routeCycleId: 'c2027' }))).toBe(false);
+  });
+
+  describe('with the real scope check (can + resourceOfOwner)', () => {
+    const t = buildTenant('t1');
+    const p = (id: string, o: Partial<GoalPlan>) => plan({ id, tenantId: 't1', ownerType: 'Employee', ownerEmployeeId: null, ownerOrgUnitId: null, ...o });
+    const allows = (who: Parameters<typeof t.profileOf>[0], target: GoalPlan, kind: Parameters<typeof planRouteAllows>[1]) => {
+      const profile = t.profileOf(who);
+      return planRouteAllows(target, kind, { mayView: can(profile, 'goalplan.view', resourceOfOwner('t1', target)), viewerEmployeeId: profile.employeeId, routeCycleId: target.cycleId });
+    };
+    const empPlan = p('emp', { ownerEmployeeId: t.employee('emp') });
+    const opsPlan = p('ops-emp', { ownerEmployeeId: t.employee('opsEmp') });
+    const salesPlan = p('sales', { ownerType: 'OrgUnit', ownerOrgUnitId: t.unit('sales') });
+    const opsUnitPlan = p('ops', { ownerType: 'OrgUnit', ownerOrgUnitId: t.unit('ops') });
+    const company = p('company', { ownerType: 'Company', ownerOrgUnitId: t.unit('root') });
+
+    it('a manager opens a plan inside their scope, not one outside it', () => {
+      expect(allows('head', empPlan, 'members')).toBe(true);
+      expect(allows('head', opsPlan, 'members')).toBe(false);
+      expect(allows('head', salesPlan, 'unit')).toBe(true);
+      expect(allows('head', opsUnitPlan, 'unit')).toBe(false);
+    });
+
+    it('an employee opens only their own plan — through any route', () => {
+      expect(allows('emp', empPlan, 'my')).toBe(true);
+      expect(allows('emp2', empPlan, 'my')).toBe(false);
+      expect(allows('emp2', empPlan, 'members')).toBe(false);
+      expect(allows('emp2', empPlan, 'cycles')).toBe(false);
+    });
+
+    it('the Company plan is readable by the whole tenant (BR-KPI-63)', () => {
+      expect(allows('emp', company, 'unit')).toBe(true);
+    });
+
+    it('HR (Tenant scope) opens any plan of the cycle', () => {
+      expect(allows('hr', opsPlan, 'cycles')).toBe(true);
+      expect(allows('hr', opsUnitPlan, 'cycles')).toBe(true);
+    });
   });
 });

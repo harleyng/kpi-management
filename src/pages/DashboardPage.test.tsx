@@ -57,8 +57,8 @@ async function renderAs(userId: Id, setup?: (gw: DataGateway) => void) {
   render(
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <MemoryRouter initialEntries={['/dashboard']}>
-          <DashboardPage />
+        <MemoryRouter initialEntries={['/dashboard/overview']}>
+          <DashboardPage section="overview" />
         </MemoryRouter>
       </TooltipProvider>
     </QueryClientProvider>,
@@ -86,7 +86,7 @@ describe('DashboardPage', () => {
 
   it('a manager starts at their own department — no company or Khối above it', async () => {
     await renderAs(SYNTRA.user(SYNTRA.personas.manager));
-    const crumbs = await screen.findByRole('navigation', { name: 'Đường dẫn' }, { timeout: 5000 });
+    const crumbs = await screen.findByRole('navigation', { name: 'Đường dẫn đơn vị' }, { timeout: 5000 });
     expect(crumbs).toHaveTextContent(/^Phòng Kinh doanh$/);
     expect(await screen.findByRole('table', { name: 'Nhân viên của Phòng Kinh doanh' })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Các đơn vị trực thuộc' })).toBeNull();

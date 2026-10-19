@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,12 +35,19 @@ const ISSUE_FIELD: Record<string, { field: string; hint: string }> = {
 };
 
 /**
- * "Tạo đợt khởi chạy" (plan §5.4, D5, BR-KPI-19) — an inline panel on the launches tab, not a modal:
- * the recipient filter is too tall for one (ui-ux, T5 phase 2). The checks the gateway runs
+ * "Tạo đợt khởi chạy" (plan §5.4, D5, BR-KPI-19) — the body of its own page (`NewLaunchPage`), not a
+ * modal: the recipient filter is too tall for one (ui-ux, T5 phase 2). The checks the gateway runs
  * (`validateLaunch`, `launchTimingIssues`) run here first; a cycle that does not accept the form type
  * is not offered (`cycleAllowsLaunch`).
  */
-export function LaunchPanel({ onDone }: { onDone: (launch: FormLaunch | null) => void }) {
+export function LaunchPanel({
+  onDone,
+  onDirtyChange,
+}: {
+  onDone: (launch: FormLaunch | null) => void;
+  /** Told whenever the form starts or stops differing from its defaults — the page's unsaved guard. */
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { tenant } = useSession();
   const clock = useGatewayClock();
   const create = useCreateLaunch();
@@ -77,6 +84,18 @@ export function LaunchPanel({ onDone }: { onDone: (launch: FormLaunch | null) =>
     return issues.map((i) => ISSUE_FIELD[i.detail ?? '']).find((m) => m?.field === field)?.hint;
   };
   const blocked = issues.length > 0 || name.trim() === '' || !workflow;
+  // The scheduled time is not counted: it only shows once "Thời điểm" itself has changed.
+  const dirty =
+    formType !== 'KPI_EVAL' ||
+    workflowId !== null ||
+    name.trim() !== '' ||
+    timing !== 'NOW' ||
+    cycleId !== null ||
+    periodId !== null ||
+    dueDays !== String(DEFAULT_DUE_DAYS) ||
+    mode !== 'ALL' ||
+    filter !== EMPTY_RECIPIENT_FILTER;
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   const submit = () => {
     setTried(true);
@@ -104,8 +123,7 @@ export function LaunchPanel({ onDone }: { onDone: (launch: FormLaunch | null) =>
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">Tạo đợt khởi chạy</h2>
+        <div className="flex justify-end">
           <RequiredLegend />
         </div>
         {tried && blocked && (

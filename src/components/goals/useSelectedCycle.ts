@@ -5,7 +5,7 @@ import { defaultCycleId } from '@/lib/cycleRules';
 
 /**
  * The cycle a Goal Plan screen shows, kept in `?cycle=` (a reload or a shared link keeps it).
- * Without one: `cycleRules.defaultCycleId` (the Active cycle). Changing it drops any open plan / goal.
+ * Without one: `cycleRules.defaultCycleId` (the Active cycle).
  */
 export function useSelectedCycle(): { cycles: ReturnType<typeof useCycles>; cycle: PerformanceCycle | null; setCycleId: (id: string) => void } {
   const cycles = useCycles();
@@ -14,8 +14,7 @@ export function useSelectedCycle(): { cycles: ReturnType<typeof useCycles>; cycl
   const cycle = cycles.data?.find((c) => c.id === id) ?? null;
   const setCycleId = (next: string) =>
     setParams((p) => {
-      const out = new URLSearchParams();
-      for (const [k, v] of p) if (!['plan', 'goal', 'mode'].includes(k)) out.set(k, v);
+      const out = new URLSearchParams(p);
       out.set('cycle', next);
       return out;
     });

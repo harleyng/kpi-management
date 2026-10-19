@@ -21,9 +21,15 @@ function readStoredCollapsed(): boolean {
 
 interface SidebarState {
   collapsed: boolean;
+  /**
+   * The menu parent the user unfolded by hand (its url), or `null`. Accordion: one at a time — the
+   * parent of the current page is always open on top of it, so it is not stored. Not persisted: a
+   * folded-open menu is about this visit, not a preference.
+   */
+  openParent: string | null;
 }
 
-export const useSidebarStore = create<SidebarState>(() => ({ collapsed: readStoredCollapsed() }));
+export const useSidebarStore = create<SidebarState>(() => ({ collapsed: readStoredCollapsed(), openParent: null }));
 
 function remember(collapsed: boolean) {
   try {
@@ -39,4 +45,6 @@ export const sidebarActions = {
     useSidebarStore.setState({ collapsed });
     remember(collapsed);
   },
+  /** Unfold a parent (folding whichever other one was open), or fold it if it was the open one. */
+  toggleParent: (url: string) => useSidebarStore.setState((s) => ({ openParent: s.openParent === url ? null : url })),
 };

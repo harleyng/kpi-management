@@ -30,7 +30,7 @@ function renderBell(employeeCode: string) {
   render(
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <MemoryRouter initialEntries={['/dashboard']}>
+        <MemoryRouter initialEntries={['/dashboard/overview']}>
           <NotificationBell />
           <Location />
         </MemoryRouter>
@@ -77,7 +77,7 @@ describe('NotificationBell', () => {
     expect(rows).toHaveLength(2);
     fireEvent.click(rows[0]);
 
-    expect(screen.getByLabelText('location').textContent).toMatch(/^\/my\/tasks\?form=/);
+    expect(screen.getByLabelText('location').textContent).toMatch(/^\/forms\//);
     await waitFor(async () =>
       expect((await gateway.system.listNotifications(S, SYNTRA.user('E006'), { unreadOnly: true })).items).toHaveLength(1),
     );

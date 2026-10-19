@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,19 +13,18 @@ import { useCancelLaunch, useLaunches } from '@/hooks/queries/forms';
 import { combineQueries } from '@/lib/queryState';
 import { formatDateTime } from '@/lib/utils';
 import { canCancelLaunch } from '@/lib/workflowRules';
-import { LaunchPanel } from './LaunchPanel';
 import { recipientSummary } from './recipients';
 
 /**
  * "Đợt khởi chạy" (D5): every launch — one-off and those a recurring rule produced — newest first,
- * with "Tạo đợt khởi chạy" as an inline panel above. A launched one opens its forms; only a Scheduled
- * one (no forms yet) can be cancelled (`canCancelLaunch`).
+ * with "Tạo đợt khởi chạy" opening its own page (`NewLaunchPage`). A launched one opens its forms;
+ * only a Scheduled one (no forms yet) can be cancelled (`canCancelLaunch`).
  */
 export function LaunchesTab({ onOpenForms }: { onOpenForms: (launchId: Id) => void }) {
   const launches = useLaunches();
   const lookups = useFormLookups();
   const cancel = useCancelLaunch();
-  const [creating, setCreating] = useState(false);
+  const navigate = useNavigate();
   const [cancelling, setCancelling] = useState<FormLaunch | null>(null);
 
   const rows = launches.data?.slice().sort((a, b) => (a.scheduledAt < b.scheduledAt ? 1 : -1));
@@ -73,17 +73,7 @@ export function LaunchesTab({ onOpenForms }: { onOpenForms: (launchId: Id) => vo
   ];
 
   return (
-    <div className="space-y-3">
-      {creating ? (
-        <LaunchPanel onDone={() => setCreating(false)} />
-      ) : (
-        <div className="flex justify-end">
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="h-4 w-4" aria-hidden />
-            Tạo đợt khởi chạy
-          </Button>
-        </div>
-      )}
+    <>
       <DataTable
         label="Đợt khởi chạy"
         columns={columns}
@@ -91,6 +81,12 @@ export function LaunchesTab({ onOpenForms }: { onOpenForms: (launchId: Id) => vo
         query={combineQueries([launches, lookups.query])}
         getRowId={(l) => l.id}
         empty="Chưa có đợt khởi chạy nào. Tạo đợt đầu tiên để gửi phiếu đăng ký hoặc đánh giá."
+        actions={
+          <Button onClick={() => navigate('/admin/launches/runs/new')}>
+            <Plus className="h-4 w-4" aria-hidden />
+            Tạo đợt khởi chạy
+          </Button>
+        }
       />
       <ConfirmDialog
         open={cancelling !== null}
@@ -105,6 +101,6 @@ export function LaunchesTab({ onOpenForms }: { onOpenForms: (launchId: Id) => vo
           setCancelling(null);
         }}
       />
-    </div>
+    </>
   );
 }

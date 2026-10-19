@@ -115,11 +115,13 @@ export function AccountsTab() {
                 <SelectItem value={ALL}>Tất cả</SelectItem>
               </SelectContent>
             </Select>
-            <Button size="sm" className="ml-auto" onClick={() => setAcctParam('new')} disabled={!data}>
-              <Plus aria-hidden />
-              Tạo tài khoản
-            </Button>
           </div>
+        }
+        actions={
+          <Button onClick={() => setAcctParam('new')} disabled={!data}>
+            <Plus aria-hidden />
+            Tạo tài khoản
+          </Button>
         }
       />
       {acctParam !== null && data && (

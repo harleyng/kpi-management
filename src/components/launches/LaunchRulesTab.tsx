@@ -66,13 +66,7 @@ export function LaunchRulesTab() {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button onClick={() => setEditing('new')}>
-          <Plus className="h-4 w-4" aria-hidden />
-          Thêm lịch tự khởi chạy
-        </Button>
-      </div>
+    <>
       <DataTable
         label="Lịch tự khởi chạy"
         columns={columns}
@@ -80,9 +74,15 @@ export function LaunchRulesTab() {
         query={combineQueries([rules, workflows])}
         getRowId={(r) => r.id}
         empty="Chưa có lịch tự khởi chạy. Thêm lịch để phiếu đánh giá tháng tự gửi sau mỗi kỳ."
+        actions={
+          <Button onClick={() => setEditing('new')}>
+            <Plus className="h-4 w-4" aria-hidden />
+            Thêm lịch tự khởi chạy
+          </Button>
+        }
       />
       {editing !== null && <LaunchRuleDialog rule={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-    </div>
+    </>
   );
 }
 

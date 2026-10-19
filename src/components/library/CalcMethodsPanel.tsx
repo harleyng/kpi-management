@@ -81,23 +81,20 @@ export function CalcMethodsPanel({ canManage }: { canManage: boolean }) {
         getRowId={(m) => m.id}
         empty="Chưa có phương pháp tính nào."
         pageSize={null}
-        toolbar={
-          <>
-            <p className="text-sm text-muted-foreground">Phương pháp đã dùng cho mục tiêu thì giữ nguyên cách tính; muốn đổi, hãy tạo phương pháp mới.</p>
-            {canManage && (
-              <Button
-                size="sm"
-                className="ml-auto"
-                onClick={(e) => {
-                  lastTrigger.current = e.currentTarget;
-                  setEditing('new');
-                }}
-              >
-                <Plus className="h-4 w-4" aria-hidden />
-                Thêm phương pháp
-              </Button>
-            )}
-          </>
+        toolbar={<p className="text-sm text-muted-foreground">Phương pháp đã dùng cho mục tiêu thì giữ nguyên cách tính; muốn đổi, hãy tạo phương pháp mới.</p>}
+        actions={
+          canManage && (
+            <Button
+              size="sm"
+              onClick={(e) => {
+                lastTrigger.current = e.currentTarget;
+                setEditing('new');
+              }}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Thêm phương pháp
+            </Button>
+          )
         }
       />
       <CalcMethodSheet

@@ -76,16 +76,7 @@ export function DelegationsPanel() {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Người được ủy quyền xử lý thay các bước của bạn trong thời gian ủy quyền. Lịch sử ghi nhận cả hai người.</p>
-        {mayDelegate && (
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="h-4 w-4" aria-hidden />
-            Ủy quyền mới
-          </Button>
-        )}
-      </div>
+    <>
       <DataTable
         label="Ủy quyền của bạn"
         columns={columns}
@@ -93,6 +84,14 @@ export function DelegationsPanel() {
         query={all}
         getRowId={(d) => d.id}
         empty="Bạn chưa ủy quyền cho ai. Khi bạn vắng mặt, người được ủy quyền sẽ xử lý các bước của bạn."
+        actions={
+          mayDelegate ? (
+            <Button onClick={() => setCreating(true)}>
+              <Plus className="h-4 w-4" aria-hidden />
+              Ủy quyền mới
+            </Button>
+          ) : undefined
+        }
       />
       {creating && <DelegationDialog existing={all.data ?? []} onClose={() => setCreating(false)} />}
       <ConfirmDialog
@@ -109,7 +108,7 @@ export function DelegationsPanel() {
           setRevoking(null);
         }}
       />
-    </div>
+    </>
   );
 }
 

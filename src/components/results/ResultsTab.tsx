@@ -221,7 +221,7 @@ export function ResultsTab({ cycle, period, levels, scaleName }: ResultsTabProps
         }}
         pageResetKey={`${search}|${tier}|${status}`}
         toolbar={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
             <SearchInput value={search} onChange={setSearch} placeholder="Tìm theo tên, mã, đơn vị" label="Tìm kết quả" className="w-64" />
             <Select value={tier} onValueChange={(v) => setTier(v as Filter<OwnerType>)}>
               <SelectTrigger className="h-9 w-36" aria-label="Lọc theo cấp">

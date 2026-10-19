@@ -4,20 +4,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/contexts/useSession';
 import { CYCLE_STATUS_LABEL, type CyclePeriod, type Id, type PerformanceCycle } from '@/data/types';
 import { useCycles, usePeriods } from '@/hooks/queries/goals';
-import { defaultCycle, defaultMonth, monthsOf } from '@/lib/actualEntryRules';
+import { defaultMonth, monthsOf } from '@/lib/actualEntryRules';
 
 /**
- * The cycle and month pickers the actuals screens share. Each picks its default once its data is in
- * (the Active cycle; the latest month that has started) — `actualEntryRules` decides which.
+ * The cycle and month pickers the actuals screens share. The page's cycle and month arrive resolved
+ * from the URL (`useCyclePeriodParams`); a month picker used on its own (the template's month, a
+ * sync run) picks its default once its data is in — `actualEntryRules` decides which.
  */
 export function CycleSelect({ value, onChange }: { value: Id | null; onChange: (id: Id) => void }) {
   const cycles = useCycles();
-  useEffect(() => {
-    if (value === null && cycles.data) {
-      const pick = defaultCycle(cycles.data);
-      if (pick) onChange(pick.id);
-    }
-  }, [value, cycles.data, onChange]);
   if (cycles.isPending && cycles.fetchStatus !== 'idle') return <Skeleton className="h-9 w-44" />;
   return (
     <Select value={value ?? undefined} onValueChange={onChange} disabled={!cycles.data}>

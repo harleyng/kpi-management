@@ -1,6 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyStateCard } from '@/components/shared/EmptyState';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -13,14 +11,21 @@ import { useRatingLevels, useRatingScales } from '@/hooks/queries/results';
 import { errorSpecOf } from '@/lib/errorCatalog';
 import { combineQueries, loadPhase } from '@/lib/queryState';
 
-const TABS = ['results', 'rating', 'payroll'] as const;
-type Tab = (typeof TABS)[number];
+export type ResultsSection = 'period' | 'rating' | 'payroll';
+
+const SECTIONS: Record<ResultsSection, { title: string; description: string }> = {
+  period: { title: 'Kết quả theo kỳ', description: 'Tổng hợp điểm KPI, xếp loại và % hưởng lương KPI của từng người; tính, chốt và khóa kết quả theo kỳ.' },
+  rating: { title: 'Xếp loại & quy đổi', description: 'Thang xếp loại của chu kỳ và quy đổi từ xếp loại sang % hưởng lương KPI.' },
+  payroll: { title: 'Xuất file lương', description: 'Xuất % hưởng lương KPI của kỳ đã chốt cho bộ phận C&B.' },
+};
 const EMPTY_LEVELS: never[] = [];
 
-/** "Kết quả & lương" — WBS 4.6.1–4.6.4, Track T6 (HR, C&B). */
-export default function ResultsPayrollPage() {
-  const [params, setParams] = useSearchParams();
-  const tab: Tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'results';
+/**
+ * "Kết quả & lương" — WBS 4.6.1–4.6.4, Track T6 (HR, C&B); one sub-page per section. Every section
+ * shares the cycle/period in the URL and waits for the cycle's rating scale before showing a row.
+ */
+export default function ResultsPayrollPage({ section }: { section: ResultsSection }) {
+  const { title, description } = SECTIONS[section];
   const selection = useResultPeriod();
   const { cycle, period } = selection;
   const scaleId = cycle?.ratingScaleId ?? null;
@@ -35,48 +40,20 @@ export default function ResultsPayrollPage() {
   const phase = loadPhase(base, ready);
   const levelRows = levels.data ?? EMPTY_LEVELS;
 
-  const setTab = (value: string) => {
-    const next = new URLSearchParams(params);
-    next.set('tab', value);
-    setParams(next, { replace: true });
-  };
-
   return (
     <>
       <PageHeader
-        title="Kết quả & lương"
-        description="Tổng hợp điểm KPI, xếp loại, % hưởng lương KPI và chốt kết quả theo kỳ."
-        actions={selection.cycles && selection.cycles.length > 0 ? <ResultPeriodPicker selection={selection} showPeriod={tab !== 'rating'} /> : undefined}
+        title={title}
+        description={description}
+        actions={selection.cycles && selection.cycles.length > 0 ? <ResultPeriodPicker selection={selection} showPeriod={section !== 'rating'} /> : undefined}
       />
       {phase === 'error' && <ErrorStateCard spec={errorSpecOf(base.error)} onAction={() => void base.refetch()} />}
       {phase === 'loading' && <Skeleton className="h-64 w-full" />}
       {ready && !cycle && <EmptyStateCard>Chưa có chu kỳ đánh giá nào. Tạo chu kỳ ở mục Chu kỳ trước.</EmptyStateCard>}
-      {ready && cycle && (
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="results">Kết quả kỳ</TabsTrigger>
-            <TabsTrigger value="rating">Xếp loại & quy đổi</TabsTrigger>
-            <TabsTrigger value="payroll">Xuất file lương</TabsTrigger>
-          </TabsList>
-          <TabsContent value="results" className="mt-4">
-            {period ? (
-              <ResultsTab key={period.id} cycle={cycle} period={period} levels={levelRows} scaleName={scaleName} />
-            ) : (
-              <EmptyStateCard>Chu kỳ {cycle.name} chưa có kỳ đánh giá nào.</EmptyStateCard>
-            )}
-          </TabsContent>
-          <TabsContent value="rating" className="mt-4">
-            <RatingTab cycle={cycle} levels={levels.data} levelsQuery={levels} scaleName={scaleName} />
-          </TabsContent>
-          <TabsContent value="payroll" className="mt-4">
-            {period ? (
-              <PayrollExportTab key={period.id} cycle={cycle} period={period} />
-            ) : (
-              <EmptyStateCard>Chu kỳ {cycle.name} chưa có kỳ đánh giá nào.</EmptyStateCard>
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
+      {ready && cycle && section === 'rating' && <RatingTab cycle={cycle} levels={levels.data} levelsQuery={levels} scaleName={scaleName} />}
+      {ready && cycle && section !== 'rating' && !period && <EmptyStateCard>Chu kỳ {cycle.name} chưa có kỳ đánh giá nào.</EmptyStateCard>}
+      {ready && cycle && section === 'period' && period && <ResultsTab key={period.id} cycle={cycle} period={period} levels={levelRows} scaleName={scaleName} />}
+      {ready && cycle && section === 'payroll' && period && <PayrollExportTab key={period.id} cycle={cycle} period={period} />}
     </>
   );
 }

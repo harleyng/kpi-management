@@ -3,16 +3,13 @@ import { AlertTriangle, CalendarDays, Plus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { DataTable, type DataTableColumn } from '@/components/shared/DataTable';
 import { FormField } from '@/components/shared/FormField';
-import { SectionTitle } from '@/components/shared/SectionTitle';
-import { CycleStatusBadge, GoalPlanStatusBadge } from '@/components/shared/StatusBadge';
+import { GoalPlanStatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from '@/contexts/useSession';
 import {
   CYCLE_STATUS_LABEL,
@@ -63,84 +60,56 @@ const NEXT_STATUS_BODY: Readonly<Record<CycleStatus, string>> = {
   Closed: '',
 };
 
-/** The selected cycle (WBS 4.3.1, 4.3.6): its header and status step, its periods, its Goal Plans. */
-export function CycleDetail({ cycle, onOpenPlan, onEdit }: { cycle: PerformanceCycle; onOpenPlan: (planId: string) => void; onEdit: () => void }) {
+/**
+ * The cycle detail page's header actions (WBS 4.3.1): "Sửa thông tin" while the cycle is editable,
+ * and the next status step behind a confirmation. A refusal's issues go to `onError` (shown under the
+ * header); `null` clears it.
+ */
+export function CycleActions({ cycle, onEdit, onError }: { cycle: PerformanceCycle; onEdit: () => void; onError: (message: string | null) => void }) {
   const [confirming, setConfirming] = useState(false);
   const setStatus = useSetCycleStatus();
   const next = nextCycleStatus(cycle);
-  const [statusError, setStatusError] = useState<string | null>(null);
 
   return (
-    <Card>
-      <CardContent className="space-y-5 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">{cycle.name}</h2>
-              <CycleStatusBadge status={cycle.status} />
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {formatDate(cycle.startDate)} – {formatDate(cycle.endDate)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {canEditCycle(cycle).ok && (
-              <Button variant="outline" onClick={onEdit}>
-                Sửa thông tin
-              </Button>
-            )}
-            {next && (
-              <Button onClick={() => setConfirming(true)} disabled={setStatus.isPending}>
-                {NEXT_STATUS_ACTION[cycle.status]}
-              </Button>
-            )}
-          </div>
-        </div>
-        {statusError && (
-          <p role="alert" className="text-sm text-support-negative">
-            {statusError}
-          </p>
-        )}
-        <Tabs defaultValue="periods">
-          <TabsList>
-            <TabsTrigger value="periods">Kỳ đánh giá</TabsTrigger>
-            <TabsTrigger value="plans">Goal Plan</TabsTrigger>
-          </TabsList>
-          <TabsContent value="periods" className="mt-4">
-            <PeriodsPanel cycle={cycle} />
-          </TabsContent>
-          <TabsContent value="plans" className="mt-4">
-            <CyclePlansPanel cycle={cycle} onOpenPlan={onOpenPlan} />
-          </TabsContent>
-        </Tabs>
-        {next && (
-          <ConfirmDialog
-            open={confirming}
-            onOpenChange={setConfirming}
-            title={`${NEXT_STATUS_ACTION[cycle.status]} "${cycle.name}"?`}
-            body={NEXT_STATUS_BODY[cycle.status]}
-            confirmLabel={NEXT_STATUS_ACTION[cycle.status]}
-            destructive={next === 'Closed'}
-            onConfirm={() => {
-              setStatusError(null);
-              setStatus.mutate(
-                { cycleId: cycle.id, status: next },
-                {
-                  onSuccess: () => toastSaved(`Chu kỳ đã chuyển sang "${CYCLE_STATUS_LABEL[next]}"`),
-                  onError: (e) => setStatusError(e instanceof KpiError && e.issues.length ? e.issues.map(issueText).join(' ') : null),
-                },
-              );
-            }}
-          />
-        )}
-      </CardContent>
-    </Card>
+    <>
+      {canEditCycle(cycle).ok && (
+        <Button variant="outline" onClick={onEdit}>
+          Sửa thông tin
+        </Button>
+      )}
+      {next && (
+        <Button onClick={() => setConfirming(true)} disabled={setStatus.isPending}>
+          {NEXT_STATUS_ACTION[cycle.status]}
+        </Button>
+      )}
+      {next && (
+        <ConfirmDialog
+          open={confirming}
+          onOpenChange={setConfirming}
+          title={`${NEXT_STATUS_ACTION[cycle.status]} "${cycle.name}"?`}
+          body={NEXT_STATUS_BODY[cycle.status]}
+          confirmLabel={NEXT_STATUS_ACTION[cycle.status]}
+          destructive={next === 'Closed'}
+          onConfirm={() => {
+            onError(null);
+            setStatus.mutate(
+              { cycleId: cycle.id, status: next },
+              {
+                onSuccess: () => toastSaved(`Chu kỳ đã chuyển sang "${CYCLE_STATUS_LABEL[next]}"`),
+                onError: (e) => onError(e instanceof KpiError && e.issues.length ? e.issues.map(issueText).join(' ') : null),
+              },
+            );
+          }}
+        />
+      )}
+    </>
   );
 }
 
 // ─── Periods ───────────────────────────────────────────────────────────────────────────────────
 
-function PeriodsPanel({ cycle }: { cycle: PerformanceCycle }) {
+/** The cycle's periods (WBS 4.3.1): generated in a dialog, lockable once the cycle runs. */
+export function PeriodsPanel({ cycle }: { cycle: PerformanceCycle }) {
   const periods = usePeriods(cycle.id);
   const lock = useSetPeriodLocked();
   const [generating, setGenerating] = useState(false);
@@ -148,22 +117,20 @@ function PeriodsPanel({ cycle }: { cycle: PerformanceCycle }) {
   const lockable = canLockPeriod(cycle).ok;
 
   return (
-    <div className="space-y-4">
-      <SectionTitle
-        icon={CalendarDays}
-        title="Kỳ đánh giá"
-        action={
-          editable && !generating ? (
-            <Button variant="outline" size="sm" onClick={() => setGenerating(true)}>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        {editable ? 'Các kỳ chỉ sửa được khi chu kỳ còn "Đang lập kế hoạch".' : 'Chu kỳ đã bắt đầu — các kỳ không sửa được, chỉ khóa / mở khóa số liệu.'}
+      </p>
+      {generating && periods.data && <GeneratePeriods cycle={cycle} existing={periods.data} onDone={() => setGenerating(false)} />}
+      <DataTable
+        actions={
+          editable ? (
+            <Button onClick={() => setGenerating(true)} disabled={!periods.data}>
+              <CalendarDays aria-hidden />
               Tạo kỳ tự động
             </Button>
           ) : undefined
         }
-      >
-        {editable ? 'Các kỳ chỉ sửa được khi chu kỳ còn "Đang lập kế hoạch".' : 'Chu kỳ đã bắt đầu — các kỳ không sửa được, chỉ khóa / mở khóa số liệu.'}
-      </SectionTitle>
-      {generating && periods.data && <GeneratePeriods cycle={cycle} existing={periods.data} onDone={() => setGenerating(false)} />}
-      <DataTable
         label="Các kỳ của chu kỳ"
         rows={periods.data}
         query={periods}
@@ -207,77 +174,84 @@ function GeneratePeriods({ cycle, existing, onDone }: { cycle: PerformanceCycle;
     summary.added.some((a) => a.periodType === p.periodType && a.label === p.label) ? 'Thêm mới' : summary.updated.some((a) => a.periodType === p.periodType && a.label === p.label) ? 'Cập nhật ngày' : 'Giữ nguyên';
 
   return (
-    <div className="space-y-4 rounded-md border p-4">
-      <h3 className="text-sm font-semibold">Tạo kỳ tự động · xem trước {merged ? merged.inputs.length : 0} kỳ</h3>
-      <div className="flex flex-wrap items-end gap-4">
-        <fieldset className="space-y-1.5">
-          <legend className="text-sm font-medium">Loại kỳ</legend>
-          <div className="flex flex-wrap gap-3">
-            {PERIOD_TYPES.map((t) => (
-              <label key={t} className="flex items-center gap-1.5 text-sm">
-                <input type="checkbox" checked={types.includes(t)} onChange={(e) => setTypes((ts) => (e.target.checked ? [...ts, t] : ts.filter((x) => x !== t)))} />
-                {PERIOD_TYPE_LABEL[t]}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <FormField label="Hạn nhập số (ngày sau cuối tháng)" className="w-56">
-          {(control) => <Input {...control} inputMode="numeric" value={inputDays} onChange={(e) => setInputDays(e.target.value)} />}
-        </FormField>
-        <FormField label="Hạn đánh giá (ngày sau cuối tháng)" className="w-56">
-          {(control) => <Input {...control} inputMode="numeric" value={evalDays} onChange={(e) => setEvalDays(e.target.value)} />}
-        </FormField>
-      </div>
-      <p className="text-xs text-muted-foreground">Giả định Q32: quý, nửa năm tính từ tháng đầu của chu kỳ. Kỳ đã có (cùng loại, cùng tên) giữ nguyên mã và trạng thái khóa.</p>
-      {!generated.ok ? (
-        <p role="alert" className="text-sm text-support-negative">
-          {generated.issues.map(issueText).join(' ')}
-        </p>
-      ) : (
-        merged && (
-          <div className="max-h-80 overflow-auto rounded-md border">
-            <Table aria-label="Xem trước các kỳ">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Loại</TableHead>
-                  <TableHead>Kỳ</TableHead>
-                  <TableHead>Thời gian</TableHead>
-                  <TableHead>Hạn nhập số</TableHead>
-                  <TableHead>Hạn đánh giá</TableHead>
-                  <TableHead>Thay đổi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {merged.inputs.map((p) => (
-                  <TableRow key={`${p.periodType}:${p.label}`}>
-                    <TableCell>{PERIOD_TYPE_LABEL[p.periodType]}</TableCell>
-                    <TableCell className="font-medium">{p.label}</TableCell>
-                    <TableCell>
-                      {formatDate(p.startDate)} – {formatDate(p.endDate)}
-                    </TableCell>
-                    <TableCell>{p.inputDeadline ? formatDate(p.inputDeadline) : '—'}</TableCell>
-                    <TableCell>{p.evalDeadline ? formatDate(p.evalDeadline) : '—'}</TableCell>
-                    <TableCell className="text-muted-foreground">{status(p, merged.summary)}</TableCell>
-                  </TableRow>
+    <Dialog open onOpenChange={(o) => !o && !save.isPending && onDone()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Tạo kỳ tự động · {cycle.name}</DialogTitle>
+          <DialogDescription>Xem trước {merged ? merged.inputs.length : 0} kỳ trước khi áp dụng.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <fieldset className="space-y-1.5">
+              <legend className="text-sm font-medium">Loại kỳ</legend>
+              <div className="flex flex-wrap gap-3">
+                {PERIOD_TYPES.map((t) => (
+                  <label key={t} className="flex items-center gap-1.5 text-sm">
+                    <input type="checkbox" checked={types.includes(t)} onChange={(e) => setTypes((ts) => (e.target.checked ? [...ts, t] : ts.filter((x) => x !== t)))} />
+                    {PERIOD_TYPE_LABEL[t]}
+                  </label>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </fieldset>
+            <FormField label="Hạn nhập số (ngày sau cuối tháng)" className="w-56">
+              {(control) => <Input {...control} inputMode="numeric" value={inputDays} onChange={(e) => setInputDays(e.target.value)} />}
+            </FormField>
+            <FormField label="Hạn đánh giá (ngày sau cuối tháng)" className="w-56">
+              {(control) => <Input {...control} inputMode="numeric" value={evalDays} onChange={(e) => setEvalDays(e.target.value)} />}
+            </FormField>
           </div>
-        )
-      )}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onDone} disabled={save.isPending}>
-          Hủy
-        </Button>
-        <Button
-          disabled={!merged || save.isPending}
-          aria-busy={save.isPending}
-          onClick={() => merged && save.mutate({ cycleId: cycle.id, periods: merged.inputs }, { onSuccess: () => { toastSaved(`Đã lưu ${merged.inputs.length} kỳ`); onDone(); } })}
-        >
-          Áp dụng
-        </Button>
-      </div>
-    </div>
+          <p className="text-xs text-muted-foreground">Giả định Q32: quý, nửa năm tính từ tháng đầu của chu kỳ. Kỳ đã có (cùng loại, cùng tên) giữ nguyên mã và trạng thái khóa.</p>
+          {!generated.ok ? (
+            <p role="alert" className="text-sm text-support-negative">
+              {generated.issues.map(issueText).join(' ')}
+            </p>
+          ) : (
+            merged && (
+              <div className="max-h-80 overflow-auto rounded-md border">
+                <Table aria-label="Xem trước các kỳ">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Loại</TableHead>
+                      <TableHead>Kỳ</TableHead>
+                      <TableHead>Thời gian</TableHead>
+                      <TableHead>Hạn nhập số</TableHead>
+                      <TableHead>Hạn đánh giá</TableHead>
+                      <TableHead>Thay đổi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {merged.inputs.map((p) => (
+                      <TableRow key={`${p.periodType}:${p.label}`}>
+                        <TableCell>{PERIOD_TYPE_LABEL[p.periodType]}</TableCell>
+                        <TableCell className="font-medium">{p.label}</TableCell>
+                        <TableCell>
+                          {formatDate(p.startDate)} – {formatDate(p.endDate)}
+                        </TableCell>
+                        <TableCell>{p.inputDeadline ? formatDate(p.inputDeadline) : '—'}</TableCell>
+                        <TableCell>{p.evalDeadline ? formatDate(p.evalDeadline) : '—'}</TableCell>
+                        <TableCell className="text-muted-foreground">{status(p, merged.summary)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onDone} disabled={save.isPending}>
+            Hủy
+          </Button>
+          <Button
+            disabled={!merged || save.isPending}
+            aria-busy={save.isPending}
+            onClick={() => merged && save.mutate({ cycleId: cycle.id, periods: merged.inputs }, { onSuccess: () => { toastSaved(`Đã lưu ${merged.inputs.length} kỳ`); onDone(); } })}
+          >
+            Áp dụng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -285,7 +259,8 @@ function GeneratePeriods({ cycle, existing, onDone }: { cycle: PerformanceCycle;
 
 const ALL = '__all';
 
-function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle; onOpenPlan: (planId: string) => void }) {
+/** Every Goal Plan of the cycle (WBS 4.3.6) with lock / unlock; a plan opens on its own page (`onOpenPlan`). */
+export function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle; onOpenPlan: (planId: string) => void }) {
   const { can } = useSession();
   const plans = useGoalPlans({ cycleId: cycle.id });
   const units = useOrgUnits();
@@ -388,14 +363,15 @@ function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle; onOpe
           ))}
         </SelectContent>
       </Select>
-      {can('goalplan.edit') && cycle.status !== 'Closed' && (
-        <Button size="sm" className="ml-auto" onClick={() => setCreating(true)}>
-          <Plus aria-hidden />
-          Tạo Goal Plan công ty / bộ phận
-        </Button>
-      )}
     </div>
   );
+  const create =
+    can('goalplan.edit') && cycle.status !== 'Closed' ? (
+      <Button onClick={() => setCreating(true)} disabled={!plans.data || !units.data}>
+        <Plus aria-hidden />
+        Tạo Goal Plan công ty / bộ phận
+      </Button>
+    ) : undefined;
 
   return (
     <>
@@ -412,6 +388,7 @@ function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle; onOpe
           setStatus(ALL);
         }}
         toolbar={toolbar}
+        actions={create}
       />
       {creating && plans.data && units.data && <CreatePlanDialog cycle={cycle} plans={plans.data} units={units.data} onClose={() => setCreating(false)} onCreated={onOpenPlan} />}
     </>

@@ -12,7 +12,7 @@ import { errorSpecOf } from '@/lib/errorCatalog';
 /**
  * "KPI của tôi" (WBS 4.3.2–4.3.5, Track T3): the signed-in person's own Goal Plan in the chosen cycle —
  * goals, weights, levels, split, links — and "Gửi" at their registration step. Actuals (WBS 4.4.2)
- * arrive with Track T4.
+ * arrive with Track T4. A goal opens on its own page under the plan (`/my/kpi/plans/:planId/goals/:goalId`).
  */
 export default function MyKpiPage() {
   const { user } = useSession();
@@ -35,7 +35,7 @@ export default function MyKpiPage() {
   } else if (!plan) {
     body = <EmptyStateCard>Chưa có Goal Plan trong chu kỳ này. HR sẽ khởi chạy phiếu đăng ký.</EmptyStateCard>;
   } else {
-    body = <GoalPlanWorkspace goalPlanId={plan.id} />;
+    body = <GoalPlanWorkspace goalPlanId={plan.id} basePath={`/my/kpi/plans/${encodeURIComponent(plan.id)}`} />;
   }
 
   return (

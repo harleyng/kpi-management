@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarRange, Info } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarRange, Info } from 'lucide-react';
 import { SectionTitle } from '@/components/shared/SectionTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,20 +20,26 @@ interface PeriodSplitPanelProps {
   goal: Goal;
   readOnly: boolean;
   onClose: () => void;
+  /** Whether the split holds edits not saved yet — for the page's unsaved-changes guard. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /**
  * "Phân bổ mục tiêu theo kỳ" (WBS 4.3.5, BR-KPI-11): the goal's target per month or quarter. "Chia
  * đều" is `goalPlanRules.evenSplit` by the KPI's aggregation; a mismatch is a WARNING (product owner)
- * — shown live, never blocking — because quarters and the year are built from these splits.
+ * — shown live, never blocking — because quarters and the year are built from these splits. The
+ * "Phân bổ theo kỳ" tab of the goal page.
  */
-export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose }: PeriodSplitPanelProps) {
+export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose, onDirtyChange }: PeriodSplitPanelProps) {
   const stored = data.periodTargets.filter((t) => t.goalId === goal.id);
   const typesInCycle = useMemo(() => [...new Set(data.periods.map((p) => p.periodType))] as PeriodType[], [data.periods]);
   const storedType = data.periods.find((p) => p.id === stored[0]?.periodId)?.periodType;
   const [type, setType] = useState<PeriodType>(storedType ?? (typesInCycle.includes('Month') ? 'Month' : (typesInCycle[0] ?? 'Month')));
   const periods = useMemo(() => data.periods.filter((p) => p.periodType === type).sort((a, b) => (a.startDate < b.startDate ? -1 : 1)), [data.periods, type]);
-  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(stored.map((t) => [t.periodId, formatDecimalInput(t.targetValue)])));
+  const [initialValues] = useState<Record<string, string>>(() => Object.fromEntries(stored.map((t) => [t.periodId, formatDecimalInput(t.targetValue)])));
+  const [values, setValues] = useState<Record<string, string>>(initialValues);
+  const dirty = !readOnly && Object.keys({ ...initialValues, ...values }).some((id) => (values[id] ?? '').trim() !== (initialValues[id] ?? ''));
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   const save = useSetPeriodTargets();
   const aggregation = goal.kpiDefId ? (lookups.kpi.get(goal.kpiDefId)?.aggregation ?? null) : null;
 
@@ -54,11 +60,7 @@ export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose }: Per
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <ArrowLeft aria-hidden />
-          Quay lại danh sách
-        </Button>
-        <SectionTitle icon={CalendarRange} title={`Phân bổ theo kỳ: ${goal.name}`}>
+        <SectionTitle icon={CalendarRange} title="Phân bổ mục tiêu theo kỳ">
           Mục tiêu {formatTarget(goal, lookups.unit.get(goal.unitId))}
           {aggregation ? ` · cộng dồn kiểu "${AGGREGATION_LABEL[aggregation]}"` : ''}
         </SectionTitle>

@@ -1,14 +1,18 @@
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary';
-import { SessionProvider } from '@/contexts/SessionContext';
 import { isRetryable } from '@/lib/errorCatalog';
-import App from './App.tsx';
+import { appRoutes } from './App.tsx';
 import './index.css';
-import { GatewayEventBridge } from '@/components/layout/GatewayEventBridge';
+
+/**
+ * The data router — needed for `useBlocker` (an editor page asking before its unsaved edits are left,
+ * `UnsavedChangesGuard`). The routes stay declared as elements in `App.tsx`.
+ */
+const router = createBrowserRouter(appRoutes);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,12 +32,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={200}>
         <Toaster />
-        <BrowserRouter>
-          <SessionProvider>
-            <GatewayEventBridge />
-            <App />
-          </SessionProvider>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </TooltipProvider>
     </QueryClientProvider>
   </RouteErrorBoundary>,

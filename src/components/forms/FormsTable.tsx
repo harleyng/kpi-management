@@ -20,6 +20,8 @@ interface FormsTableProps {
   /** "Phiếu của tôi": the subject is always the viewer, so the first column names the form type. */
   showSubject?: boolean;
   toolbar?: ReactNode;
+  /** The list's primary action — the right of the toolbar row (`DataTable`'s `actions`). */
+  actions?: ReactNode;
   isFiltered?: boolean;
   onClearFilters?: () => void;
   /** `null` turns client paging off (a list the gateway pages, with its own pager below). */
@@ -40,6 +42,7 @@ export function FormsTable({
   atMyStep,
   showSubject = true,
   toolbar,
+  actions,
   isFiltered,
   onClearFilters,
   pageSize,
@@ -112,6 +115,7 @@ export function FormsTable({
       getRowId={(f) => f.id}
       empty={empty}
       toolbar={toolbar}
+      actions={actions}
       isFiltered={isFiltered}
       onClearFilters={onClearFilters}
       pageSize={pageSize}

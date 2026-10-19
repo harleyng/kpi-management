@@ -57,13 +57,11 @@ export function PositionsTab() {
         getRowId={(r) => r.position.id}
         empty="Chưa có chức danh nào."
         pageSize={null}
-        toolbar={
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => setEditing('new')} disabled={!data}>
-              <Plus aria-hidden />
-              Thêm chức danh
-            </Button>
-          </div>
+        actions={
+          <Button size="sm" onClick={() => setEditing('new')} disabled={!data}>
+            <Plus aria-hidden />
+            Thêm chức danh
+          </Button>
         }
       />
       {editing && data && (

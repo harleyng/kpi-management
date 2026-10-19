@@ -78,6 +78,44 @@ describe('DataTable', () => {
     expect(screen.getByText('Chọn kỳ để xem số liệu.')).toBeInTheDocument();
   });
 
+  it('puts the toolbar and the primary action ABOVE the table card, in every state', () => {
+    const { container, rerender } = renderTable({
+      toolbar: <input aria-label="Tìm chỉ tiêu" />,
+      actions: <button type="button">Thêm chỉ tiêu</button>,
+      query: query({ error: new KpiError('ERR-KPI-01') }),
+    });
+    const table = screen.getByRole('table');
+    const search = screen.getByRole('textbox', { name: 'Tìm chỉ tiêu' });
+    // Still there when the read failed — the user can re-filter or add.
+    expect(screen.getByRole('button', { name: 'Thêm chỉ tiêu' })).toBeInTheDocument();
+    // Not inside the card that holds the table.
+    const card = table.closest('.rounded-lg, [class*="rounded"]')!;
+    expect(card.contains(search)).toBe(false);
+    expect(container.firstElementChild!.contains(search)).toBe(true);
+
+    rerender(
+      <DataTable<Row>
+        label="Danh sách chỉ tiêu"
+        columns={columns}
+        rows={[]}
+        query={query()}
+        getRowId={(r) => r.id}
+        empty="Chưa có chỉ tiêu nào."
+        emptyAction={<button type="button">Thêm chỉ tiêu</button>}
+        actions={<button type="button">Thêm chỉ tiêu</button>}
+      />,
+    );
+    // With `actions`, the empty state does not repeat the button.
+    expect(screen.getByText('Chưa có chỉ tiêu nào.')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Thêm chỉ tiêu' })).toHaveLength(1);
+  });
+
+  it('renders just the card without a toolbar or actions', () => {
+    const { container } = renderTable();
+    expect(container.firstElementChild!.querySelector('table')).not.toBeNull();
+    expect(container.firstElementChild!.className).not.toContain('space-y-3');
+  });
+
   it('says "nothing matches" with a clear action when a filter emptied the list', () => {
     const onClearFilters = vi.fn();
     renderTable({ rows: [], isFiltered: true, onClearFilters });

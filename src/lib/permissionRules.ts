@@ -500,62 +500,95 @@ export function can(profile: AccessProfile, code: PermissionCode, resource?: Per
 
 // ─── Navigation ────────────────────────────────────────────────────────────────────────────────
 
-/** The slice of a nav item these rules read — `NavItem` in `navConfig.ts` satisfies it. */
-export interface PermissionGatedItem {
+/** A menu destination — `NavLeaf` / `NavChild` in `navConfig.ts` satisfy it. */
+export interface PermissionGatedLeaf {
   url: string;
   /** `null` = any signed-in user. */
   permission: PermissionCode | null;
+  children?: undefined;
 }
+
+/**
+ * A menu item that only groups sub-pages (`NavParent`). It has NO permission of its own: it shows,
+ * and its url opens, exactly when one of its children does — so a parent can never let a profile
+ * reach something by falling through to it.
+ */
+export interface PermissionGatedParent<C extends PermissionGatedLeaf = PermissionGatedLeaf> {
+  url: string;
+  children: readonly C[];
+  permission?: undefined;
+}
+
+/** The slice of a nav item these rules read — `NavItem` in `navConfig.ts` satisfies it. */
+export type PermissionGatedItem = PermissionGatedLeaf | PermissionGatedParent;
 
 export interface PermissionGatedGroup<I extends PermissionGatedItem = PermissionGatedItem> {
   items: readonly I[];
 }
 
-function itemVisible(item: PermissionGatedItem, profile: AccessProfile): boolean {
+function leafVisible(item: PermissionGatedLeaf, profile: AccessProfile): boolean {
   return item.permission === null ? profile.active : can(profile, item.permission);
 }
 
+function itemVisible(item: PermissionGatedItem, profile: AccessProfile): boolean {
+  return item.children ? item.children.some((child) => leafVisible(child, profile)) : leafVisible(item, profile);
+}
+
 /**
- * The menu the profile sees: each group keeps its permitted items, in order; a group left with none
- * disappears. Hiding a link does NOT protect its route — that is `canOpenPath` (the AppShell guard).
+ * The menu the profile sees: each group keeps its permitted items, in order — a parent keeps its
+ * permitted children and disappears with none; a group left with no item disappears. Hiding a link
+ * does NOT protect its route — that is `canOpenPath` (the AppShell guard).
  */
 export function visibleNavGroups<I extends PermissionGatedItem, G extends PermissionGatedGroup<I>>(
   groups: readonly G[],
   profile: AccessProfile,
 ): G[] {
   return groups.flatMap((group) => {
-    const items = group.items.filter((item) => itemVisible(item, profile));
+    const items = group.items.flatMap((item): I[] => {
+      if (!item.children) return leafVisible(item, profile) ? [item] : [];
+      const children = item.children.filter((child) => leafVisible(child, profile));
+      return children.length > 0 ? [{ ...item, children }] : [];
+    });
     return items.length > 0 ? [{ ...group, items }] : [];
   });
 }
 
 /** `/admin/library/?x=1#y` → `/admin/library`. */
-function normalisePath(pathname: string): string {
+export function normalisePath(pathname: string): string {
   const path = pathname.split(/[?#]/, 1)[0] || '/';
   return path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
 }
 
+/** Does `url` claim `path` — the path itself or a deeper segment of it (`/a/b` claims `/a/b/1`, not `/a/bc`)? */
+export function claimsPath(url: string, path: string): boolean {
+  const u = normalisePath(url);
+  const p = normalisePath(path);
+  return p === u || p.startsWith(u === '/' ? '/' : `${u}/`);
+}
+
 /**
- * May the profile open this path? The longest nav item whose url is the path or a parent segment of
- * it decides (`/admin/library/123` follows "Thư viện KPI"; `/admin/libraryX` matches nothing). A
- * path no item claims — `/`, the not-found page — is open; `navConfig.test.ts` keeps every route of
- * `App.tsx` claimed or explicitly public. A detail page still checks its own record with `can`.
+ * May the profile open this path? The longest menu url that is the path or a parent segment of it
+ * decides — a leaf by its permission, a parent (its own url, or a path under it no child claims) by
+ * whether any child is visible. So a detail route (`/admin/cycles/123`) follows its leaf ("Chu kỳ"),
+ * and `/admin/libraryX` matches nothing. A path no item claims — `/`, the not-found page — is open;
+ * `navConfig.test.ts` keeps every route of `App.tsx` claimed or explicitly public. A detail page
+ * still checks its own record with `can`.
  */
 export function canOpenPath(
   pathname: string,
   groups: readonly PermissionGatedGroup[],
   profile: AccessProfile,
 ): boolean {
-  const path = normalisePath(pathname);
   let match: PermissionGatedItem | null = null;
   let matchLength = -1;
   for (const group of groups) {
     for (const item of group.items) {
-      const url = normalisePath(item.url);
-      const claims = path === url || path.startsWith(url === '/' ? '/' : `${url}/`);
-      if (claims && url.length > matchLength) {
-        match = item;
-        matchLength = url.length;
+      for (const candidate of [item, ...(item.children ?? [])]) {
+        const url = normalisePath(candidate.url);
+        if (claimsPath(url, pathname) && url.length > matchLength) {
+          match = candidate;
+          matchLength = url.length;
+        }
       }
     }
   }

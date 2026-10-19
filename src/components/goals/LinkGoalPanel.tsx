@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, Link2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link2 } from 'lucide-react';
 import { EntityCombobox, type ComboboxOption } from '@/components/shared/EntityCombobox';
 import { FormField } from '@/components/shared/FormField';
 import { SectionTitle } from '@/components/shared/SectionTitle';
@@ -24,6 +24,8 @@ interface LinkGoalPanelProps {
   goal: Goal;
   readOnly: boolean;
   onClose: () => void;
+  /** A parent goal picked but not linked yet — for the page's unsaved-changes guard. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const planLabel = (plan: GoalPlan, lookups: GoalLookups) =>
@@ -37,8 +39,9 @@ const planLabel = (plan: GoalPlan, lookups: GoalLookups) =>
  * "Liên kết lên chỉ tiêu cấp trên" (WBS 4.3.4, BR-KPI-07): an employee ties a goal they added to a
  * goal of their manager, their unit or the company (`planAccessRules.linkCandidatePlans`). Only goals
  * the person may SEE are offered (D2). The contribution % is informational in P1 (`ASSUMPTION Q31`).
+ * The "Liên kết" tab of the goal page.
  */
-export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose }: LinkGoalPanelProps) {
+export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose, onDirtyChange }: LinkGoalPanelProps) {
   const { tenantId, today } = useSession();
   const directory = useSessionDirectory(tenantId).data;
   const candidates = useMemo(
@@ -51,6 +54,8 @@ export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose }: LinkGo
   const [parentId, setParentId] = useState<string | null>(null);
   const [pct, setPct] = useState('100');
   const [error, setError] = useState<string | null>(null);
+  const dirty = !readOnly && parentId !== null;
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
 
   const existing = data.alignments.filter((a) => a.childGoalId === goal.id);
   const options = useMemo<ComboboxOption[] | undefined>(() => {
@@ -97,11 +102,7 @@ export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose }: LinkGo
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <ArrowLeft aria-hidden />
-          Quay lại danh sách
-        </Button>
-        <SectionTitle icon={Link2} title={`Liên kết: ${goal.name}`}>
+        <SectionTitle icon={Link2} title="Liên kết lên chỉ tiêu cấp trên">
           Liên kết chỉ tiêu này lên chỉ tiêu của quản lý, của bộ phận hoặc của công ty.
         </SectionTitle>
 

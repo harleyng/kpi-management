@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { EmptyStateCard } from '@/components/shared/EmptyState';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DelegationsPanel } from '@/components/forms/DelegationsPanel';
 import { FormTypeSelect } from '@/components/forms/FormFilters';
 import { FormsTable } from '@/components/forms/FormsTable';
@@ -10,39 +8,26 @@ import { useSession } from '@/contexts/useSession';
 import type { FormType } from '@/data/types';
 import { useForms, useInbox } from '@/hooks/queries/forms';
 
-const TABS = ['inbox', 'mine', 'delegations'] as const;
-type Tab = (typeof TABS)[number];
+export type MyTasksSection = 'inbox' | 'forms' | 'delegations';
+
+const SECTIONS: Record<MyTasksSection, { title: string; description: string }> = {
+  inbox: { title: 'Chờ tôi xử lý', description: 'Các phiếu đang chờ bạn ở bước hiện tại: đăng ký, điều chỉnh và đánh giá KPI.' },
+  forms: { title: 'Phiếu của tôi', description: 'Mọi phiếu về KPI của bạn, kể cả phiếu đang ở bước của người khác.' },
+  delegations: { title: 'Ủy quyền', description: 'Người được ủy quyền xử lý thay các bước của bạn trong thời gian ủy quyền. Lịch sử ghi nhận cả hai người.' },
+};
 
 /**
- * "Việc cần xử lý" (WBS 4.5.5) — every role. The inbox holds the forms whose CURRENT step waits on
- * the user, as its actor or as a delegate (`forms.listInbox`, most urgent first); "Phiếu của tôi" the
- * forms about the user; "Ủy quyền" their delegations. HR acting as proxy finds forms on "Khởi chạy
- * phiếu" → "Phiếu" — proxy access is not an inbox.
+ * "Việc cần xử lý" (WBS 4.5.5) — every role; one sub-page per section. "Chờ tôi xử lý" holds the
+ * forms whose CURRENT step waits on the user, as its actor or as a delegate (`forms.listInbox`, most
+ * urgent first); "Phiếu của tôi" the forms about the user; "Ủy quyền" their delegations. HR acting as
+ * proxy finds forms on "Khởi chạy phiếu" → "Phiếu đã tạo" — proxy access is not an inbox.
  */
-export default function MyTasksPage() {
-  const [params, setParams] = useSearchParams();
-  const tab: Tab = TABS.includes(params.get('tab') as Tab) ? (params.get('tab') as Tab) : 'inbox';
-  const setTab = (next: string) => setParams(next === 'inbox' ? {} : { tab: next }, { replace: true });
-
+export default function MyTasksPage({ section }: { section: MyTasksSection }) {
+  const { title, description } = SECTIONS[section];
   return (
     <>
-      <PageHeader title="Việc cần xử lý" description="Các phiếu đang chờ bạn: đăng ký, điều chỉnh và đánh giá KPI." />
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="inbox">Cần xử lý</TabsTrigger>
-          <TabsTrigger value="mine">Phiếu của tôi</TabsTrigger>
-          <TabsTrigger value="delegations">Ủy quyền</TabsTrigger>
-        </TabsList>
-        <TabsContent value="inbox" className="mt-4">
-          <InboxTab />
-        </TabsContent>
-        <TabsContent value="mine" className="mt-4">
-          <MyFormsTab />
-        </TabsContent>
-        <TabsContent value="delegations" className="mt-4">
-          <DelegationsPanel />
-        </TabsContent>
-      </Tabs>
+      <PageHeader title={title} description={description} />
+      {section === 'inbox' ? <InboxTab /> : section === 'forms' ? <MyFormsTab /> : <DelegationsPanel />}
     </>
   );
 }

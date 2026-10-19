@@ -79,8 +79,17 @@ interface DataTableProps<T> {
   /** Change it (e.g. to the search term) to send the table back to page 1. */
   pageResetKey?: unknown;
   serverPage?: ServerPage;
-  /** Search and filters above the table, inside its card. */
+  /**
+   * Search and filters — the left of the toolbar row, which sits ABOVE the table's card on the page
+   * canvas (design-system.md, "Tables"). It renders in every state, so a failed read can still be
+   * re-filtered.
+   */
   toolbar?: ReactNode;
+  /**
+   * The list's primary action ("Thêm chỉ tiêu") — the right of the toolbar row. With it, an empty
+   * list shows only its sentence: the button is already one line above, never twice.
+   */
+  actions?: ReactNode;
   /** `<TableRow>`s for a totals footer (a weight total) — computed by a rule, never here. */
   footer?: ReactNode;
 }
@@ -117,6 +126,7 @@ export function DataTable<T>({
   pageResetKey,
   serverPage,
   toolbar,
+  actions,
   footer,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<{ columnId: string; direction: SortDirection } | null>(null);
@@ -198,7 +208,7 @@ export function DataTable<T>({
               {FILTERED_EMPTY}
             </EmptyState>
           ) : (
-            <EmptyState action={emptyAction}>{empty}</EmptyState>
+            <EmptyState action={actions ? undefined : emptyAction}>{empty}</EmptyState>
           )}
         </TableCell>
       </TableRow>
@@ -220,10 +230,9 @@ export function DataTable<T>({
 
   const showRows = !failed && !firstLoad && visible && visible.length > 0;
 
-  return (
+  const card = (
     <Card>
       <CardContent className="p-0">
-        {toolbar && <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">{toolbar}</div>}
         <Table
           aria-label={label}
           aria-busy={firstLoad || refreshing || undefined}
@@ -267,6 +276,17 @@ export function DataTable<T>({
         )}
       </CardContent>
     </Card>
+  );
+
+  if (!toolbar && !actions) return card;
+  return (
+    <div className="space-y-3">
+      <div className="flex min-h-9 flex-wrap items-center gap-2">
+        {toolbar}
+        {actions && <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {card}
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { FormField } from '@/components/shared/FormField';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Kgi } from '@/data/types';
@@ -17,6 +18,7 @@ const NO_UNIT = '__none';
 /**
  * The plan's KGI (BR-KPI-02): 3–5 key goals, advisory (a warning in the readiness strip, never a
  * block). A KGI may carry a target, never scored (`ASSUMPTION Q9`). Collapsed once it has 3 or more.
+ * Adding or editing one opens a dialog — the list never turns into a form.
  */
 export function KgiSection({ data, lookups, editable }: { data: PlanWorkspaceData; lookups: GoalLookups; editable: boolean }) {
   const [open, setOpen] = useState(data.kgis.length < KGI_COUNT.min);
@@ -51,49 +53,39 @@ export function KgiSection({ data, lookups, editable }: { data: PlanWorkspaceDat
       </div>
       {open && (
         <div id="kgi-list" className="border-t px-4 py-3">
-          {data.kgis.length === 0 && editing === null && <p className="text-sm text-muted-foreground">Chưa có KGI nào.</p>}
+          {data.kgis.length === 0 && <p className="text-sm text-muted-foreground">Chưa có KGI nào.</p>}
           <ol className="space-y-2">
-            {data.kgis.map((kgi, i) =>
-              editing !== 'new' && editing?.id === kgi.id ? (
-                <li key={kgi.id}>
-                  <KgiForm data={data} lookups={lookups} kgi={kgi} onDone={() => setEditing(null)} />
-                </li>
-              ) : (
-                <li key={kgi.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <span className="font-medium">
-                      {i + 1}. {kgi.name}
+            {data.kgis.map((kgi, i) => (
+              <li key={kgi.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                <div className="min-w-0">
+                  <span className="font-medium">
+                    {i + 1}. {kgi.name}
+                  </span>
+                  {kgi.targetValue !== null && (
+                    <span className="tabular-nums text-muted-foreground">
+                      {' '}
+                      · mục tiêu {formatNumber(kgi.targetValue)} {kgi.unitId ? lookups.unit.get(kgi.unitId)?.name : ''}
                     </span>
-                    {kgi.targetValue !== null && (
-                      <span className="tabular-nums text-muted-foreground">
-                        {' '}
-                        · mục tiêu {formatNumber(kgi.targetValue)} {kgi.unitId ? lookups.unit.get(kgi.unitId)?.name : ''}
-                      </span>
-                    )}
-                    <span className="text-muted-foreground"> · {goalCount(kgi.id)} chỉ tiêu</span>
-                    {kgi.description && <p className="text-xs text-muted-foreground">{kgi.description}</p>}
-                  </div>
-                  {editable && (
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setEditing(kgi)}>
-                        Sửa
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDeleting(kgi)}>
-                        Xóa
-                      </Button>
-                    </div>
                   )}
-                </li>
-              ),
-            )}
-            {editing === 'new' && (
-              <li>
-                <KgiForm data={data} lookups={lookups} kgi={null} onDone={() => setEditing(null)} />
+                  <span className="text-muted-foreground"> · {goalCount(kgi.id)} chỉ tiêu</span>
+                  {kgi.description && <p className="text-xs text-muted-foreground">{kgi.description}</p>}
+                </div>
+                {editable && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(kgi)} aria-label={`Sửa KGI ${kgi.name}`}>
+                      Sửa
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleting(kgi)} aria-label={`Xóa KGI ${kgi.name}`}>
+                      Xóa
+                    </Button>
+                  </div>
+                )}
               </li>
-            )}
+            ))}
           </ol>
         </div>
       )}
+      {editing && <KgiDialog key={editing === 'new' ? 'new' : editing.id} data={data} lookups={lookups} kgi={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />}
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(o) => !o && setDeleting(null)}
@@ -107,7 +99,8 @@ export function KgiSection({ data, lookups, editable }: { data: PlanWorkspaceDat
   );
 }
 
-function KgiForm({ data, lookups, kgi, onDone }: { data: PlanWorkspaceData; lookups: GoalLookups; kgi: Kgi | null; onDone: () => void }) {
+/** Add / edit one KGI in a dialog (same fields and checks as before). */
+function KgiDialog({ data, lookups, kgi, onDone }: { data: PlanWorkspaceData; lookups: GoalLookups; kgi: Kgi | null; onDone: () => void }) {
   const [name, setName] = useState(kgi?.name ?? '');
   const [description, setDescription] = useState(kgi?.description ?? '');
   const [target, setTarget] = useState(formatDecimalInput(kgi?.targetValue ?? null));
@@ -141,43 +134,51 @@ function KgiForm({ data, lookups, kgi, onDone }: { data: PlanWorkspaceData; look
   };
 
   return (
-    <div className="space-y-3 rounded-md bg-surface-alt p-3">
-      <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
-        <FormField label="Tên KGI" required error={submitted ? nameError : undefined}>
-          {(control) => <Input {...control} value={name} onChange={(e) => setName(e.target.value)} />}
-        </FormField>
-        <FormField label="Mục tiêu" hint="Không bắt buộc, không tính điểm (giả định Q9)." error={targetError}>
-          {(control) => <Input {...control} inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} />}
-        </FormField>
-        <FormField label="Đơn vị đo">
-          {(control) => (
-            <Select value={unitId} onValueChange={setUnitId}>
-              <SelectTrigger {...control}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_UNIT}>Không có</SelectItem>
-                {lookups.units.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </FormField>
-      </div>
-      <FormField label="Mô tả">
-        {(control) => <Input {...control} value={description} onChange={(e) => setDescription(e.target.value)} />}
-      </FormField>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={onDone} disabled={save.isPending}>
-          Hủy
-        </Button>
-        <Button size="sm" onClick={onSave} disabled={save.isPending} aria-busy={save.isPending}>
-          {kgi ? 'Lưu KGI' : 'Thêm KGI'}
-        </Button>
-      </div>
-    </div>
+    <Dialog open onOpenChange={(o) => !o && !save.isPending && onDone()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{kgi ? `Sửa KGI "${kgi.name}"` : 'Thêm KGI'}</DialogTitle>
+          <DialogDescription>KGI là mục tiêu then chốt của Goal Plan (nên có {KGI_COUNT.min}–{KGI_COUNT.max}); chỉ tiêu gắn vào KGI để thấy chúng phục vụ điều gì.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label="Tên KGI" required error={submitted ? nameError : undefined} className="sm:col-span-2">
+              {(control) => <Input {...control} value={name} onChange={(e) => setName(e.target.value)} />}
+            </FormField>
+            <FormField label="Mục tiêu" hint="Không bắt buộc, không tính điểm (giả định Q9)." error={targetError}>
+              {(control) => <Input {...control} inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} />}
+            </FormField>
+            <FormField label="Đơn vị đo">
+              {(control) => (
+                <Select value={unitId} onValueChange={setUnitId}>
+                  <SelectTrigger {...control}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_UNIT}>Không có</SelectItem>
+                    {lookups.units.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+          </div>
+          <FormField label="Mô tả">
+            {(control) => <Input {...control} value={description} onChange={(e) => setDescription(e.target.value)} />}
+          </FormField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onDone} disabled={save.isPending}>
+            Hủy
+          </Button>
+          <Button onClick={onSave} disabled={save.isPending} aria-busy={save.isPending}>
+            {kgi ? 'Lưu KGI' : 'Thêm KGI'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

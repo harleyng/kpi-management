@@ -1,39 +1,45 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DiscardChangesDialog } from '@/components/library/DiscardChangesDialog';
 import { LibraryExportButton } from '@/components/library/LibraryExportButton';
-import { TemplateEditor } from '@/components/library/TemplateEditor';
-import { TemplateList, type TemplateListEntry } from '@/components/library/TemplateList';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
+import { DataTable, type DataTableColumn } from '@/components/shared/DataTable';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchInput } from '@/components/shared/SearchInput';
+import { LibraryStatusBadge } from '@/components/shared/StatusBadge';
 import { useSession } from '@/contexts/useSession';
+import { LIBRARY_STATUSES, type KpiTemplate } from '@/data/types';
 import { useKpiDefinitions, useKpiTemplateItems, useKpiTemplates } from '@/hooks/queries/library';
 import { useOrgUnits, usePositions } from '@/hooks/queries/org';
-import { errorSpecOf } from '@/lib/errorCatalog';
-import { TEMPLATE_AUDIENCE_LABEL, templateAudience, templateIssues, type TemplateAudience } from '@/lib/libraryRules';
-import { combineQueries, loadPhase } from '@/lib/queryState';
+import { TEMPLATE_AUDIENCE_LABEL, templateAudience, templateIssues, templateWeightTotal, type TemplateAudience } from '@/lib/libraryRules';
+import { combineQueries } from '@/lib/queryState';
 import { matchesSearch } from '@/lib/search';
+import { formatPercent } from '@/lib/utils';
 
 const ALL = 'all';
-const NEW = 'moi';
+
+interface TemplateRow {
+  template: KpiTemplate;
+  /** "Đơn vị: Phòng Marketing", "Chung"… */
+  audience: string;
+  itemCount: number;
+  weightTotal: number;
+  /** Off 100% or outside 5–8 items, or an archived KPI inside (`templateIssues` warnings). */
+  needsReview: boolean;
+}
 
 /**
- * Bộ mẫu — WBS 4.2.4, track T2. Master list on the left, the selected template on the right. The
- * selection and filters live in the URL; switching away from unsaved edits asks first.
+ * Bộ mẫu — WBS 4.2.4, track T2. The list only; a template opens on its own page
+ * (`/admin/templates/:templateId`, `TemplateDetailPage`). Search and the audience filter live in the URL.
  */
 export default function KpiTemplatesPage() {
   const { can } = useSession();
   const canManage = can('library.manage');
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const search = params.get('q') ?? '';
   const audienceFilter = (params.get('ad') ?? ALL) as TemplateAudience | typeof ALL;
-  const selectedParam = params.get('bo');
 
   const templates = useKpiTemplates();
   const items = useKpiTemplateItems();
@@ -41,13 +47,6 @@ export default function KpiTemplatesPage() {
   const orgUnits = useOrgUnits();
   const positions = usePositions();
   const query = combineQueries([templates, items, definitions, orgUnits, positions]);
-  const loaded = templates.data && items.data && definitions.data && orgUnits.data && positions.data;
-
-  const dirtyRef = useRef(false);
-  const onDirtyChange = useCallback((dirty: boolean) => {
-    dirtyRef.current = dirty;
-  }, []);
-  const [pendingSelect, setPendingSelect] = useState<string | null>(null);
 
   const setParam = (changes: Record<string, string | null>) =>
     setParams(
@@ -62,14 +61,8 @@ export default function KpiTemplatesPage() {
       { replace: true },
     );
 
-  const select = (id: string) => {
-    if (id === selectedParam) return;
-    if (dirtyRef.current) setPendingSelect(id);
-    else setParam({ bo: id });
-  };
-
-  const entries = useMemo<TemplateListEntry[] | undefined>(() => {
-    if (!loaded || !templates.data || !items.data || !definitions.data || !orgUnits.data || !positions.data) return undefined;
+  const rows = useMemo<TemplateRow[] | undefined>(() => {
+    if (!templates.data || !items.data || !definitions.data || !orgUnits.data || !positions.data) return undefined;
     const defs = new Map(definitions.data.map((d) => [d.id, d]));
     const unitName = new Map(orgUnits.data.map((u) => [u.id, u.name]));
     const positionName = new Map(positions.data.map((p) => [p.id, p.name]));
@@ -85,89 +78,104 @@ export default function KpiTemplatesPage() {
           template: t,
           audience: target ? `${TEMPLATE_AUDIENCE_LABEL[audience]}: ${target}` : TEMPLATE_AUDIENCE_LABEL[audience],
           itemCount: own.length,
+          weightTotal: templateWeightTotal(own),
           needsReview: warnings.length > 0,
         };
       });
-  }, [loaded, templates.data, items.data, definitions.data, orgUnits.data, positions.data, audienceFilter, search]);
+  }, [templates.data, items.data, definitions.data, orgUnits.data, positions.data, audienceFilter, search]);
 
-  const selected = selectedParam && selectedParam !== NEW ? templates.data?.find((t) => t.id === selectedParam) ?? null : null;
-  const storedItems = useMemo(() => (selected && items.data ? items.data.filter((i) => i.templateId === selected.id) : []), [selected, items.data]);
-  const creating = selectedParam === NEW && canManage;
+  const open = (id: string) => navigate(`/admin/templates/${id}`);
 
-  let detail;
-  const phase = loadPhase(query, Boolean(loaded));
-  if (phase === 'error') detail = <ErrorStateCard spec={errorSpecOf(query.error)} onAction={() => void query.refetch()} className="border-0" />;
-  else if (!loaded) detail = null;
-  else if (creating || selected) {
-    detail = (
-      <TemplateEditor
-        template={creating ? null : selected}
-        storedItems={storedItems}
-        definitions={definitions.data ?? []}
-        orgUnits={(orgUnits.data ?? []).filter((u) => u.status === 'Active' || u.id === selected?.orgUnitId)}
-        positions={(positions.data ?? []).filter((p) => p.status === 'Active' || p.id === selected?.positionId)}
-        readOnly={!canManage}
-        onSaved={(id) => setParam({ bo: id })}
-        onCancelNew={() => setParam({ bo: null })}
-        onDirtyChange={onDirtyChange}
-      />
-    );
-  } else if (selectedParam) {
-    detail = <EmptyState>Không tìm thấy bộ mẫu này. Có thể nó đã bị xóa hoặc thuộc công ty khác.</EmptyState>;
-  } else {
-    detail = <EmptyState>Chọn một bộ mẫu ở danh sách bên trái để xem và sửa chỉ tiêu.</EmptyState>;
-  }
+  const columns: DataTableColumn<TemplateRow>[] = [
+    {
+      id: 'name',
+      header: 'Tên bộ mẫu',
+      cell: ({ template }) => (
+        <button
+          type="button"
+          className="rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={() => open(template.id)}
+        >
+          {template.name}
+        </button>
+      ),
+      sortValue: ({ template }) => template.name,
+      className: 'min-w-[16rem]',
+    },
+    { id: 'audience', header: 'Áp dụng cho', cell: (r) => r.audience, sortValue: (r) => r.audience, className: 'min-w-[12rem]' },
+    { id: 'items', header: 'Số chỉ tiêu', numeric: true, cell: (r) => r.itemCount, sortValue: (r) => r.itemCount },
+    {
+      id: 'weight',
+      header: 'Tổng trọng số',
+      numeric: true,
+      cell: (r) => (r.itemCount === 0 ? null : formatPercent(r.weightTotal)),
+      sortValue: (r) => (r.itemCount === 0 ? null : r.weightTotal),
+    },
+    {
+      id: 'review',
+      header: 'Kiểm tra',
+      // Said in words, not only colour.
+      cell: (r) =>
+        r.needsReview ? (
+          <span className="inline-flex items-center gap-1 whitespace-nowrap text-sm">
+            <AlertTriangle className="h-3.5 w-3.5 text-support-warning" aria-hidden />
+            Cần xem lại
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">Hợp lệ</span>
+        ),
+      sortValue: (r) => (r.needsReview ? 0 : 1),
+      className: 'whitespace-nowrap',
+    },
+    {
+      id: 'status',
+      header: 'Trạng thái',
+      cell: ({ template }) => <LibraryStatusBadge status={template.status} />,
+      sortValue: ({ template }) => LIBRARY_STATUSES.indexOf(template.status),
+    },
+  ];
+
+  const isFiltered = search !== '' || audienceFilter !== ALL;
 
   return (
     <>
       <PageHeader title="Bộ mẫu" description="Bộ chỉ tiêu mẫu theo đơn vị hoặc chức danh, kèm trọng số mặc định, để lập Goal Plan nhanh." actions={<LibraryExportButton />} />
-      <Card className="flex flex-col overflow-hidden lg:h-[calc(100dvh-13rem)] lg:min-h-[30rem] lg:flex-row">
-        <div className="flex min-h-0 flex-col border-b lg:w-80 lg:shrink-0 lg:border-b-0 lg:border-r">
-          <div className="space-y-2 border-b p-3">
-            <SearchInput value={search} onChange={(v) => setParam({ q: v })} placeholder="Tìm bộ mẫu" />
-            <div className="flex gap-2">
-              <Select value={audienceFilter} onValueChange={(v) => setParam({ ad: v })}>
-                <SelectTrigger className="h-9 flex-1" aria-label="Lọc theo đối tượng áp dụng">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Mọi đối tượng</SelectItem>
-                  {(Object.keys(TEMPLATE_AUDIENCE_LABEL) as TemplateAudience[]).map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {TEMPLATE_AUDIENCE_LABEL[a]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {canManage && (
-                <Button size="sm" className="h-9" onClick={() => select(NEW)}>
-                  <Plus className="h-4 w-4" aria-hidden />
-                  Thêm bộ mẫu
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="max-h-[24rem] overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
-            <TemplateList
-              entries={entries}
-              query={query}
-              selectedId={creating ? null : selectedParam}
-              onSelect={select}
-              isFiltered={search !== '' || audienceFilter !== ALL}
-              emptyText={canManage ? 'Chưa có bộ mẫu nào. Chọn Thêm bộ mẫu để tạo bộ đầu tiên.' : 'Chưa có bộ mẫu nào.'}
-            />
-          </div>
-        </div>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{detail}</div>
-      </Card>
-      <DiscardChangesDialog
-        open={pendingSelect !== null}
-        onOpenChange={(open) => !open && setPendingSelect(null)}
-        onDiscard={() => {
-          dirtyRef.current = false;
-          setParam({ bo: pendingSelect });
-          setPendingSelect(null);
-        }}
+      <DataTable
+        label="Danh sách bộ mẫu"
+        columns={columns}
+        rows={rows}
+        query={query}
+        getRowId={(r) => r.template.id}
+        empty={canManage ? 'Chưa có bộ mẫu nào. Chọn Thêm bộ mẫu để tạo bộ đầu tiên.' : 'Chưa có bộ mẫu nào.'}
+        isFiltered={isFiltered}
+        onClearFilters={() => setParam({ q: null, ad: null })}
+        pageResetKey={`${search}|${audienceFilter}`}
+        toolbar={
+          <>
+            <SearchInput value={search} onChange={(v) => setParam({ q: v })} placeholder="Tìm bộ mẫu" className="w-full sm:w-72" />
+            <Select value={audienceFilter} onValueChange={(v) => setParam({ ad: v })}>
+              <SelectTrigger className="h-9 w-[12rem]" aria-label="Lọc theo đối tượng áp dụng">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>Mọi đối tượng</SelectItem>
+                {(Object.keys(TEMPLATE_AUDIENCE_LABEL) as TemplateAudience[]).map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {TEMPLATE_AUDIENCE_LABEL[a]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        }
+        actions={
+          canManage && (
+            <Button size="sm" onClick={() => navigate('/admin/templates/new')}>
+              <Plus className="h-4 w-4" aria-hidden />
+              Thêm bộ mẫu
+            </Button>
+          )
+        }
       />
     </>
   );

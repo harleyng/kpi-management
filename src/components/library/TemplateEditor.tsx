@@ -85,7 +85,7 @@ export interface TemplateEditorProps {
 }
 
 /**
- * The detail side of `/admin/templates` (WBS 4.2.4): the template's header, its items with default
+ * The body of `/admin/templates/:templateId` (WBS 4.2.4): the template's header, its items with default
  * weights, and the footer every edit settles — the live weight total and item count. Those two are
  * WARNINGS (`ASSUMPTION Q26`): the template saves, and the Goal Plan made from it is what must reach
  * 100% and 5–8 KPIs (BR-KPI-03/04). Applying a template to a plan is track T3's.
@@ -334,7 +334,7 @@ function TemplateEditorInner({ template, storedItems, definitions, orgUnits, pos
         )}
       </div>
 
-      <div className="sticky bottom-0 flex flex-wrap items-center gap-x-6 gap-y-2 border-t bg-surface-alt px-4 py-3">
+      <div className="sticky bottom-0 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-b-[inherit] border-t bg-surface-alt px-4 py-3">
         <div aria-live="polite" className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-1 text-sm">
           <span className="flex items-center gap-1.5">
             {form.items.length === 0 ? null : weightWarning ? (

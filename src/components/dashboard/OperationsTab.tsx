@@ -169,12 +169,13 @@ function OverdueLine({ count, what }: { count: number; what: string }) {
   return count === 0 ? (
     <p className="text-sm text-muted-foreground">Không có {what} quá hạn.</p>
   ) : (
-    <p className="flex items-center gap-2 text-sm">
+    // A <div>: the badge renders a <div>, which a <p> may not hold.
+    <div className="flex items-center gap-2 text-sm">
       <OverdueBadge />
       <span>
         {count} {what} quá hạn
       </span>
-    </p>
+    </div>
   );
 }
 

@@ -152,7 +152,7 @@ export function KpiDefinitionsPanel({ canManage }: { canManage: boolean }) {
             ? 'Chưa có chỉ tiêu mẫu. Thêm chỉ tiêu đầu tiên để dùng khi lập Goal Plan.'
             : 'Thư viện chưa có chỉ tiêu mẫu nào.'
         }
-        emptyAction={
+        actions={
           canManage && (
             <Button size="sm" onClick={openNew}>
               <Plus className="h-4 w-4" aria-hidden />
@@ -161,7 +161,16 @@ export function KpiDefinitionsPanel({ canManage }: { canManage: boolean }) {
           )
         }
         isFiltered={isFiltered}
-        onClearFilters={() => setParams(new URLSearchParams(params.get('tab') ? { tab: params.get('tab') as string } : {}), { replace: true })}
+        onClearFilters={() =>
+          setParams(
+            (p) => {
+              const next = new URLSearchParams(p);
+              for (const key of ['q', 'vc', 'tt']) next.delete(key);
+              return next;
+            },
+            { replace: true },
+          )
+        }
         pageResetKey={`${search}|${perspectiveFilter}|${statusFilter}`}
         toolbar={
           <>
@@ -197,12 +206,6 @@ export function KpiDefinitionsPanel({ canManage }: { canManage: boolean }) {
                 ))}
               </SelectContent>
             </Select>
-            {canManage && (
-              <Button size="sm" className="ml-auto" onClick={openNew}>
-                <Plus className="h-4 w-4" aria-hidden />
-                Thêm chỉ tiêu
-              </Button>
-            )}
           </>
         }
       />

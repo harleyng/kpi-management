@@ -17,6 +17,8 @@ import {
   visibleNavGroups,
   type PermissionCode,
   type PermissionGatedItem,
+  type PermissionGatedLeaf,
+  type PermissionGatedParent,
   type PermissionResource,
 } from './permissionRules';
 import { buildTenant, type AccountKey, type TestTenant } from './permissionFixtures.test-util';
@@ -529,6 +531,45 @@ describe('visibleNavGroups and canOpenPath', () => {
 
   it('shows everything to a profile holding every code', () => {
     expect(visibleNavGroups(groups, A.profileOf('admin'))).toEqual(groups);
+  });
+
+  describe('with sub-items', () => {
+    const leaf = (url: string, permission: PermissionCode | null): PermissionGatedLeaf => ({ url, permission });
+    const nested = [
+      { label: 'mine', items: [leaf('/my/kpi', null), { url: '/my/tasks', children: [leaf('/my/tasks/inbox', null)] }] },
+      {
+        label: 'admin',
+        items: [
+          { url: '/admin/launches', children: [leaf('/admin/launches/runs', 'form.launch'), leaf('/admin/launches/workflows', 'goalplan.import')] },
+          { url: '/admin/library', children: [leaf('/admin/library/definitions', 'library.manage')] },
+        ],
+      },
+    ];
+
+    it('keeps a parent with its permitted children only, and drops one with none', () => {
+      const forCnb = visibleNavGroups(nested, cnb);
+      const launches = forCnb[1].items[0] as PermissionGatedParent;
+      expect(launches.children.map((c) => c.url)).toEqual(['/admin/launches/runs']);
+      expect(visibleNavGroups(nested, selfEmp).map((g) => g.label)).toEqual(['mine']);
+      expect(visibleNavGroups(nested, A.profileOf('admin'))).toEqual(nested);
+    });
+
+    it.each([
+      ['/admin/launches/runs', 'cnb', true],
+      ['/admin/launches/runs/new', 'cnb', true], // a detail route follows its sub-item
+      ['/admin/launches/workflows', 'cnb', false], // a narrower sibling decides for itself
+      ['/admin/launches/workflows/w1', 'cnb', false],
+      ['/admin/launches/workflows/w1', 'hr', true],
+      ['/admin/launches', 'cnb', true], // the parent url: any child visible
+      ['/admin/launches', 'emp', false], // …never open by falling through
+      ['/admin/launches?tab=rules', 'emp', false],
+      ['/admin/launches/xyz', 'emp', false], // unclaimed by a child → the parent decides
+      ['/admin/launchesX', 'emp', true],
+      ['/my/tasks', 'emp', true],
+      ['/my/tasks/inbox', 'idle', false],
+    ] as const)('%s for %s → %s', (path, key, allowed) => {
+      expect(canOpenPath(path, nested, A.profileOf(key))).toBe(allowed);
+    });
   });
 
   it.each([

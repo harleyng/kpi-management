@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -73,7 +73,7 @@ function Probe() {
   const navigate = useNavigate();
   return (
     <div>
-      <button type="button" onClick={() => navigate('/my/tasks')}>
+      <button type="button" onClick={() => navigate('/my/tasks/inbox')}>
         go-tasks
       </button>
       <span data-testid="who">{`${s.tenantId}|${s.user.id}`}</span>
@@ -220,7 +220,7 @@ describe('SessionProvider — the stored selection is a preference, never truste
 
 describe('SessionProvider — switching', () => {
   it('switches tenant through a fresh load, never showing the old tenant’s people', async () => {
-    renderApp('/admin/library');
+    renderApp('/admin/library/definitions');
     await who();
     expect(screen.getByTestId('people').textContent!.split(',').every((id) => id.startsWith('t1-'))).toBe(true);
 
@@ -248,11 +248,20 @@ describe('SessionProvider — switching', () => {
 
   it('stays on the page when the new person may open it, goes home when not', async () => {
     store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-hr' } });
-    renderApp('/admin/library');
+    renderApp('/admin/library/definitions');
     await who();
     act(() => session!.switchUser('t1-user-cnb'));
     expect(await who()).toBe('t1|t1-user-cnb');
-    expect(screen.getByTestId('path').textContent).toBe('/admin/library');
+    expect(screen.getByTestId('path').textContent).toBe('/admin/library/definitions');
+    act(() => session!.switchUser('t1-user-emp'));
+    expect(await who()).toBe('t1|t1-user-emp');
+    expect(screen.getByTestId('path').textContent).toBe('/my/kpi');
+  });
+
+  it('goes home from a detail page the new person may not open', async () => {
+    store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-hr' } });
+    renderApp('/admin/cycles/c1/plans/p1');
+    await who();
     act(() => session!.switchUser('t1-user-emp'));
     expect(await who()).toBe('t1|t1-user-emp');
     expect(screen.getByTestId('path').textContent).toBe('/my/kpi');
@@ -272,7 +281,7 @@ describe('SessionProvider — switching', () => {
     const first = session!;
     // A navigation re-renders the provider (it reads the location) without changing the session.
     fireEvent.click(screen.getByRole('button', { name: 'go-tasks' }));
-    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/my/tasks'));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/my/tasks/inbox'));
     expect(session).toBe(first);
     expect(session!.can).toBe(first.can);
     expect(session!.switchUser).toBe(first.switchUser);
@@ -293,7 +302,7 @@ describe('SessionProvider — switching', () => {
 
 describe('the AppShell route guard', () => {
   it('blocks a typed-in route the person may not open, with the catalogue copy and a way home', async () => {
-    renderApp('/system/users', true);
+    renderApp('/system/users/accounts', true);
     // ceo (BOD) holds no user.manage.
     expect(await screen.findByText(ERROR_CATALOG['ERR-KPI-05'].title)).toBeInTheDocument();
     expect(screen.queryByTestId('who')).toBeNull();
@@ -304,9 +313,52 @@ describe('the AppShell route guard', () => {
 
   it('lets the route through for a person holding its permission', async () => {
     store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-admin' } });
-    renderApp('/system/users', true);
+    renderApp('/system/users/accounts', true);
     expect(await who()).toBe('t1|t1-user-admin');
     expect(screen.queryByText(ERROR_CATALOG['ERR-KPI-05'].title)).toBeNull();
+  });
+
+  it('sends an old link to the sub-page it became, keeping its other params', async () => {
+    store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-admin' } });
+    renderApp('/admin/library?tab=danh-muc&q=x', true);
+    await who();
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/admin/library/perspectives'));
+  });
+
+  it('denies an old link the person may not open instead of redirecting into it', async () => {
+    renderApp('/admin/actuals?tab=sync', true);
+    expect(await screen.findByText(ERROR_CATALOG['ERR-KPI-05'].title)).toBeInTheDocument();
+    expect(screen.queryByTestId('who')).toBeNull();
+  });
+
+  it('opens the area of the current sub-page in the menu and marks the page', async () => {
+    store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-admin' } });
+    renderApp('/admin/library/units?cycle=c1', true);
+    await who();
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    const area = within(nav).getByRole('button', { name: 'Thư viện KPI' });
+    expect(area).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('link', { name: 'Đơn vị đo' })).toHaveAttribute('aria-current', 'page');
+    // Another area is folded until opened by hand — one at a time.
+    const launches = within(nav).getByRole('button', { name: 'Khởi chạy phiếu' });
+    expect(launches).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).queryByRole('link', { name: 'Đợt khởi chạy' })).toBeNull();
+    fireEvent.click(launches);
+    expect(launches).toHaveAttribute('aria-expanded', 'true');
+    expect(within(nav).getByRole('link', { name: 'Đợt khởi chạy' })).toHaveAttribute('href', '/admin/launches/runs');
+    // The area holding the page stays open.
+    fireEvent.click(area);
+    expect(area).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('carries the cycle and period between sibling sub-pages only', async () => {
+    store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-admin' } });
+    renderApp('/admin/results/period?cycle=c1&period=p1&q=x', true);
+    await who();
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
+    expect(within(nav).getByRole('link', { name: 'Xuất file lương' })).toHaveAttribute('href', '/admin/results/payroll?cycle=c1&period=p1');
+    fireEvent.click(within(nav).getByRole('button', { name: 'Số liệu & import' }));
+    expect(within(nav).getByRole('link', { name: 'Nhập tay' })).toHaveAttribute('href', '/admin/actuals/entry');
   });
 
   it('shows only the permitted menu groups', async () => {

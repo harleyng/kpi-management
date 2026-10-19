@@ -23,11 +23,13 @@ async function becomePersona(page: Page, search: string, role: RegExp) {
 test.describe('@smoke Dashboard (Phase 3)', () => {
   test('BOD opens on T02 at the company, drills to a department and opens a person', async ({ page }) => {
     await becomePersona(page, 'Ban điều hành', /vai trò .*Ban điều hành/);
-    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Dashboard', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+    const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+    await nav.getByRole('button', { name: 'Dashboard', exact: true }).click();
+    await nav.getByRole('link', { name: 'Tổng quan', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Tổng quan' })).toBeVisible();
 
     // The company's own T02 result is a Draft: shown, labelled "Tạm tính", unrated.
-    await expect(page.getByRole('navigation', { name: 'Đường dẫn' })).toContainText('Công ty Syntra');
+    await expect(page.getByRole('navigation', { name: 'Đường dẫn đơn vị' })).toContainText('Công ty Syntra');
     const summary = page.locator('dl').first();
     await expect(summary).toContainText('106,07');
     await expect(summary).toContainText('Tạm tính');
@@ -55,7 +57,7 @@ test.describe('@smoke Dashboard (Phase 3)', () => {
 
   test('the assistant summarises what is on screen, labelled simulated', async ({ page }) => {
     await becomePersona(page, 'Ban điều hành', /vai trò .*Ban điều hành/);
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/overview');
     await page.getByRole('button', { name: 'Tóm tắt' }).click();
     const card = page.getByRole('region', { name: /Trợ lý KPI/ });
     await expect(card.getByText('Giả lập', { exact: true })).toBeVisible();
@@ -68,7 +70,7 @@ test.describe('@smoke Dashboard (Phase 3)', () => {
 
   test('the operations report counts T02 forms and lists the overdue ones', async ({ page }) => {
     await becomePersona(page, 'Ban điều hành', /vai trò .*Ban điều hành/);
-    await page.goto('/dashboard?tab=van-hanh');
+    await page.goto('/dashboard/operations');
     await expect(page.getByText('Hoàn thành 22/27 phiếu', { exact: false })).toBeVisible();
     await expect(page.getByRole('table', { name: 'Phiếu quá hạn' }).getByRole('row').nth(1)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Xuất báo cáo vận hành (Excel)' })).toBeEnabled();
@@ -77,8 +79,8 @@ test.describe('@smoke Dashboard (Phase 3)', () => {
 
   test('a manager sees their own department as the root — no company above it', async ({ page }) => {
     await becomePersona(page, 'Đỗ Văn Hùng', /vai trò .*Quản lý/);
-    await page.goto('/dashboard');
-    const crumbs = page.getByRole('navigation', { name: 'Đường dẫn' });
+    await page.goto('/dashboard/overview');
+    const crumbs = page.getByRole('navigation', { name: 'Đường dẫn đơn vị' });
     await expect(crumbs).toHaveText('Phòng Kinh doanh');
     await expect(page.getByRole('table', { name: /^Nhân viên của/ })).toBeVisible();
     await shot(page, '6-manager');
