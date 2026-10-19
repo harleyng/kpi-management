@@ -59,6 +59,7 @@ npm run typecheck && npm run test && npm run build && npm run lint
 - **A push to `main` is a production deploy** — Vercel is connected to the GitHub repository. Every
   other branch gets its own preview deployment.
 - Vercel environment (Production and Preview): `VITE_DATA_ADAPTER=mock`.
-- **Deployment Protection is on** (Vercel Authentication, all deployments except custom domains): only
-  members of the Vercel team can open the URLs. Ask before making a link public.
+- **Deployment Protection is on** (Vercel Authentication for **all** deployments, production included):
+  only members of the Vercel team can open the URLs; anyone else is sent to the Vercel login. Ask before
+  making a link public.
 - CI (GitHub Actions, `.github/workflows/ci.yml`) runs the Phase 4 gate on every push to `main`.

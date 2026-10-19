@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PlaceholderPanel } from '@/components/shared/PlaceholderPanel';
 
-/** Placeholder (Phase 0). Replaced by WP 4.7.1–4.7.4 · Phase 3. */
+/** Placeholder (Phase 0). Replaced by WP 4.7.1–4.7.4, Phase 3. */
 export default function DashboardPage() {
   return (
     <>
@@ -10,7 +10,7 @@ export default function DashboardPage() {
         description="Bức tranh KPI sống của công ty, bộ phận và cá nhân."
       />
       <PlaceholderPanel
-        spec="WP 4.7.1–4.7.4 · Phase 3"
+        spec="WP 4.7.1–4.7.4, Phase 3"
         items={[
           "Dashboard điều hành theo 4 viễn cảnh BSC",
           "Dashboard quản lý và cá nhân",

@@ -71,7 +71,7 @@ export function SidebarAccount({ collapsed = false }: { collapsed?: boolean }) {
       <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-60">
         <DropdownMenuLabel>Vai trò</DropdownMenuLabel>
         <div className="px-2 pb-1.5 text-xs text-muted-foreground">
-          {roles.map((role) => ROLE_LABEL[role]).join(' · ')}
+          {roles.map((role) => ROLE_LABEL[role]).join(', ')}
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>Đăng xuất (giả lập)</DropdownMenuItem>

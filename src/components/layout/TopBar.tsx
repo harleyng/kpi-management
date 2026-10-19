@@ -1,4 +1,4 @@
-import { FlaskConical } from 'lucide-react';
+import { Building2, FlaskConical } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSession } from '@/contexts/useSession';
 
@@ -17,9 +17,14 @@ export function TopBar() {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-6">
-      <div className="min-w-0 leading-tight">
-        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Công ty</div>
-        <div className="truncate text-sm font-semibold">{tenantName}</div>
+      {/* No caption above the name: an eyebrow is template chrome. The icon says "company" to the
+          eye, the visually hidden prefix says it to assistive tech. */}
+      <div className="flex min-w-0 items-center gap-2">
+        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="truncate text-sm font-semibold">
+          <span className="sr-only">Công ty: </span>
+          {tenantName}
+        </span>
       </div>
 
       <div className="flex-1" />

@@ -133,7 +133,7 @@ function SidebarGroup({
       {collapsed ? (
         index > 0 && <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-sidebar-border" />
       ) : (
-        <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="px-2 pb-1 text-xs font-medium text-muted-foreground">
           {group.label}
         </div>
       )}

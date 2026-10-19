@@ -39,7 +39,7 @@ keeps its lane expert.
 
 | The user says | Route to |
 |---|---|
-| "Review this interface" | UI/UX Designer |
+| "Review this interface" / "critique" / "audit the UI" / "polish" / "the copy is unclear" | UI/UX Designer (`/design-review <mode>`) |
 | "Should we build X?" / "Think like a PO" | CPO |
 | "Is this rule right?" / "Write a user story for…" / "What does CMC / DATX say?" | BA Expert |
 | "The score is wrong" / "how should % be calculated" / "rating" / "payout" / "trọng số" | HR Performance Expert |

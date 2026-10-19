@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-10-19 — UI design judgement follows impeccable (Operate mode) + Anthropic frontend-design
+
+**Decision.** The `ui-ux` agent works from `.agents/skills/ui-ux-designer/reference/` — condensed,
+KPI-specific adaptations (Apache-2.0, attributed in `NOTICE.md`) of impeccable v4.6.0 (Operate mode,
+craft floor, refuse list, critique /40, audit /20, polish triage, clarify) and Anthropic's frontend-design
+(restraint, generated-UI defaults, plan-then-review, writing). Every P1 screen is an **Operate** surface:
+precision and restraint, standard controls. frontend-design's "be distinctive, take aesthetic risk" applies
+only to Persuade surfaces (none in P1). `/design-review critique|audit|polish|copy` runs the passes; a
+track merges only with no open P0/P1 from its critique and audit. Impeccable's scripts and binary are
+not vendored. **No ALL-CAPS labels and no eyebrow captions**; the shell was brought in line (sidebar
+group captions, the tenant name in the top bar, `PlaceholderPanel`, the roles list).
+
+**Why.** Generated UIs drift to the same defaults — card grids, hero metrics, uppercase eyebrows, dotted
+meta strings — and on an HR tool those cost trust and scan speed. Uppercase Vietnamese also stacks
+diacritics (QUẢN TRỊ KPI) and reads worse at small sizes. Writing the bar down once, with a scored
+review, stops each track re-deciding it.
+
+**Updated alongside.** `design-system.md` (Principles, typography, layout patterns), `ui-ux-designer`
+SKILL.md, `.claude/agents/ui-ux.md`, `.claude/skills/design-review/`, `development.md` (design quality
+passes), orchestrator routing, `CLAUDE.md` (expert panel), the prompt hook.
+
+---
+
 ## 2026-10-19 — ERD deltas D1–D6 are PROPOSED, awaiting Phase 1.1
 
 **Decision.** The six deltas from reading the CMC user guides (plan §4) are recorded as proposals, not

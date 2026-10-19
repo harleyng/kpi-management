@@ -4,6 +4,27 @@
 > Tokens live in `src/index.css` (CSS variables, HSL) and `tailwind.config.ts`. `Inter` is loaded in
 > `index.html`. Inherited from the OmniX Studio scaffold; the livestream-only tokens (`stage-*`,
 > `kind-*`, `audio-*`, `scene-*`) were dropped.
+> The design judgement (mode, craft floor, refuse list, critique/audit) lives in
+> `.agents/skills/ui-ux-designer/reference/` — adapted from impeccable and Anthropic's frontend-design.
+
+---
+
+## Principles (Operate mode)
+
+Every P1 screen is an **Operate** surface: the user came to finish a task. Ambition shows as precision
+and restraint, not expression (`reference/operate-craft.md`).
+
+1. **Standard controls, familiar navigation.** The brand lends type, palette, density and one signature
+   move — never the layout, the navigation model or the controls.
+2. **Restrained colour.** Neutrals carry the screen; primary purple marks primary actions, selection and
+   focus only; `support-*` tones appear only where they mean a state.
+3. **Density where comparison happens.** Tables over card grids; no nested cards; no hero-metric tiles.
+4. **Every state designed** — loading, empty, error, blocked (with the reason), read-only, long content.
+5. **Sentence case everywhere.** No ALL-CAPS labels, no eyebrow above a heading: Vietnamese capitals
+   stack diacritics and lose legibility at small sizes, and an eyebrow is template chrome.
+6. **Motion conveys state only**, 150–250 ms; no entrance choreography.
+7. **Words are design.** Glossary terms, actions that keep their name from button to toast, errors that
+   say how to recover (`reference/copy.md`).
 
 ---
 
@@ -84,8 +105,10 @@ settled and good · **negative** = refused or failed. A **locked** thing is sett
 ## Typography
 
 - **Font:** `Inter, sans-serif`, applied globally on `body`; `font-sans` in Tailwind.
-- Scale: `text-[10px]` (nav group labels) · `text-xs` · `text-sm` (the dense default for tables and nav)
-  · `text-base` · `text-xl` (page titles) · `text-2xl` (large figures). Weights 400/500/600/700.
+- One family; a fixed rem scale with a tight ratio, no fluid headings: `text-xs` (captions, nav group
+  labels, table headers) · `text-sm` (the dense default for tables and nav) · `text-base` · `text-xl`
+  (page titles) · `text-2xl` (large figures). Weights 400/500/600/700. Hierarchy comes from size and
+  weight, never from uppercase or letter-spacing.
 - **Figures use `class="tabular"`** (`font-variant-numeric: tabular-nums`): targets, actuals, weights,
   percentages, scores. Without it, numeric columns jitter.
 
@@ -119,15 +142,16 @@ of several statuses.
 ## Layout patterns
 
 - **App frame**: a 240px sidebar (`w-60`, hidden below `md`) plus the main area; the top bar carries the
-  tenant name and the **"Dữ liệu giả lập" banner** (amber, always visible). The sidebar collapses to a
-  64px icon rail (⌘B / Ctrl-B), a remembered user preference — never collapsed by a route.
-- **The sidebar is a three-part column**: product mark, scrolling nav (5 groups by role), account block
-  on the bottom edge.
+  tenant (building icon + name, no caption above it) and the **"Dữ liệu giả lập" banner** (amber, always
+  visible). The sidebar collapses to a 64px icon rail (⌘B / Ctrl-B), a remembered user preference —
+  never collapsed by a route.
+- **The sidebar is a three-part column**: product mark, scrolling nav (5 groups by role, group captions
+  `text-xs font-medium text-muted-foreground` in sentence case), account block on the bottom edge.
 - **Page heading**: `<PageHeader title description actions>` on every route-level screen. The title is
   the same string as the menu item.
 - **Unbuilt blocks**: `<PlaceholderPanel spec items>` naming the WBS work package and track.
-- **Tables** (most screens): wrap in `<Card><CardContent className="p-0">`; header `text-xs uppercase
-  tracking-wide text-muted-foreground`; rows `hover:bg-surface-alt`. **Numeric columns right-aligned,
+- **Tables** (most screens): wrap in `<Card><CardContent className="p-0">`; header `text-xs font-medium
+  text-muted-foreground` in sentence case; rows `hover:bg-surface-alt`. **Numeric columns right-aligned,
   `tabular`, unit in the header.** Editable cells look editable; values computed by the rules (score,
   "chưa giao", weight total) look computed (muted background, no input border).
 - **Totals and blockers** sit where the decision is made: the weight total and the computed score at the

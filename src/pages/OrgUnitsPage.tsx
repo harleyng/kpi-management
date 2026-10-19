@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PlaceholderPanel } from '@/components/shared/PlaceholderPanel';
 
-/** Placeholder (Phase 0). Replaced by WP 4.1.1–4.1.4, 4.1.7 · Track T1. */
+/** Placeholder (Phase 0). Replaced by WP 4.1.1–4.1.4, 4.1.7, Track T1. */
 export default function OrgUnitsPage() {
   return (
     <>
@@ -10,7 +10,7 @@ export default function OrgUnitsPage() {
         description="Công ty thành viên, cây tổ chức, chức danh và quan hệ báo cáo."
       />
       <PlaceholderPanel
-        spec="WP 4.1.1–4.1.4, 4.1.7 · Track T1"
+        spec="WP 4.1.1–4.1.4, 4.1.7, Track T1"
         items={[
           "Quản lý công ty thành viên (tenant)",
           "Cây tổ chức Công ty → Khối → Phòng",

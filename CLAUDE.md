@@ -140,7 +140,7 @@ resolution rules and synthesis format live in `.agents/skills/orchestrator/SKILL
 | `hr-performance-expert` | BSC, KGI → CSF → KPI, calculation methods, weights, roll-up, rating, payout. Gatekeeper of `src/lib/*Rules.ts` | Phase 2 for KPI Rules work |
 | `workflow-expert` | Form state machine, steps, SLA and overdue, return, proxy, delegation, Goal Plan lock/unlock, launches | Phase 2 for Workflow work |
 | `cto` | Code quality, the gateway → hooks → components layering, silent failures, performance | Phase 2 |
-| `ui-ux` | Dense table screens (Goal Plan, evaluation form), states, accessibility | Phase 2 when there is a screen |
+| `ui-ux` | Dense Operate-mode screens (Goal Plan, evaluation form): states, copy, accessibility; scored critiques and audits via `/design-review` (adapted from impeccable + Anthropic frontend-design) | Phase 2 when there is a screen; before a track merges |
 | `system-architect` | Domain types, the `DataGateway` contract, fixtures, tenant isolation, readiness for a database | Phase 2 for Large, contract or fixture changes |
 | `qa` | Test strategy, scoring edge cases, tenant isolation, the Phase 4 gate | Phase 4 (EVERY size) |
 

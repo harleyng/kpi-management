@@ -55,6 +55,9 @@ fi
 if echo "$PROMPT" | grep -qiE '\b(import|excel|xlsx|exceljs|template|bulk|batch|upload)\b'; then
   SKILL_NUDGE="${SKILL_NUDGE}/add-import-template (shared 4.4.3 framework: exceljs template → parse → per-row validation in src/lib → preview → confirm by batch, per-row errors); "
 fi
+if echo "$PROMPT" | grep -qiE '\b(critique|audit|polish|design review|ux|ui|look(s)? (better|off)|copy|wording|layout|typography|spacing|accessib(le|ility))\b'; then
+  SKILL_NUDGE="${SKILL_NUDGE}/design-review (critique /40 · audit /20 · polish · copy — read .agents/skills/ui-ux-designer/reference/operate-craft.md first; look at the rendered screen; Operate mode = precision and restraint, nothing from the refuse list); "
+fi
 if echo "$PROMPT" | grep -qiE '\b(flow|process|journey|business rule|BR-KPI|state set|status)\b'; then
   SKILL_NUDGE="${SKILL_NUDGE}/update-flow (proposal in docs/flows/new-flow.md first, then sweep routes + rules + state sets + fixtures + error copy, then update business-rules.md and log the decision); "
 fi

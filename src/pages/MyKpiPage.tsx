@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PlaceholderPanel } from '@/components/shared/PlaceholderPanel';
 
-/** Placeholder (Phase 0). Replaced by WP 4.3.2–4.3.5 · Track T3. */
+/** Placeholder (Phase 0). Replaced by WP 4.3.2–4.3.5, Track T3. */
 export default function MyKpiPage() {
   return (
     <>
@@ -10,7 +10,7 @@ export default function MyKpiPage() {
         description="Goal Plan của bạn trong chu kỳ hiện tại: chỉ tiêu, trọng số, mục tiêu và tiến độ."
       />
       <PlaceholderPanel
-        spec="WP 4.3.2–4.3.5 · Track T3 (nhập số: WP 4.4.2, Track T4)"
+        spec="WP 4.3.2–4.3.5, Track T3 (nhập số: WP 4.4.2, Track T4)"
         items={[
           "Xem Goal Plan cá nhân theo chu kỳ và kỳ đánh giá",
           "Thêm chỉ tiêu từ thư viện hoặc tự nhập, liên kết với chỉ tiêu của quản lý (cascade/link)",

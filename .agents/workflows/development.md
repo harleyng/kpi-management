@@ -95,8 +95,13 @@ After the analysis is confirmed (KPI Rules / Workflow work starts here):
    New form type or process? **`/add-workflow`**. New Excel import? **`/add-import-template`**.
 5. **List the test cases up front**, drawn from the phase-1 use cases and plan §8.1 — rules, gateway
    behaviour, and tenant isolation.
-6. **Delegate the design review in parallel:**
-   - **Medium:** `cto` (layering, silent failures) + `ui-ux` (composition, consistency, accessibility).
+6. **A new screen gets a short plan first** (`ui-ux-designer/reference/operate-craft.md` §7): work areas
+   and what each is for, the data read first and its states, the primary action, where totals and
+   blockers sit — prose plus a small ASCII wireframe — reviewed against the work package so it is not
+   the generic admin template.
+7. **Delegate the design review in parallel:**
+   - **Medium:** `cto` (layering, silent failures) + `ui-ux` (composition, states, copy, accessibility —
+     against the Operate craft floor and refuse list).
    - **KPI Rules:** `hr-performance-expert` (method, edge cases, assumptions) + `qa` (test design).
    - **Workflow:** `workflow-expert` (transitions, actors, time) + `system-architect` (contract, fixtures).
    - **Large:** `cto` + `ui-ux` + `system-architect` (+ the lane expert if rules or workflow are touched).
@@ -136,6 +141,20 @@ npm run lint        # 4. Linter — 0 errors
 
 - If you edited `CLAUDE.md`, also run `npm run guides:check` (or `guides:sync`).
 - If you changed a clickable flow or a route, run `npm run test:e2e:smoke`.
+- **If you changed a screen, look at it rendered** (1280 and 768 wide) and check the craft floor
+  (`ui-ux-designer/reference/operate-craft.md` §5) in one batched pass: contrast, spacing, type steps,
+  every state, tabular numbers, copy. A green build does not prove a screen is right.
+
+## Design quality passes (`/design-review`)
+
+| When | Pass | Owner |
+|---|---|---|
+| Phase 2 of any task with a new screen | design review against `operate-craft.md` | `ui-ux` |
+| Before a Phase 2 track merges into `main` | `critique` on its main screens + `audit` on its components; no open P0/P1 | `ui-ux` |
+| Phase 1.4 (UI kit) and before Phase 4 UAT | `audit` of the whole app | `ui-ux` + `qa` |
+| A feature is functionally done | `polish`, in triage order | the implementer |
+
+`critique` and `audit` report; they never change code in the same pass.
 
 ---
 

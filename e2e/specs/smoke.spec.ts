@@ -52,7 +52,7 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng —')).toBeVisible();
+      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }

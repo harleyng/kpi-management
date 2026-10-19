@@ -2,7 +2,7 @@ import { Construction } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface PlaceholderPanelProps {
-  /** The WBS work package(s) and track that will fill this screen, e.g. "WP 4.3.2–4.3.5 · Track T3". */
+  /** The WBS work package(s) and track that will fill this screen, e.g. "WP 4.3.2–4.3.5, Track T3". */
   spec: string;
   /** What will be built here, in product language (Vietnamese). */
   items: string[];
@@ -21,8 +21,9 @@ export function PlaceholderPanel({ spec, items }: PlaceholderPanelProps) {
       <CardContent className="p-5">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Construction className="h-4 w-4 text-primary" aria-hidden />
-          Chưa xây dựng — {spec}
+          Chưa xây dựng
         </div>
+        <p className="mt-1 text-xs text-muted-foreground">Phần việc: {spec}</p>
         <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
           {items.map((item) => (
             <li key={item} className="flex gap-2">

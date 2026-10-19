@@ -47,7 +47,7 @@ agents will not find it.
 | `hr-performance-expert` | `business-rules.md` (§1, §3, §4), `common-pitfalls.md` |
 | `workflow-expert` | `business-rules.md` (§2, §5), `architecture.md` (+ `docs/flows/new-flow.md`) |
 | `cto` | `architecture.md`, `common-pitfalls.md` |
-| `ui-ux` | `design-system.md`, `component-registry.md` |
+| `ui-ux` | `design-system.md`, `component-registry.md` (+ `.agents/skills/ui-ux-designer/reference/*` — craft floor, critique, audit, copy) |
 | `system-architect` | `architecture.md`, `business-rules.md`, `common-pitfalls.md` (+ `docs/erd/kpi_erd.mermaid`) |
 | `qa` | `architecture.md`, `business-rules.md`, `common-pitfalls.md` |
 

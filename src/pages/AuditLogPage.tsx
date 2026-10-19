@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PlaceholderPanel } from '@/components/shared/PlaceholderPanel';
 
-/** Placeholder (Phase 0). Replaced by WP 4.8.4 · Track T7. */
+/** Placeholder (Phase 0). Replaced by WP 4.8.4, Track T7. */
 export default function AuditLogPage() {
   return (
     <>
@@ -10,7 +10,7 @@ export default function AuditLogPage() {
         description="Nhật ký thao tác trên dữ liệu KPI, phiếu và kết quả."
       />
       <PlaceholderPanel
-        spec="WP 4.8.4 · Track T7"
+        spec="WP 4.8.4, Track T7"
         items={[
           "Ghi nhận ai làm gì, lúc nào, thay ai (proxy)",
           "Lọc theo người dùng, đối tượng, khoảng thời gian",

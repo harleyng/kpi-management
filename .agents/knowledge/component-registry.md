@@ -29,7 +29,7 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · tabs 
 | Component | Purpose |
 |---|---|
 | `PageHeader` | Title, description, actions — every route-level screen |
-| `PlaceholderPanel` | "Chưa xây dựng — WP x.y.z · Track Tn" + the list of remaining work |
+| `PlaceholderPanel` | "Chưa xây dựng", then "Phần việc: WP x.y.z, Track Tn" + the list of remaining work |
 | `EmptyState` / `EmptyStateCard` | "There is nothing here" for a panel / a whole page, with an optional next action |
 | `ErrorStateCard` | A failed read in place of the table; takes a catalogue `spec` (`errorSpecOf(error)`) |
 | `ConfirmDialog` | Confirmation before an irreversible action (lock, finalise, delete); `destructive` for removals |
