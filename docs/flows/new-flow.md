@@ -146,6 +146,30 @@ Sau khi phiếu đánh giá hoàn thành:
 4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa để chuyển lương; bản nháp giữ nguyên.
 5. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
 
+## 4C. Tổ chức và nhân sự (Track T1)
+
+Quản trị hệ thống làm phần này một lần trước khi giao KPI, rồi cập nhật khi có thay đổi nhân sự. Màn hình:
+**Hệ thống → Tổ chức** (Cơ cấu · Nhân sự · Chức danh · Công ty) và **Hệ thống → Người dùng & quyền**
+(Tài khoản · Vai trò & quyền). Quy tắc chi tiết: `business-rules.md` §10.
+
+- **Cây tổ chức.** Công ty → Khối → Phòng ban → Nhóm (được bỏ qua một cấp). Không ngừng dùng được đơn vị
+  còn đơn vị trực thuộc đang dùng, còn nhân viên, hoặc còn bảng mục tiêu của chu kỳ chưa đóng; màn hình
+  ghi rõ lý do bên cạnh nút.
+- **Điều chuyển.** Thêm phân công chính mới từ ngày D thì phân công đang có tự kết thúc ngày D − 1, trong
+  cùng một lần lưu. Từ ngày D, các bước "quản lý trực tiếp" trên phiếu đang mở chuyển cho quản lý mới
+  (vì người xử lý được xác định lúc thao tác). Kiêm nhiệm không làm kết thúc phân công nào.
+- **Nghỉ việc.** Nhập ngày làm việc cuối: tài khoản đăng nhập chuyển sang Ngừng dùng trước, rồi mới ghi
+  nhận nghỉ việc (các phân công kết thúc vào ngày đó). Cấp dưới trực tiếp, đơn vị đang làm trưởng và ủy
+  quyền **không tự đổi**: màn hình liệt kê để quản trị chỉ định người thay. Phiếu đang mở vẫn chạy tiếp.
+- **Tài khoản.** Mỗi nhân viên có tối đa một tài khoản đang dùng; tài khoản của nhân viên luôn có vai trò
+  Nhân viên (bản thân). Khi gán vai trò, màn hình cho biết phạm vi đó gồm bao nhiêu nhân viên.
+- **Không tự khóa mình.** Hệ thống từ chối mọi thay đổi làm công ty không còn quản trị viên, làm vai trò
+  Quản trị hệ thống mất quyền quản lý tổ chức/người dùng, hoặc làm chính người đang thao tác mất quyền
+  quản lý người dùng.
+- **Công ty.** Chỉ sửa tên, mã, múi giờ của công ty đang chọn. Chưa có tạo công ty mới hay tạm ngưng.
+- **Nhập từ Excel (WBS 4.1.7).** Đã có file mẫu (sheet Nhân sự + mã đơn vị + mã chức danh) và quy tắc
+  kiểm tra từng dòng. Nút "Nhập từ file" mở khi khung nhập dữ liệu dùng chung (T4) hoàn tất.
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -174,6 +198,7 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
+| Q19–Q24 | Quy tắc tổ chức, điều chuyển, nghỉ việc, quản lý ngoài đơn vị, quản lý công ty (các tài liệu nguồn không nêu) | Như `business-rules.md` §8 và §10 | Product owner + HR |
 
 ## 7. Quyết định đã chốt
 
@@ -211,3 +236,11 @@ trực tiếp đến quy trình:
 - Chốt kết quả theo nguyên tắc "tất cả hoặc không": còn một kết quả vướng thì không chốt kết quả nào.
 - Phòng ban/công ty được xếp loại nhưng không có % lương.
 - Kỳ đã chốt kết quả thì không nhập thêm số thực tế; chưa đến kỳ thì cũng chưa nhập được (giả định Q18).
+
+**19/10/2026 — Track T1, tổ chức và phân quyền (product owner duyệt).** Chi tiết: `business-rules.md` §10.
+
+- **Chỉ sửa công ty hiện tại**; không tạo công ty mới, không tạm ngưng trong bản thử nghiệm.
+- **Ma trận quyền sửa được** theo từng vai trò, có bước xác nhận liệt kê quyền thêm/bỏ; vai trò Quản trị
+  hệ thống luôn giữ quyền quản lý tổ chức và người dùng.
+- **Nhập tổ chức từ Excel:** T1 làm file mẫu và quy tắc kiểm tra; việc nhập dùng khung chung của T4.
+- **Quản lý trực tiếp ngoài đơn vị** được phép, có cảnh báo.

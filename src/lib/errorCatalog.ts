@@ -22,7 +22,10 @@ export type ErrorCode =
   | 'ERR-KPI-10'
   | 'ERR-KPI-11'
   | 'ERR-KPI-12'
-  | 'ERR-KPI-13';
+  | 'ERR-KPI-13'
+  | 'ERR-KPI-14'
+  | 'ERR-KPI-15'
+  | 'ERR-KPI-16';
 
 /** Where the message surfaces — determines which component renders it. */
 export type ErrorSurface = 'toast' | 'banner' | 'inline' | 'empty-state' | 'modal';
@@ -151,6 +154,35 @@ export const ERROR_CATALOG: Record<ErrorCode, ErrorSpec> = {
     surface: 'inline',
     title: 'Cấu hình tính điểm chưa hợp lệ',
     message: 'Hãy kiểm tra lại các mục được đánh dấu.',
+    action: null,
+  },
+  // ERR-KPI-14…16 are raised by T1's organisation and access guards (`orgAdminRules`, `accessAdminRules`).
+  // Other tracks number their codes from ERR-KPI-17.
+  'ERR-KPI-14': {
+    code: 'ERR-KPI-14',
+    trigger:
+      'Ending or deactivating a unit or a position that is still in use: active sub-units, current assignments, Goal Plans of an open cycle (orgAdminRules) — BR-KPI-69, 70',
+    surface: 'inline',
+    title: 'Đang được sử dụng, chưa thể ngừng',
+    message: 'Hãy kết thúc hoặc chuyển các mục đang sử dụng trước khi ngừng dùng.',
+    action: null,
+  },
+  'ERR-KPI-15': {
+    code: 'ERR-KPI-15',
+    trigger:
+      'A change would leave the company without an Active ADMIN with a company-wide scope, take user.manage / org.manage from ADMIN, take user.manage from the person making it, or suspend their own company (accessAdminRules, orgAdminRules) — BR-KPI-72, 73',
+    surface: 'inline',
+    title: 'Thao tác này sẽ làm mất quyền quản trị',
+    message: 'Công ty phải luôn còn ít nhất một tài khoản quản trị đang hoạt động, và bạn không thể tự gỡ quyền quản trị của mình.',
+    action: null,
+  },
+  'ERR-KPI-16': {
+    code: 'ERR-KPI-16',
+    trigger:
+      'A direct manager that cannot be: the person themself, someone not employed over the assignment, or a line that loops back (orgAdminRules) — BR-KPI-66',
+    surface: 'inline',
+    title: 'Quan hệ báo cáo chưa hợp lệ',
+    message: 'Quản lý trực tiếp phải là người khác, đang làm việc trong suốt thời gian phân công, và không tạo vòng báo cáo.',
     action: null,
   },
 };

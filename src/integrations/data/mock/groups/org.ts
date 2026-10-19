@@ -1,11 +1,20 @@
-import type { Employee, EmployeeAssignment, Id, RolePermission } from '@/data/types';
+import type { Employee, EmployeeAssignment, Id } from '@/data/types';
 import { descendantUnitIds, isEffectiveOn } from '@/lib/orgRules';
 import { matchesSearch } from '@/lib/search';
 import type { AssignmentFilter, EmployeeFilter, OrgGateway } from '../../types';
-import { removeRow } from '../integrity';
-import { eqOpt, upsert, whereEq } from '../rows';
+import { eqOpt } from '../rows';
 import type { Runtime } from '../runtime';
 import type { Tx } from '../store';
+import {
+  deleteUserRoleTx,
+  saveAccountTx,
+  saveAssignmentTx,
+  saveEmployeeTx,
+  saveOrgUnitTx,
+  savePositionTx,
+  saveUserRoleTx,
+  setRolePermissionsTx,
+} from './orgTx';
 
 /** `undefined` date = any assignment ever (EmployeeFilter.activeOn: "omitted, no date filter"). */
 const effective = (a: EmployeeAssignment, date: string | undefined) => date === undefined || isEffectiveOn(a, date);
@@ -47,48 +56,44 @@ export function orgGroup(rt: Runtime): OrgGateway {
   return {
     listOrgUnits: rt.read('org.listOrgUnits', (tx) => tx.all('OrgUnit')),
     saveOrgUnit: rt.write('org.saveOrgUnit', { permission: 'org.manage' }, (tx, input: Parameters<OrgGateway['saveOrgUnit']>[2]) =>
-      upsert(tx, 'OrgUnit', input, { create: () => ({}) }),
+      saveOrgUnitTx(tx, input),
     ),
 
     listPositions: rt.read('org.listPositions', (tx) => tx.all('JobPosition')),
     savePosition: rt.write('org.savePosition', { permission: 'org.manage' }, (tx, input: Parameters<OrgGateway['savePosition']>[2]) =>
-      upsert(tx, 'JobPosition', input, { create: () => ({}) }),
+      savePositionTx(tx, input),
     ),
 
     listEmployees: rt.read('org.listEmployees', (tx, filter?: EmployeeFilter) => listEmployees(tx, filter)),
     getEmployee: rt.read('org.getEmployee', (tx, employeeId: Id) => tx.get('Employee', employeeId)),
     saveEmployee: rt.write('org.saveEmployee', { permission: 'org.manage' }, (tx, input: Parameters<OrgGateway['saveEmployee']>[2]) =>
-      upsert(tx, 'Employee', input, { create: () => ({}) }),
+      saveEmployeeTx(tx, input),
     ),
 
     listAssignments: rt.read('org.listAssignments', (tx, filter?: AssignmentFilter) => listAssignments(tx, filter)),
     saveAssignment: rt.write('org.saveAssignment', { permission: 'org.manage' }, (tx, input: Parameters<OrgGateway['saveAssignment']>[2]) =>
-      upsert(tx, 'EmployeeAssignment', input, { create: () => ({}) }),
+      saveAssignmentTx(tx, input),
     ),
 
     listUserAccounts: rt.read('org.listUserAccounts', (tx) => tx.all('UserAccount')),
     getUserAccount: rt.read('org.getUserAccount', (tx, userId: Id) => tx.get('UserAccount', userId)),
     saveUserAccount: rt.write('org.saveUserAccount', { permission: 'user.manage' }, (tx, input: Parameters<OrgGateway['saveUserAccount']>[2]) =>
-      upsert(tx, 'UserAccount', input, { create: () => ({ lastLoginAt: null }) }),
+      saveAccountTx(tx, input),
     ),
 
     listRoles: rt.read('org.listRoles', (tx) => tx.all('Role')),
     listPermissions: rt.read('org.listPermissions', (tx) => [...tx.globals.permissions.values()]),
     listRolePermissions: rt.read('org.listRolePermissions', (tx) => tx.all('RolePermission')),
-    setRolePermissions: rt.write('org.setRolePermissions', { permission: 'user.manage' }, (tx, roleId: Id, permissionIds: readonly Id[]) => {
-      tx.get('Role', roleId);
-      for (const row of whereEq(tx, 'RolePermission', 'roleId', roleId)) removeRow(tx, 'RolePermission', `${row.roleId}|${row.permissionId}`);
-      return permissionIds.map((permissionId) =>
-        tx.insert('RolePermission', { tenantId: tx.tenantId, roleId, permissionId } satisfies RolePermission),
-      );
-    }),
+    setRolePermissions: rt.write('org.setRolePermissions', { permission: 'user.manage' }, (tx, roleId: Id, permissionIds: readonly Id[]) =>
+      setRolePermissionsTx(tx, roleId, permissionIds),
+    ),
 
     listUserRoles: rt.read('org.listUserRoles', (tx, userId?: Id) => tx.all('UserRole').filter((r) => eqOpt(userId, r.userId))),
     saveUserRole: rt.write('org.saveUserRole', { permission: 'user.manage' }, (tx, input: Parameters<OrgGateway['saveUserRole']>[2]) =>
-      upsert(tx, 'UserRole', input, { create: () => ({}) }),
+      saveUserRoleTx(tx, input),
     ),
     deleteUserRole: rt.write('org.deleteUserRole', { permission: 'user.manage' }, (tx, userRoleId: Id) => {
-      removeRow(tx, 'UserRole', userRoleId);
+      deleteUserRoleTx(tx, userRoleId);
     }),
   };
 }

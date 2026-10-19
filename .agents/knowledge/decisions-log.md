@@ -6,6 +6,50 @@
 
 ---
 
+## 2026-10-19 — T1: org and access guards are transition-based rules shared by screen and gateway, run after the structural check
+
+**Decision.** The org rules (BR-KPI-65…73) live in `src/lib/orgAdminRules.ts` and `accessAdminRules.ts`,
+compare the draft with the stored row and fire only on the change they are about. The mock runs them in
+`groups/orgTx.ts` AFTER `validateTransaction` on the written state; screens run the same functions as a
+pre-check, only on complete lists (`useOrgDirectory`). Behaviours inside the existing methods: B1 transfer
+(new primary from D ends the running one on D − 1), B2 a new employee account gets EMPLOYEE / Self and
+`employeeId` is immutable, B3 recording a last working day ends the assignments past it, and
+`setRolePermissions` writes the diff. ERR-KPI-14/15/16 are T1's; other tracks number from 17.
+
+**Why.** A rule checked against the whole row would make seeded edge cases (E040's manager hired after
+him, an Inactive unit with history) uneditable forever — renaming them would fail. Rules before the
+structural check would read a foreign id first and could answer differently from a missing one, and
+would turn the Gate 1 answers ("duplicate", "one root", "below itself") into rule sub-codes. A transfer
+as two writes (end, then add) leaves a gap — or two primaries — when the second fails. B3 was added
+during implementation: without it a resignation needs three writes, or leaves an assignment running
+after the last working day.
+
+**Consequence.** T4's `commitImport` must call the `orgTx` helpers (employees → assignments → accounts),
+never `upsert` org rows itself. `fixtures/orgGuards.test.ts` fails if a seed change would make a row
+uneditable.
+
+**Updated alongside.** `business-rules.md` §0, §6, §8 (Q19–Q24), §10, BR-KPI-20 note; `architecture.md`
+(mock table, "T1 guards"); `component-registry.md`; `docs/flows/new-flow.md` §4C and §7.
+
+## 2026-10-19 — T1 scope: current company only, editable matrix, import split with T4, resignation locks the login first
+
+**Decision.** (product owner) Tenant management edits the current company's name, code and zone; no
+creating or suspending, and a company can never suspend itself. The role → permission matrix is
+editable per role, confirmed with the exact additions and removals; ADMIN always keeps `org.manage` /
+`user.manage`, and nobody can remove the last company-wide ADMIN or their own `user.manage`. WBS 4.1.7:
+T1 ships the template and the row rules, T4 wires staging and commit. A manager outside the unit line is
+allowed with a warning. "Cho nghỉ việc" sets the accounts Inactive BEFORE recording the resignation.
+`SCOPE_TYPE_LABEL.OrgUnit` is "Theo đơn vị".
+
+**Why.** `saveTenant` only edits the actor's home tenant and a new tenant has no roles, accounts or root —
+nobody could ever sign in; suspending your own company hides it from the switcher with no way back. An
+admin unticking `user.manage` on their own role, or deactivating the last ADMIN, would strand the demo
+with only a reseed to recover. Moving the shared import framework into T1 would hold up the first merge
+for six tracks. Resign-then-lock, on a failed second write, leaves someone who has left with a live
+login. "Đơn vị" alone read like "Đơn vị tính" on T2's screens.
+
+**Updated alongside.** `business-rules.md` §0, §8 (Q21, Q24), §10 (BR-KPI-71…73); `docs/flows/new-flow.md` §7.
+
 ## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
 
 **Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or

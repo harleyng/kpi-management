@@ -10,8 +10,8 @@
 ## `src/components/ui/` — shadcn primitives (never edited)
 
 alert-dialog · badge (semantic tones `positive` / `warning` / `negative` / `info` / `muted`) · button ·
-card · command · dialog · dropdown-menu · input · label · popover · progress · scroll-area · select ·
-separator · skeleton · slider · sonner (top-right toaster) · switch · table (added in 1.4) · tabs · textarea · tooltip.
+card · checkbox (T1) · command · dialog · dropdown-menu · input · label · popover · progress · scroll-area · select ·
+separator · sheet (T1) · skeleton · slider · sonner (top-right toaster) · switch · table (added in 1.4) · tabs · textarea · tooltip.
 
 ## `src/components/layout/`
 
@@ -51,6 +51,26 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SearchInput` | Magnifier-in-a-field; the caller filters (with `foldDiacritics`) |
 | `SectionTitle` | A titled section inside a page body |
 | `CopyButton` | Hover-revealed copy-to-clipboard with an announced confirmation |
+| `EditSheet` (T1) | The right-hand editor sheet: title, scrolling body, sticky footer (Hủy / submit + `footerStart`), `problems` above the actions (`role="alert"`), "Bỏ thay đổi chưa lưu?" on a dirty close, `wide` for sectioned records. Keep dialogs OUTSIDE it — a portal still bubbles React submit events to the sheet's form |
+| `BlockedReason` (T1) | Why an action is disabled, as visible `text-xs` text (a span, so it fits in a field hint); give the action `aria-describedby` |
+| `ConfirmDialog` `details` | Optional list under the body ("Thêm: … / Bỏ: …") |
+
+## `src/components/org/` and `src/components/access/` (Track T1)
+
+| Component | Purpose |
+|---|---|
+| `OrgStructureTab` | Tree (`OrgUnitTreeView`, `?unit=`, "Hiện đơn vị ngừng dùng" `?inactive=1`) beside the unit's detail: head, dates, staff today, Sửa / Thêm đơn vị trực thuộc / Ngừng dùng (blocked reasons from `unitEndIssues`) |
+| `UnitSheet` | Add / edit a unit — parent options exclude its own subtree; head picker limited to the unit's people |
+| `EmployeesTab` / `EmployeeSheet` | People with today's primary line; the wide sheet (`?emp=`, `new`) = "Hồ sơ" + "Phân công" |
+| `AssignmentDialog` | `first` · `transfer` · `concurrent` · `end`; preview from `transferPlan`, outside-unit warning from `managerOutsideUnit` |
+| `ResignDialog` | Last working day + `resignationImpact`; `useResignEmployee` (accounts Inactive first); partial failure stays open with "Thử lại" |
+| `PositionsTab` | Positions + "Đang phân công" count; stop blocked with the reason |
+| `TenantTab` | The current company's name, code, zone; status read-only |
+| `ImportActions` | "Tải mẫu nhập" (lazy exceljs) + disabled "Nhập từ file" with its visible reason (WBS 4.1.7) |
+| `AccountsTab` / `AccountSheet` | Accounts with roles and "Phạm vi rộng nhất"; the sheet (`?acct=`) = account form + `RoleAssignments` |
+| `RoleAssignments` | Role rows with scope and "N nhân viên" (`scopeCoverage`); protected / last-admin rows locked with the reason; inline "Gán vai trò" |
+| `PermissionMatrix` / `RolePermissionSheet` | Read matrix (sticky header + first column, `Check` / `—` with labels); per-role edit sheet, confirm lists the diff and the accounts reached |
+| `accessContext.ts` | `accessContextOf`, `railIssues` (the admin rails on a proposed change), `MODULE_LABEL`, `permissionsByModule` |
 
 ## `src/contexts/`
 
@@ -95,6 +115,11 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25) |
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
 | `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
+| `orgAdminRules.ts` (T1) | `unitIssues`, `unitEndIssues`, `unitUsage`, `headIssues`, `positionIssues`, `positionUsage`, `employeeIssues`, `resignationPlan` (B3), `resignationImpact`, `assignmentIssues`, `managerOutsideUnit`, `transferPlan` (B1), `tenantIssues`, `isValidTimeZone`, `Draft<T>` — transition-based, `RuleIssue[]` — tested + `fixtures/orgGuards.test.ts` |
+| `accessAdminRules.ts` (T1) | `accountIssues`, `accountPlan` (B2), `userRoleIssues`, `userRoleRemovalIssues`, `isProtectedUserRole`, `accessIssues` (BR-KPI-72), `tenantAdmins`, `ADMIN_LOCKED_PERMISSIONS`, `scopeCoverage`, `widestScope` — tested |
+| `orgImportRules.ts` / `importColumns.ts` (T1) | `ORG_DATA_COLUMNS` (`ImportColumn<Row>` — the template and T4's parser share it), `orgDataRowErrors` (file + tenant, a manager later in the file is valid, loops across both) — tested |
+| `excel/workbook.ts` / `excel/orgDataTemplate.ts` (T1) | `buildTemplateWorkbook` (exceljs imported on call only), `orgDataTemplateSpec` — tested |
+| `orgIssueCopy.ts` (T1) | `ORG_ISSUE_COPY` (sentence per rule sub-code), `orgIssueText`, `fieldIssues`, `otherIssues` — completeness tested against the rule sources |
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
@@ -115,7 +140,7 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 
 | File | Hooks |
 |---|---|
-| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`) |
+| `org.ts` | Reads: `useOrgUnits`, `useEmployees(filter)`, `usePositions`, `useAssignments(filter)`, `useUserAccounts`, `useRoles`, `useRolePermissions`, `useUserRoles`, `usePermissions` (each with its `*Key`); `useOrgDirectory` / `useAccessDirectory` (data only when EVERY list loaded — pre-checks never run on a partial list). Writes (T1, one `useOrgMutation` shape: catalogue toast, `issuesOf(error)` for the form, roots invalidated on settle): `useSaveOrgUnit`, `useSavePosition`, `useSaveEmployee`, `useSaveAssignment`, `useSaveUserAccount`, `useSaveUserRole`, `useDeleteUserRole`, `useSetRolePermissions`, `useSaveTenant` (+ tenants), `useResignEmployee` (`ResignError.stage`) — tested |
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |

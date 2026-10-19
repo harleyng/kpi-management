@@ -1,6 +1,7 @@
 import { COLLECTION_NAMES, type CollectionName, type Seed } from '@/data/fixtures/types';
 import type { AuditAction, EntityName, Id, IsoDateTime, Tenant } from '@/data/types';
-import { KpiDeferredError, KpiError } from '@/lib/errorCatalog';
+import { KpiDeferredError, KpiError, toKpiError } from '@/lib/errorCatalog';
+import { tenantIssues } from '@/lib/orgAdminRules';
 import type { DomainEvent, RowSnapshot } from '../types';
 import { auditRowOf, NOT_AUDITED } from './audit';
 import { authorizeWrite, type Track, type WriteAuth } from './authorize';
@@ -359,6 +360,9 @@ export class Runtime {
         if ([...this.globals.tenants.values()].some((t) => t.id !== saved.id && t.code === saved.code)) {
           throw new KpiError('ERR-KPI-06', `Tenant: duplicate code ${saved.code}`);
         }
+        // BR-KPI-73 (T1): a valid IANA zone; a tenant never suspends itself.
+        const issues = tenantIssues(saved, existing, home.tenantId);
+        if (issues.length > 0) throw toKpiError(issues);
         const next = new Map(this.globals.tenants);
         next.set(saved.id, saved);
         const data = this.tenants.get(saved.id) ?? new TenantData(saved.id);

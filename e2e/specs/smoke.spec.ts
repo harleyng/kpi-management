@@ -31,6 +31,8 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/audit-log', 'Nhật ký'],
 ];
 
+/** Routes whose page is built (no "Chưa xây dựng" placeholder any more) — add a track's routes as it lands. */
+const BUILT = new Set(['/system/org', '/system/users']);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -89,10 +91,24 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (!BUILT.has(path)) await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
+
+  test('T1: a role\'s permission change is confirmed with exactly what it adds', async ({ page }) => {
+    await requireSession(page);
+    await becomeAdmin(page);
+    await page.goto('/system/users?tab=vai-tro');
+    await page.getByRole('button', { name: 'Sửa quyền — Ban điều hành' }).click();
+    await page.getByRole('checkbox', { name: 'Xem nhật ký hệ thống' }).click();
+    await page.getByRole('button', { name: 'Lưu thay đổi' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Lưu thay đổi quyền của vai trò Ban điều hành?' });
+    await expect(dialog.getByText('Thêm:')).toBeVisible();
+    await expect(dialog.getByText('Xem nhật ký hệ thống')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Lưu thay đổi' }).click();
+    await expect(page.getByText('Đã lưu quyền của vai trò.')).toBeVisible();
+  });
 
   test('an unknown address shows the not-found page', async ({ page }) => {
     await requireSession(page);
