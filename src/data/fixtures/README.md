@@ -6,10 +6,20 @@
 ## Why fixtures are a contract
 
 The seven Phase 2 tracks (T1–T7, `docs/plans/KPI_repo_plan.md` §6.3) run **in parallel** because
-they all read the same seed — no track waits for another track's screens. After **Gate 1** the
-fixtures are frozen: a track that needs a fixture or the `DataGateway` contract changed is doing a
-**Large** change. It goes through `system-architect`, and every other track is told before merge.
-**Bump `SEED_VERSION`** (`index.ts`) with any change, so browsers holding an older copy reseed.
+they all read the same seed — no track waits for another track's screens.
+
+**Frozen at Gate 1 (2026-10-19), `SEED_VERSION` = `2027-04-06.G1`.** `freeze.test.ts` pins the seed
+hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49). A failing
+freeze test means a fixture or the `DataGateway` contract changed — a **Large** change:
+1. `system-architect` reviews it;
+2. every other track is told before merge;
+3. **bump `SEED_VERSION`** (`index.ts`), so browsers holding an older copy reseed;
+4. update `FROZEN` in `freeze.test.ts`;
+5. `/log-decision`.
+
+What the seed still leaves to the tracks (`seed.test.ts`): the states T1 `Tenant:Suspended`, T3
+`Cycle:Evaluating`, T4 `Sync run:Running` (`STATE_EXEMPTIONS`), and the empty `PayrollExport` (T6,
+`EMPTY_UNTIL_WIRED`).
 
 ## Layout
 
@@ -25,6 +35,7 @@ fixtures are frozen: a track that needs a fixture or the `DataGateway` contract 
 | `syntra/` | `org.ts` · `goals.ts` · `actuals.ts` · `forms.ts` · `system.ts` · `results.ts` (run last) · `index.ts` |
 | `demoCo.ts` | the second tenant |
 | `seed.test.ts` | integrity (through the mock's own check), coverage, identity, business and timeline invariants |
+| `freeze.test.ts` | the Gate 1 freeze: seed hash, gateway surface, entity count |
 
 ## Conventions
 

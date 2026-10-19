@@ -11,6 +11,11 @@
 > with co-located tests. A rule names the function that enforces it.
 > Phase 1.3 (2026-10-19) implemented §9 — roles, permissions and data scope — in
 > `src/lib/permissionRules.ts`.
+> **Gate 1 passed 2026-10-19**: the mock gateway calls these rules on every method (bar the Phase 2
+> tracks' own work packages, `architecture.md`) and enforces `can()` on every write. Gate 1 added
+> `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
+> shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
+> import).
 
 ---
 
@@ -103,17 +108,31 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   plan is already locked and an evaluation has no plan, so the form could never be released; AUTO_FORWARD
   never on the last step (`validateWorkflow`; a misconfigured one falls back to REMIND). REMIND records
   no action. The deadline day itself is on time. One move per form per scheduler tick. A form is also
-  **frozen** while HR has its registration plan locked by hand. *Source: email template "Email nhắc
-  Deadline"; SF4C PMGM.09.*
+  **frozen** while HR has its registration plan locked by hand. The clock-driven jobs run as one
+  **scheduler tick** (`scheduler.runDue(tenantId)`, a system write with no actor): due SCHEDULED
+  launches → recurring rule firings → overdue steps (on the forms as the tick found them) → reminders.
+  **Reminders are not deduplicated by the scheduler**: every tick inside the window re-emits
+  `form.dueSoon` with the same `reminderKey`; the notification listener (T7) writes one notification
+  per (reminderKey, recipient). AUTO_LOCK audits the plan's lock as `LOCK` with reason `AUTO_LOCK` and
+  no user. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
 - **BR-KPI-14** — HR can **lock and unlock** a Goal Plan; every lock/unlock is kept in its history. A
-  locked plan cannot be edited except through the adjustment process. *Source: HR guide pp. 47–49;
-  SF4C PMGM.03, PMGM.06.*
+  locked plan cannot be edited except through the adjustment process. Lock and unlock are audited as
+  `LOCK` / `UNLOCK` (unlock with its reason). Cancelling a registration whose plan HR had locked puts the
+  plan back to Draft and is audited as `UNLOCK` with the cancel reason. Unlocking returns the plan to
+  where its open registration form stands (`statusAfterUnlock`), or Approved when registration had
+  finished; the open form re-enters its step with the new due date. *Source: HR guide pp. 47–49; SF4C
+  PMGM.03, PMGM.06.*
 - **BR-KPI-15** — **Adjustment** (GOAL_CHANGE) changes an approved, locked Goal Plan through its own
   approval chain. It is started by hand (`forms.startForm`), at most one open per plan. The proposal is a
   list of `GoalChangeItem`s (ADD / MODIFY / CANCEL, each with a reason); the plan **stays Locked** and
   untouched until the final approval, then: MODIFY creates a new Active goal that `replacesGoalId` the old
   one (→ Changed), CANCEL marks the goal Cancelled, ADD creates a goal. "Đang điều chỉnh" is derived from
-  the open form, never a plan status. *Source: SF4C PMGM.06–07; Manager guide.*
+  the open form, never a plan status. `forms.startForm` refuses (`workflowRules.canStartForm`): an
+  evaluation (`NOT_STARTABLE`, 06); no plan, a period, a subject other than the plan's owner (the unit
+  head for a unit plan), a due date in the past (06); a plan that is not Locked (`PLAN_NOT_LOCKED`, 04);
+  a second open adjustment (`CHANGE_ALREADY_OPEN`, 04); a cycle that does not accept the form (04). A
+  draft proposal (`saveGoalChangeItems`) may still lack its reasons — `changeItemIssues(..., { draft:
+  true })`; the submit requires them. *Source: SF4C PMGM.06–07; Manager guide.*
 - **BR-KPI-16** — **Evaluation runs in three steps**: (1) the employee self-assesses each goal (% and
   explanation) with evidence; (2) the direct manager scores each goal (% and comment); (3) HR/C&B records
   the final % per goal. *Source: NoteX minutes §2.3; Manager guide pp. 98–109; SF4C PMGM.12.*
@@ -131,8 +150,15 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   registration) is skipped. A registration launch creates the subject's Draft Employee plan when there is
   none; Company and OrgUnit plans are registered by a form started by hand for the unit head. The
   recurring launch (`FORM_LAUNCH_RULE`, trigger `PERIOD_END` + `offsetDays` ≥ 0) moves from P2 into P1
-  because the monthly evaluation must launch itself, and fires once per (rule, period) (D5). *Source:
-  HR guide pp. 89–93.*
+  because the monthly evaluation must launch itself, and fires once per (rule, period) (D5). Starting a
+  unit plan's registration by hand needs a Company / OrgUnit plan that is not Locked and has no open
+  registration; its subject is the unit head. A launch is NOW (fires at once, `scheduledAt` = now) or
+  SCHEDULED (strictly in the future, fires at the first tick after); RECURRING comes only from a rule
+  (`launchTimingIssues`). Only a Scheduled launch can be cancelled (`canCancelLaunch`, 04). A recurring
+  rule launches the **evaluation only**, whole days ≥ 0 (`validateLaunchRule`). Rules fire for periods
+  of **Active or Evaluating** cycles (product owner, Gate 1: the last month ends after the cycle moved
+  to Evaluating). An evaluation form's items snapshot the **current** actual of (goal, period) at the
+  moment the launch fires (BR-KPI-17). *Source: HR guide pp. 89–93.*
 - **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
   ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
   is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
@@ -144,21 +170,45 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   the tenant's time zone, and the delegator must still be the step's actor. HR may act as proxy on a
   step **nobody is assigned to** (a top manager, an unfilled role) so no form gets stuck. **Nobody acts
   on a review step of their own form** — the subject is never an actor, delegate or proxy of a non-SELF
-  step (HR's own evaluation goes to another HR user) (`workflowRules.entitlement`). *Source: ERD
-  `FORM_STEP_ACTION`, `DELEGATION`; plan §8.1; Phase 1.5 workflow review.*
+  step (HR's own evaluation goes to another HR user) (`workflowRules.entitlement`). `saveDelegation`
+  refuses (`delegationIssues`, ERR-KPI-06): delegating to oneself (`SELF_DELEGATION`); to anyone but an
+  Active account of the tenant; dates not real or backwards; a `validTo` already past; a **chain** — the
+  delegate already delegates, or the delegator is someone's delegate, for the same form type over
+  overlapping dates (`DELEGATION_CHAIN`); an overlapping duplicate of the same pair and form type. A
+  revoked delegation is not edited (04). **Who may revoke** (`canRevokeDelegation`): the delegator, or
+  someone holding `delegation.manage` with a **Tenant** scope (HR, C&B, BOD, ADMIN under the default
+  matrix) — a manager whose unit covers the delegator is not enough (05); revoking twice is 04.
+  *Source: ERD `FORM_STEP_ACTION`, `DELEGATION`; plan §8.1; Phase 1.5 workflow review.*
 - **BR-KPI-23** — On a form, **EDIT is a permission, not an action**: it lets the step's actor change the
   subject's plan or scores; those edits are audited, and the form does not move. Only SUBMIT, APPROVE,
   RETURN and CANCEL are recorded by a person; RETURN goes to the step's `returnToStepNo` (default the
   previous step). CANCEL is HR/ADMIN only, with a reason; cancelling a registration form puts its plan
   back to Draft. An action names the step the screen showed — if the form has moved on, it is refused
-  (ERR-KPI-04). CANCEL and acting as proxy are the `form.cancel` / `form.proxy` permissions (§9). *Source:
-  Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
+  (ERR-KPI-04). CANCEL and acting as proxy are the `form.cancel` / `form.proxy` permissions (§9). An EDIT
+  that names nobody else (`saveEvaluationItems`, `saveGoalChangeItems`, `saveGoal`… — their contracts
+  carry no `onBehalfOfUserId`) is made with the actor's **standing** (`editStanding`): as a step actor;
+  else as the valid delegate of a step actor; else, with `form.proxy`, on behalf of the first step
+  actor. The audit rows of the edit name both people. `editRefusal` distinguishes the state (closed
+  form, step without EDIT, frozen → 04) from the person (not entitled → 05). "Lưu nháp" writes only the
+  current step's column (another column → 04); the actual snapshots are never writable (04); a % above
+  the goal's method cap is 06. *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
 - **BR-KPI-24** — **Someone who leaves mid-period** is evaluated for every period they worked at least
   one day of (left on 15 Jan → January's evaluation still launches on 1 Feb); their own SELF step has no
   actor, so its overdue behaviour carries the form on to the manager, and their lines are read as of
   their last working day. Registration launches reach only people employed on the launch day. Payout is
   **not prorated** (`ASSUMPTION Q13`; `orgRules.employedFraction` is ready if it is). *Source: plan
   §8.1; Phase 1.5 review.*
+- **BR-KPI-25** — A **performance cycle** moves forward one status at a time: **Planning → Active →
+  Evaluating → Closed** (`cycleRules.CYCLE_NEXT`; anything else ERR-KPI-04). The cycle and its periods
+  are edited **only while Planning** (`canEditCycle`, ERR-KPI-04). Activating needs at least one valid
+  period (ERR-KPI-06 `PERIODS_REQUIRED`). A period lies inside its cycle, starts on or before it ends,
+  its input / evaluation deadlines (when set) are not before its end, and two periods of the **same
+  type** never overlap (a month and its quarter may) (`periodIssues`, ERR-KPI-06). **Closing a cycle
+  locks every period**; a Closed cycle's period locks no longer change (`canLockPeriod`) and its plans
+  are no longer editable (`canEditPlan.cycleClosed`). Which forms a cycle accepts (`cycleAllowsLaunch`,
+  ERR-KPI-04): registration while Planning or Active; evaluation while Active or Evaluating; an
+  adjustment at any time before Closed. *Source: Phase 1.5 workflow design (Gate 1); ERD
+  `PERFORMANCE_CYCLE`.*
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
@@ -176,7 +226,8 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   achievement would pull the plan below a goal that achieved nothing. **RATIO_UP, RATIO_DOWN and
   FORMULA must have a cap** (target 1, actual 1000 would otherwise be 100 000% and carry the plan to the
   top rating); floor ≤ cap (`calcRules.validateCalcMethod`, ERR-KPI-13). An uncapped one that reaches
-  the engine anyway is not computable, never scored.
+  the engine anyway is not computable, never scored. `library.saveCalcMethod` refuses what
+  `validateCalcMethod` refuses (ERR-KPI-13).
 - **BR-KPI-32** — A **missing actual** gives no achievement — never 0. When the data cannot give an
   answer the goal is **not computable** (ERR-KPI-12) and is treated exactly like a missing actual —
   never 0, never silently dropped. The answers (`calcRules.achievement`):
@@ -212,22 +263,56 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
 
 - **BR-KPI-40** — A period result per Goal Plan holds the total score, the rating level, the payout %
   and an **adjustment** (rule violations, attendance) in **points added to the score**, positive or
-  negative; the adjusted score never goes below 0 (`scoreRules.adjustedScore`). *Source: ERD `PERIOD_RESULT`; DATX sheet "TH KQ"
-  columns.*
+  negative; the adjusted score never goes below 0 (`scoreRules.adjustedScore`). **Stored conventions**
+  (`resultRules`): `PeriodResult.totalScore` is the **adjusted** score — a Draft stores it unrounded, a
+  Final / Locked result stores it **rounded once at finalisation** (`ratedScore`); `adjustmentPct` is
+  stored on its own. `ResultDetail.achievementPct` is the per-goal % (floor and cap already applied, or
+  the FINAL column of the form); `weightedScore` = achievement × weight / 100. Rating and payout are
+  **null while the score is incomplete**. **Payout only for Employee plans** — a Company / OrgUnit plan
+  is rated but has no payout figure. The payout is read as of the **period's end date**, for the
+  employee's unit chain and position on their last working day in the period (BR-KPI-24). The scale is
+  the cycle's `ratingScaleId`. An adjustment is set on a **Draft** only and re-scores from the result's
+  **stored details** (what HR is looking at), so an adjustment that crosses a level boundary re-rates
+  and changes the payout (`resultRules.applyAdjustment`). *Source: ERD `PERIOD_RESULT`; DATX sheet "TH
+  KQ" columns.*
 - **BR-KPI-41** — The **rating scale** maps a score range to a level. Default sample scale
   **A+ / A / B / C / D** (`ASSUMPTION Q2` — the DATX "TH KQ" sheet is broken with `#REF!`, so no real
   scale is available yet). Each level holds `[minScore, maxScore)`; the top level also takes anything
   above its max; levels must start at 0 and be contiguous (`ratingRules`). The rating reads the
   **rounded, adjusted** score, so it matches the number on screen. The seed's sample: A+ [110, 120] (and
-  above) · A [100, 110) · B [90, 100) · C [70, 90) · D [0, 70).
+  above) · A [100, 110) · B [90, 100) · C [70, 90) · D [0, 70). `results.saveRatingScale` refuses what
+  `validateRatingScale` refuses (ERR-KPI-13).
 - **BR-KPI-42** — A **payout rule** maps a rating level to a % of the KPI salary component, optionally
   per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`): A+ 120% ·
   A 100% · B 80% · C 50% · D 0% for everyone, and an OrgUnit rule paying Kinh doanh 130% for A+. The most
   specific rule in force wins: **Position**, then the **nearest org unit** up the employee's unit chain,
   then All; among equals the latest `effectiveFrom`. A rule naming both a unit and a position is
   invalid. No rule → **no payout figure** ("chưa có quy tắc"), never 0% (`ratingRules.payoutPctFor`).
-- **BR-KPI-43** — Results move **Draft → Final → Locked**; only finalised results are exported to
-  payroll, and the export is recorded. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
+  `results.savePayoutRule` refuses what `validatePayoutRule` refuses (ERR-KPI-13) and a level of another
+  scale (ERR-KPI-06 `LEVEL_NOT_IN_SCALE`).
+- **BR-KPI-43** — Results move **Draft → Final → Locked** and nothing else
+  (`resultRules.RESULT_TRANSITIONS`). **Finalising** (`finalizePeriodResults`) recomputes the selected
+  Drafts (all of the period's when none are listed) from the **current** data, keeping the adjustment,
+  and checks each with `finalizeCheck`: weights first (ERR-KPI-07), then each **not computable** goal
+  (ERR-KPI-12, detail = the reason), then each goal **with no achievement** (ERR-KPI-09); every issue
+  names its result (`data.resultId`). It is **all or none** — one result with an issue refuses the whole
+  call, writes nothing and lists every issue of every result (product owner, Gate 1). On success:
+  Final, `finalizedAt` = the gateway clock, the score rounded once; emits `results.finalized`. A listed
+  result that is not Draft → 04 (`NOT_DRAFT`), of another period → 06, no Draft → 04. **Locking**
+  (`lockPeriodResults`) turns the period's Final results Locked (audit action LOCK); Drafts stay; no
+  Final result → 04. It does not touch `CyclePeriod.isLocked`. Only finalised results are exported to
+  payroll, and the export is recorded (T6). *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
+- **BR-KPI-44** — `calculateResults` computes a **Draft** per Approved / Locked plan of the period's
+  cycle (`resultRules.buildPeriodResults`); a Final or Locked result is never recomputed (returned
+  unchanged); an existing Draft keeps its id and adjustment and gets fresh details. Refused once the
+  cycle is Closed (ERR-KPI-04). **Employee plan** — only from a **Completed KPI_EVAL form** for
+  (subject, plan, period), its **FINAL column**; no completed form → **no result** (`ASSUMPTION Q17`).
+  The form is the snapshot of the goals Active when it opened (BR-KPI-17), so every goal on it counts
+  even if since Changed / Cancelled (E026's T01). **Company / OrgUnit plan** — `calcRules.achievement`
+  on the **current** actuals of its Active goals; a Quarter / Half / Year with no own actual adds up its
+  months by the KPI's aggregation (`aggregatePeriodActuals`), the target likewise from the months' split
+  targets; a goal flagged `rollUpFromChildren` sums its CASCADE children (`ASSUMPTION Q8`); NO_ACTUAL
+  and NOT_COMPUTABLE stay null, never 0.
 
 ## 5. State sets (declared in `src/data/types.ts`, Phase 1.1)
 
@@ -293,7 +378,7 @@ Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
 | ERR-KPI-01 | A read through the DataGateway failed | empty-state with retry | Không tải được dữ liệu |
 | ERR-KPI-02 | An id does not exist in the caller's tenant (another tenant's id answers the same) | empty-state | Không tìm thấy dữ liệu |
 | ERR-KPI-03 | A write failed for a reason the user cannot fix | toast with retry | Không lưu được thay đổi |
-| ERR-KPI-04 | The write is not allowed in the record's current state (locked plan, step moved on) | toast with reload | Thao tác không còn hợp lệ |
+| ERR-KPI-04 | The write is not allowed in the record's current state (locked plan, locked period, Final / Locked result, step moved on) | toast with reload | Thao tác không còn hợp lệ |
 | ERR-KPI-05 | The actor is not entitled (not the step's actor, no valid delegation, no permission) | toast | Bạn không có quyền thực hiện thao tác này |
 | ERR-KPI-06 | Invalid input (missing field, unresolved or cross-tenant reference, duplicate) | inline | Dữ liệu chưa hợp lệ |
 
@@ -318,8 +403,14 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 - **BR-KPI-51** — The prototype holds **no real personnel data**. The "Dữ liệu giả lập" banner is shown
   on every screen. *Source: plan §10.*
 - **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync) and when it was
-  recorded; actuals are snapshots, and only the current one per goal and period counts. *Source: ERD
-  `GOAL_ACTUAL`.*
+  recorded; actuals are snapshots, and only the current one per goal and period counts. Recording an
+  actual is refused (`actualRules.actualIssues`, the same rule checks every import row): the period is
+  locked → ERR-KPI-04 `PERIOD_LOCKED`; the plan's result for the period is already Final / Locked → 04
+  `RESULT_FINAL`; the goal is not Active → 06 `GOAL_NOT_ACTIVE`; the period belongs to another cycle →
+  06 `PERIOD_NOT_IN_CYCLE`; nothing entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number
+  and no text, a TEXT goal non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`; the period has not
+  started (its start date after today in the tenant zone) → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`).
+  A negative number is accepted. *Source: ERD `GOAL_ACTUAL`.*
 
 ## 8. Open assumptions (plan §9)
 
@@ -341,6 +432,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q14 | The DATX library sheet has weights that do not sum to 100%, blank or contradictory calculation methods, mixed rows and garbled targets — how is it read? | Cleaned as listed in `src/data/fixtures/README.md` ("DATX cleaning"): weights normalised, methods filled / corrected by meaning, mixed rows split, BSC perspective mapped by subject. HR to confirm "Tồn kho" / "Xả tồn" direction and the Kế toán opex definition | Seed, BR-KPI-06, 30, 34 |
 | Q15 | KPI frequency and aggregation (absent from DATX)? | Monthly; SUM for money, counts and volumes, AVG for ratios, LAST for headcount and stock | Seed, BR-KPI-11, 36 |
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
+| Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
+| Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 
@@ -356,6 +449,8 @@ or `ASSUMPTION Q12`, except the six roles and four scopes themselves (ERD `ROLE`
   capability on this data at all"; whether they may SUBMIT / APPROVE / RETURN a form is decided only by the
   step's actor rule or a valid delegation (BR-KPI-20, 21). There is no `goal.approve` permission (the ERD's
   example code is not adopted). Either refusal is ERR-KPI-05. *Source: Phase 1.3 analysis.*
+  **The gateway enforces `can()` on every write** (Gate 1; a form action checks only the Active account
+  and leaves the rest to `workflowRules`) — `architecture.md`, "Authorization".
 - **BR-KPI-62** — **Every account with an employee record also holds EMPLOYEE / Self**, so "Của tôi" works for
   a manager, HR or BOD. A system account (no employee) does not, and its "Của tôi" screens are empty, not
   failed. *Source: plan §7.1 ("Của tôi" — every role).*

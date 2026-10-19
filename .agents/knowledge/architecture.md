@@ -130,11 +130,28 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   (else ERR-KPI-06). With no RLS, this is the isolation; the tenant-isolation tests (reads AND writes)
   become the RLS integration tests in Phase 5. Only `platform.*` is not tenant-filtered.
 - **Actor** — every user write takes `actorUserId` second; "who did it" never comes from the payload.
-  System writes (`system.recordNotification`, `system.recordAudit`) are made only by T7's listeners in
-  `src/integrations/`, and the audit entry is built from the event.
+  When a write acts for someone else (proxy, delegation, an EDIT made with that standing),
+  `Tx.onBehalfOfUserId` makes its events and audit rows name both people. System writes
+  (`system.recordNotification`, `system.recordAudit`, `scheduler.runDue`) have no actor; the first two
+  are made only by T7's listeners in `src/integrations/`, and the audit entry is built from the event.
+- **Authorization** (Gate 1, `mock/authorize.ts`) — every user write declares its auth when it is
+  registered: `rt.write(name, auth, body)`, `auth` = `{ permission, resource? }` | `'workflow'` |
+  `'actor'`. The one hook checks the actor is an Active account of the tenant, builds their access
+  profile (`permissionRules.buildAccessProfile`, as of the tenant's today, once per write) and calls
+  `can()` on every resource the resolver names (an update names the stored owner and the new one).
+  `'workflow'` = BR-KPI-61: `act` and the form editors are decided by `workflowRules` in the body; only
+  "Active account of the tenant" is checked. `'actor'` = the row is the actor's own
+  (`markNotificationRead`). An id that names no row of the tenant resolves to "code only", so the
+  integrity check still answers a foreign id exactly like a missing one. `platform.saveTenant` needs
+  `org.manage` in the actor's home tenant. Refusal = ERR-KPI-05. Writes with no dedicated code:
+  `saveWorkflow` → `cycle.manage`; `saveLaunchRule` / `createLaunch` / `cancelLaunch` → `form.launch`;
+  calculate / adjust / finalize / lock results → `result.finalize`; `saveTenant` → `org.manage`.
+  **Reads are not filtered per user** at Gate 1: they are tenant-scoped, screens gate with `can()`, and
+  row-level read filtering is RLS in Phase 5 — tracks must not add ad-hoc read filters.
 - **One clock** — the adapter reads every "now" from `clock.now()`; screens read it too (deadline badges).
-  The mock's dev toolbar moves it (`dev.setNow`). `scheduler.runDue(tenantId)` runs due launches,
-  recurring rules, reminders and overdue steps as of that clock, idempotently.
+  The "Công cụ demo" toolbar (`DevToolbar`, `component-registry.md`) moves it (`dev.setNow`), sets the
+  latency and the failure injection, runs the scheduler and reseeds. `scheduler.runDue(tenantId)` runs
+  due launches, recurring rules, overdue steps and reminders as of that clock, idempotently.
 - **Writes** — `Upsert<T, Managed>` omits `id`/`tenantId` and the columns the gateway owns (status
   transitions, timestamps, authors). Aggregates (method + tiers, template + items, workflow + steps,
   scale + levels) save together with `ChildInput` children **matched by id**, so references to a step
@@ -143,7 +160,9 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   Lists that grow without bound (`listForms`, `listNotifications`, `listAuditLog`) return `Page<T>`.
 - **Events** — every successful write emits `entity.changed` (with before/after), plus domain events
   (`goalPlan.statusChanged`, `form.launched`, `form.stepActed` with `assigneeUserIds`, `form.dueSoon`,
-  `form.overdue`, `actuals.recorded`, `results.finalized`, `payroll.exported`). T7 and the query-cache
+  `form.overdue`, `actuals.recorded`, `results.finalized`, `payroll.exported`). `form.dueSoon` carries
+  `reminderKey` (= `workflowRules.reminderKey(form)`), which T7 uses as the notification's
+  `sourceEventId` (the scheduler does not dedupe reminders, BR-KPI-13). T7 and the query-cache
   invalidation listen; listeners are idempotent by `event.id`, registered once at gateway construction,
   and a rejected listener is reported, never swallowed.
 - **Imports** — the client parses Excel (exceljs) into typed rows; `actuals.stageImport` validates and
@@ -153,7 +172,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   future database.
 - **Errors** — methods reject with `KpiError` (ERR-KPI-01…06 are the contract's generic codes); hooks
   surface the catalogue copy. React Query retries only `isRetryable` failures (01, 03) — never a
-  `KpiDeferredError` (a method waiting for its rule).
+  `KpiDeferredError` (a method waiting for its track, below).
 - **Query keys** — `[tenantId, root, ...params]` via `queryKey()` in `src/hooks/queries/keys.ts`. Each
   root of `KEY_ROOTS` names the entities it reads; `useGatewayEventInvalidation` (mounted once by
   `GatewayEventBridge` inside `SessionProvider`) invalidates every root an `entity.changed` touches,
@@ -165,27 +184,42 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 
 | File | Responsibility |
 |---|---|
-| `runtime.ts` | The per-call wrapper every method runs through: latency (150 ms; 0 under Vitest) → failure injection (`dev.setFailureMode`, glob on `group.method`; reads 01, writes 03) → copy the input → tenant check (unknown tenant 02) → authorize → transaction → integrity → save → swap in → emit → copy the output. Write bodies are synchronous, so two writes never interleave. The registry: every method's kind, `deferred` (rejects `KpiDeferredError`), `pendingGuards` |
+| `runtime.ts` | The per-call wrapper every method runs through: latency (150 ms; 0 under Vitest) → failure injection (`dev.setFailureMode`, glob on `group.method`; reads 01, writes 03) → copy the input → tenant check (unknown tenant 02) → authorize → transaction → integrity → save → swap in → emit → copy the output. Write bodies are synchronous, so two writes never interleave. The registry: every method's kind, every write's declared `auth`, `deferred` (rejects `KpiDeferredError`), `pendingGuards`, `trackOwned` (which Phase 2 track owns what is still deferred / unguarded) |
 | `store.ts` | Per-tenant tables (`Map` per collection; `RolePermission` keyed `roleId\|permissionId`; `Tenant` and `Permission` global). Rows are deep-frozen. `Tx` copies a collection on its first write and swaps it in only on commit |
 | `schema.ts` | The table definitions a database would have: writable columns (a payload's other keys are ignored — `tenantId`, status, authors come from the gateway), foreign keys with kind (`owner` immutable · `reference` · `hierarchy` acyclic) and delete policy (`restrict` · `cascade` · `setNull`), nested paths (`recipientFilter.orgUnitIds[]`, `proposed.kpiDefId`), polymorphic ids (`Notification.refId`), unique indexes (per tenant, partial ones), CHECK-like row and collection checks |
 | `integrity.ts` | Enforces the schema at COMMIT: a reference outside the tenant answers ERR-KPI-06 worded exactly like a missing id; owner / immutable column changed → 06; unique / check → 06; removal of a referenced row → 04 (cascades and set-null applied by `removeRow`) |
 | `persistence.ts` | localStorage `kpi.meta` (seed version), `kpi.clock`, `kpi.global.*`, `kpi.t.<tenant>.<Collection>`. A save writes every touched key AND the clock or none of them (previous strings restored; ERR-KPI-03) — nothing after the save can fail. A stored row of another tenant, or a missing key, fails the load (01). A different `SEED_VERSION` reseeds. `MemoryStorage` for tests |
 | `clock.ts` | Starts at `SEED_NOW`, flows with real time while the app runs, strictly increasing; `setNow(null)` → `SEED_NOW`; saved in every commit's batch, so a reload continues from the simulated time (time spent closed does not count); a corrupt saved clock is reported |
 | `bus.ts` | Per-tenant subscribers + system listeners; events only after commit; a listener's throw / rejection goes to `onDiagnostic` (console.error), never fails the write |
-| `authorize.ts` | The ONE authorization hook: the actor is an Active account of the tenant (else 05). Phase 1.3's `can()` plugs in here |
+| `authorize.ts` | The ONE authorization hook (`authorizeWrite`), run for every user write before its body with the write's declared `WriteAuth`: the actor is an Active account of the tenant (else 05), then `can()` on every resource the resolver names (else 05) — see "Authorization" above. Also the resource resolvers (`planIdResource`, `goalResource`, `formResource`, `userResource`: `undefined` = no such row → code only; `null` = owner unresolvable → deny), `profileOf` / `actorCan` (the actor's profile, cached per transaction, for workflow inputs that are permissions: `form.proxy`, `form.cancel`, `delegation.manage`) and `clockOf` |
+| `workflowContext.ts` | The workflow methods' shared plumbing: `throwRefusal` / `throwIssues` / `throwDecision` (a rule's answer → `KpiError`), `refOrInvalid` (a payload id → ERR-KPI-06 worded like the integrity check), `directoryOf`, `entitlementCtx`, `assigneesFor`, `assertMayEdit` (EDIT standing + `editRefusal`), `assertPlanEditable` (`canEditPlan` with its context from the rows), `setPlanStatus` (the one plan-status write: LOCK / UNLOCK audit + `goalPlan.statusChanged`), `fireLaunch` (recipients → Draft plans → forms → evaluation items with actual snapshots → Launched → `form.launched`). Decides nothing |
 | `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
+| `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
-**Waiting for rules** (Gate 1 requires both lists empty; `runtime.test.ts` holds the skipped Gate 1 test):
-- *Deferred* — the method's result IS a rule's answer, so it rejects `KpiDeferredError` until wired:
-  `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `stageImport`, `commitImport` (T4 4.4.3), `runSync`
-  (T4 4.4.5), `createLaunch`, `cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`,
-  `calculateResults`, `setAdjustment`, `finalizeResults`, `lockResults`, `exportPayroll` (T6), `scheduler.runDue`.
-- *Pending guard* — the method stores what it is given and its rule only REFUSES; it works now and the
-  refusal is wired later: `saveCycle`, `savePeriods`, `saveKgi`, `deleteKgi`, `saveGoal`, `deleteGoal`,
-  `setTargetLevels`, `setPeriodTargets`, `saveAlignment`, `deleteAlignment`, `recordActual`, `rejectImport`,
-  `saveWorkflow`, `saveLaunchRule`, `saveGoalChangeItems`, `saveDelegation`, `revokeDelegation` — plus the
-  permission check of every write (1.3). The exact list is `mockGateway.registry`.
+`groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
+(`buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults`) and applies the
+returned `ResultChanges`; the seed's `ResultScript` (`src/data/fixtures/results.ts`) runs the same
+functions on its arrays, so a recalculated seeded Draft is identical to the seeded row. Configuration
+guards: `saveCalcMethod` (`validateCalcMethod`), `saveRatingScale` (`validateRatingScale`),
+`savePayoutRule` (`validatePayoutRule` + level in scale) — a reference that does not resolve is left to
+the integrity check, so a foreign id still answers like a missing one.
+
+**Track-owned deferrals (after Gate 1).** Every Phase 1 rule is wired: no method is deferred and no guard
+is pending, bar a Phase 2 track's own work package (`registry.trackOwned`, pinned by the Gate 1 test in
+`src/integrations/data/mock/runtime.test.ts`; adding to it is a Large change):
+- *Deferred* (rejects `KpiDeferredError` until the track wires it; its `auth` is already declared) —
+  T4: `actuals.stageImport`, `commitImport` (4.4.3), `runSync` (4.4.5); T6: `results.exportPayroll` (4.6.4).
+- *Pending guard* (works, its refusal not wired) — T4: `actuals.rejectImport` (only a Validating batch).
+
+Wired at Gate 1 — workflow lane: `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `createLaunch`,
+`cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`, `scheduler.runDue` (now
+`rt.system`, no actor); guards on `saveCycle`, `savePeriods` (and `setPeriodLocked`), `saveKgi`,
+`deleteKgi`, `saveGoal`, `deleteGoal`, `setTargetLevels`, `setPeriodTargets`, `saveAlignment`,
+`deleteAlignment`, `saveWorkflow`, `saveLaunchRule`, `saveGoalChangeItems`, `saveDelegation`,
+`revokeDelegation`. Scoring lane: `calculateResults`, `setAdjustment`, `finalizeResults`, `lockResults`;
+guards on `recordActual`, `saveCalcMethod`, `saveRatingScale`, `savePayoutRule`. Foundation: the
+permission check of every write (above).
 - **Naming** — gateway methods use the short domain noun (`listPositions` for `JobPosition`,
   `listWorkflows` for `WorkflowTemplate`); the types keep the ERD names.
 
@@ -200,10 +234,16 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 (3 divisions, the 8 DATX departments + Kinh doanh, 42 fictional people, all 6 roles; the library from
 DATX "2. KPIs phòng ban" cleaned per `ASSUMPTION Q14`; cycles 2026 Closed · 2027 Active · 2028 Planning;
 Goal Plans in every status; three months of actuals from all three sources; forms at every step with a
-history that replays; launches, delegations, notifications, audit) and **Demo Co** (small, but a row in
-every collection, reusing Syntra's codes). The seed's "now" is **2027-04-06 09:00 +07**; the scheduler
-last ran 2027-04-01 09:00. Ids come from `seedId`; `SEED_VERSION` is bumped with every change. **After
-Gate 1 the fixtures are frozen as the contract between tracks.**
+history that replays; launches, delegations, notifications, audit; results T01 Locked · T02 Final
+(+ Drafts) · T03 Draft, produced by `resultRules` (`syntra/results.ts`, run last)) and **Demo Co** (small, but a row in every collection, reusing Syntra's codes). The seed's "now"
+is **2027-04-06 09:00 +07**; the scheduler last ran 2027-04-01 09:00. Ids come from `seedId`.
+
+**Frozen at Gate 1 (2026-10-19)** as the contract between tracks: `src/data/fixtures/freeze.test.ts` pins
+the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49);
+`SEED_VERSION` is `2027-04-06.G1`. A failing freeze test is a **Large** change: system-architect
+reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
+still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4
+`Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (T6, `EMPTY_UNTIL_WIRED`).
 
 ---
 
@@ -233,8 +273,8 @@ delta Phase 5 applies when it writes the SQL schema.
 ## Phases (plan §6)
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed (**done 2026-10-19**, rules wired at Gate 1) · **1.3** session
-+ permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (parallel) → **Gate 1** (fixtures
-frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
++ permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (**done 2026-10-19**) →
+**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 
 ---

@@ -6,6 +6,84 @@
 
 ---
 
+## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
+
+**Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or
+guard-pending **bar the Phase 2 tracks' own work packages** (`registry.trackOwned`: T4 `stageImport`,
+`commitImport`, `rejectImport`, `runSync`; T6 `exportPayroll`) — the original "both lists empty" test
+was redefined, since those methods ARE the tracks' work. Every user write declares its authorization and
+the gateway enforces `can()` on it (`authorize.ts`). Product-owner decisions:
+1. an employee's result comes only from a Completed evaluation form's FINAL column (`ASSUMPTION Q17`);
+2. finalising is all-or-none;
+3. recurring launches fire in Active or Evaluating cycles;
+4. reminders are deduped by T7 via `form.dueSoon.reminderKey`, not by the scheduler;
+5. writes with no dedicated permission reuse existing codes (`saveWorkflow` → `cycle.manage`, launches
+   and launch rules → `form.launch`, result lifecycle → `result.finalize`, `saveTenant` → `org.manage`)
+   rather than grow the 28-code catalogue.
+The freeze guard `src/data/fixtures/freeze.test.ts` pins the seed hash, the gateway surface with each
+write's permission and the entity count; `SEED_VERSION` = `2027-04-06.G1`.
+
+**Why.** The tracks start in parallel on one seed and one contract; a silent change to either would break
+the others, so a change must fail a test, not slip through review. A new permission code after Gate 1 is a
+Large change; reusing the code whose holders already run that screen kept the matrix unchanged.
+
+**Updated alongside.** `business-rules.md` (header, §9), `architecture.md` (Authorization, mock table,
+Track-owned deferrals, Fixtures strategy, Phases), `src/data/fixtures/README.md`.
+
+---
+
+## 2026-10-19 — Gate 1, workflow lane: forms, launches, scheduler, lock/unlock, cycles, plan-edit guards wired
+
+**Decision.** Every workflow method of the mock calls the rules and only the rules: `forms.act` →
+`checkAction` (the mock always builds the `submitCheck`); edits → `editRefusal` with the actor's
+`editStanding` (delegate / proxy inferred, because the edit contracts carry no `onBehalfOfUserId`);
+plan edits → `canEditPlan` (context from rows: cycle Closed, the open registration and whether this
+actor may EDIT at its step, owner = employee or unit head, plan admin = `goalplan.edit` Tenant-wide);
+alignments → `checkAlignment` on the child's plan; levels → `validateTargetLevels`; launches →
+`validateLaunch` + `launchTimingIssues` + `cycleAllowsLaunch` + `resolveRecipients`; the scheduler →
+`dueScheduledLaunches`, `launchRuleFirings`, `overdueActions`, `remindersDue`. New `cycleRules`
+(Planning → Active → Evaluating → Closed, Planning-only edits, periods, which forms a cycle accepts).
+Product-owner decisions: recurring rules fire for Active OR Evaluating cycles; the scheduler does not
+dedupe reminders — `form.dueSoon.reminderKey` lets T7 write one notification per step entry. Contract
+change before the freeze: `form.dueSoon` gained a required `reminderKey`. Not added: the skipped
+recipients on `form.launched` (would be a contract change; `fireLaunch` returns them, nothing exposes
+them); an event for a form started by hand — the `entity.changed` CREATE of the `FormInstance`
+(`launchId: null`) announces it.
+
+**Why.** A rule copied into the mock drifts; the edit contracts have no "on behalf of" field, so a
+delegate's or HR's draft could not otherwise be saved; reminders deduped by scheduler state would need a
+new column, while the key makes the listener idempotent for free.
+
+**Updated alongside.** `business-rules.md` BR-KPI-13/14/15/19/21/23 and new BR-KPI-25 (cycles),
+`architecture.md` (Track-owned deferrals, mock table, `form.dueSoon`), `docs/flows/new-flow.md` §1–4A,
+§7, the `listInbox` comment in `src/integrations/data/types.ts`.
+
+---
+
+## 2026-10-19 — Gate 1 scoring lane: one result pipeline for the mock and the seed
+
+**Decision.** `src/lib/resultRules.ts` is the only producer of `PeriodResult` / `ResultDetail`: pure
+orchestrators over plain rows (`buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`,
+`lockPeriodResults`) return a `ResultChanges` set; the mock applies it to its transaction, the seed's
+`ResultScript` to its arrays. Stored conventions in BR-KPI-40 (Draft = adjusted unrounded, Final =
+rounded once; payout only for Employee plans; rating/payout null while incomplete). Employee results
+only from a completed evaluation's FINAL column, with every goal on the form counted Active (the form
+is the snapshot) — `ASSUMPTION Q17`. Finalising is all-or-none and lists every issue of every result
+(07, then 12, then 09, each tagged `data.resultId`). `src/lib/actualRules.ts` guards `recordActual`
+(and T4's import rows): locked period / finalised result → 04; goal not Active, other cycle, wrong
+kind, empty, period not started (`ASSUMPTION Q18`) → 06. `saveCalcMethod`, `saveRatingScale`,
+`savePayoutRule` now refuse invalid configuration (13; level of another scale 06).
+
+**Why.** A seed that typed scores in, or a second copy of the arithmetic in the mock, would drift from
+the rules the moment either changed; one pipeline means a recalculated seeded Draft is byte-identical
+(tested). All-or-none finalising keeps a period's payroll batch consistent (product owner).
+
+**Updated alongside.** `business-rules.md` (BR-KPI-40, 43, new 44, 52, 31/41/42 lines, §6 ERR-KPI-04,
+§8 Q17/Q18), `architecture.md` (Track-owned deferrals, `groups/results.ts`, Fixtures strategy),
+`docs/flows/new-flow.md` (§4B, §6, §7), fixtures README, `errorCatalog.ts` (ERR-KPI-04 trigger).
+
+---
+
 ## 2026-10-19 — Phase 1.4 dev toolbar: "Công cụ demo"
 
 **Decision.** The mock's `dev` controls live in a popover beside the "Dữ liệu giả lập" banner, shown

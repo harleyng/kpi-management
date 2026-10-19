@@ -25,6 +25,11 @@ Ba tầng mục tiêu: **Công ty → Bộ phận → Cá nhân**, nối với n
 một phần chỉ tiêu của mình) và **link** (nhân viên tự thêm mục tiêu và liên kết lên mục tiêu của quản
 lý). Mỗi Goal Plan có 3–5 KGI và 5–8 KPI, tổng trọng số 100%, mỗi KPI phải có nguồn số liệu.
 
+**Trạng thái chu kỳ** chỉ đi tới từng bước: *Đang lập kế hoạch → Đang thực hiện → Đang đánh giá → Đã
+đóng*. Tên, ngày và các kỳ của chu kỳ chỉ sửa được khi còn *Đang lập kế hoạch*; muốn chuyển sang *Đang
+thực hiện* phải có ít nhất một kỳ hợp lệ. Đóng chu kỳ thì mọi kỳ bị khóa số liệu và Goal Plan của chu
+kỳ không sửa được nữa.
+
 ## 2. Quy trình 1 — Đăng ký KPI (GOAL_SETTING)
 
 Theo email template hiện tại, giữ nguyên 4 bước nhưng chạy trên hệ thống:
@@ -51,14 +56,21 @@ sequenceDiagram
   thống nói rõ còn thiếu gì.
 - Quản lý thấy với mỗi KPI đã cascade: **đã giao cho NV / tự nhận / chưa giao / tự thực hiện**; phần
   "chưa giao" do hệ thống tính.
+- Goal Plan của **công ty / bộ phận** được HR khởi tạo phiếu đăng ký bằng tay, người nhận là trưởng đơn
+  vị; mỗi Goal Plan chỉ có một phiếu đăng ký đang mở.
+- Hết hạn ở một bước → hệ thống **khóa Goal Plan**, phiếu đứng yên ở bước đó. HR mở khóa phải ghi lý do
+  và hạn mới; bước được tính lại từ lúc mở khóa nên lần chạy sau không khóa lại ngay.
+- HR hủy phiếu đăng ký (kể cả khi đang bị khóa) thì Goal Plan về *Nháp*; việc mở khóa này được ghi
+  lịch sử kèm lý do hủy.
 
 ## 3. Quy trình 2 — Điều chỉnh KPI (GOAL_CHANGE)
 
 Goal Plan đã khóa chỉ thay đổi được qua phiếu điều chỉnh: người đề xuất → quản lý trực tiếp duyệt → HR
 ghi nhận và khóa lại. Chỉ tiêu bị đổi hoặc hủy giữ lịch sử (Đang áp dụng → Đã thay đổi / Đã hủy).
 
-- Người đề xuất **tự mở** phiếu điều chỉnh (không cần HR khởi chạy); mỗi Goal Plan chỉ có **một** phiếu
-  điều chỉnh đang mở.
+- HR (hoặc quản lý) khởi tạo phiếu điều chỉnh bằng tay (không qua đợt khởi chạy) cho Goal Plan **đã
+  khóa**; mỗi Goal Plan chỉ có **một** phiếu điều chỉnh đang mở. Người lập lưu nháp đề xuất được khi
+  chưa ghi lý do, nhưng **gửi** thì mọi dòng phải có lý do.
 - Phiếu ghi **danh sách đề xuất**: thêm / sửa / hủy chỉ tiêu, mỗi dòng kèm lý do. Trong lúc phiếu đang
   chạy, Goal Plan **vẫn khóa** và số liệu, đánh giá vẫn tính theo chỉ tiêu cũ.
 - Chỉ khi bước cuối duyệt, hệ thống mới áp dụng: chỉ tiêu sửa sinh bản mới (bản cũ chuyển "Đã thay đổi"
@@ -87,6 +99,12 @@ sequenceDiagram
   **khóa** khi quá hạn, phiếu dừng tại bước đó; HR mở khóa Goal Plan phải nhập **hạn mới**, bước chạy lại
   từ lúc mở khóa.
 - Thao tác thay (HR làm thay) và ủy quyền đều ghi nhận **cả hai người**.
+- Đợt đánh giá tháng tự khởi chạy ngày 1 tháng sau (một lần cho mỗi kỳ), kể cả khi chu kỳ đã sang
+  *Đang đánh giá* (tháng 12). HR cũng có thể khởi chạy *ngay* hoặc *hẹn ngày*; đợt hẹn ngày chỉ hủy
+  được khi chưa chạy.
+- Số thực tế trên phiếu là **ảnh chụp lúc khởi chạy**, không sửa trên phiếu.
+- Nhắc hạn gửi trước hạn bước 1 ngày; hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ
+  nhận **một** thông báo cho mỗi lần vào bước.
 
 ## 4A. Ai thấy gì, ai làm gì (Phase 1.3)
 
@@ -106,6 +124,27 @@ sequenceDiagram
 - **Chạy thử nhiều vai trò không cần đăng nhập lại.** Thanh trên cùng có ô chọn **công ty** và ô chọn **người
   dùng** (nhóm theo vai trò, tìm theo tên, đơn vị, vai trò). Đổi công ty thì không còn thấy dữ liệu của công
   ty kia.
+- **Ủy quyền**: không ủy quyền cho chính mình, không ủy quyền tiếp (người đang được ủy quyền không ủy
+  quyền lại; người đang ủy quyền cho người khác không nhận thêm ủy quyền trùng thời gian), không tạo hai
+  ủy quyền trùng người, trùng loại phiếu, trùng thời gian. Người ủy quyền hoặc HR thu hồi; quản lý cấp
+  trên của người ủy quyền thì không.
+- Người được ủy quyền / HR làm thay khi **lưu nháp** cũng được ghi cả hai người, như khi gửi/duyệt.
+
+## 4B. Kết quả kỳ (Gate 1)
+
+Sau khi phiếu đánh giá hoàn thành:
+
+1. **Tính kết quả (C&B/HR).** Hệ thống tính bản nháp ("Tạm tính") cho mọi Goal Plan đã duyệt/khóa
+   của kỳ. Cá nhân: lấy % HR chốt (cột cuối) trên phiếu đánh giá đã hoàn thành — chưa hoàn thành phiếu
+   thì chưa có kết quả (giả định Q17). Công ty / phòng ban: tính từ số liệu thực tế. Tính lại bao nhiêu
+   lần cũng được khi còn là bản nháp; kết quả đã chốt không bị tính lại.
+2. **Điều chỉnh (C&B/HR).** Cộng/trừ điểm (vi phạm, chuyên cần) trên bản nháp; xếp loại và % lương
+   KPI cập nhật ngay, kể cả khi điều chỉnh làm đổi loại.
+3. **Chốt kết quả (C&B/HR).** Chốt một số hoặc toàn bộ bản nháp của kỳ. Điểm được làm tròn 2 chữ số
+   một lần. Chỉ cần MỘT kết quả còn vướng (tổng trọng số ≠ 100%, chỉ tiêu chưa có điểm hoặc không tính
+   được) thì không kết quả nào được chốt, và màn hình liệt kê mọi chỗ vướng.
+4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa để chuyển lương; bản nháp giữ nguyên.
+5. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
 
 ## 5. Khác biệt so với hiện tại
 
@@ -116,7 +155,7 @@ sequenceDiagram
 | 3 | "Khóa sau hạn" chỉ là lời nhắc | Khóa thật, hoặc tự chuyển bước, theo cấu hình | Quy tắc có hiệu lực | BR-KPI-13, 14 |
 | 4 | Không thấy phần chưa giao | Hệ thống tính "chưa giao" cho từng KPI cascade | Quản lý giao đủ, không giao vượt | BR-KPI-07 |
 | 5 | Số liệu không nguồn, không bằng chứng | Mỗi KPI có nguồn; mỗi số ghi rõ tay / Excel / API; bằng chứng đính kèm | Kiểm chứng được khi chấm | BR-KPI-05, 52 |
-| 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % lương tính tự động; dashboard sống | Ban điều hành thấy ngay | BR-KPI-35, 40–43 |
+| 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % lương tính tự động; dashboard sống | Ban điều hành thấy ngay | BR-KPI-35, 40–44 |
 | 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch (ngày 1 hằng tháng) | Không quên kỳ nào | BR-KPI-19 (D5) |
 
 ## 6. Câu hỏi mở
@@ -133,6 +172,8 @@ trực tiếp đến quy trình:
 | — | Bước nào khóa khi quá hạn, bước nào tự chuyển? | Đăng ký: khóa; đánh giá: tự chuyển | HR |
 | Q12 | Danh mục quyền, quyền mặc định của từng vai trò và phạm vi dữ liệu? (Các tài liệu nguồn không nêu) | Như `business-rules.md` §9 | Product owner + HR |
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
+| Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
+| Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
 
 ## 7. Quyết định đã chốt
 
@@ -157,3 +198,16 @@ trực tiếp đến quy trình:
   về "chưa giao"; % lương KPI không chia theo số ngày làm việc (giả định Q13).
 - **Khóa khi quá hạn** chỉ dùng cho phiếu đăng ký. Không ai được duyệt phiếu của chính mình. HR được làm
   thay ở bước không có người xử lý, để phiếu không bị kẹt.
+
+**19/10/2026 — Gate 1, luồng quy trình (product owner duyệt).**
+
+- Chu kỳ chỉ đi tới từng bước; chỉ sửa chu kỳ và kỳ khi *Đang lập kế hoạch*; đóng chu kỳ khóa mọi kỳ.
+- Đánh giá tự khởi chạy cả trong chu kỳ *Đang đánh giá*.
+- Hệ thống không tự lọc nhắc hạn trùng; mỗi lần nhắc mang một khóa cố định để thông báo chỉ ghi một lần.
+
+**19/10/2026 — Gate 1, kết quả kỳ (product owner duyệt).**
+
+- Kết quả cá nhân chỉ lấy từ phiếu đánh giá đã hoàn thành (giả định Q17).
+- Chốt kết quả theo nguyên tắc "tất cả hoặc không": còn một kết quả vướng thì không chốt kết quả nào.
+- Phòng ban/công ty được xếp loại nhưng không có % lương.
+- Kỳ đã chốt kết quả thì không nhập thêm số thực tế; chưa đến kỳ thì cũng chưa nhập được (giả định Q18).

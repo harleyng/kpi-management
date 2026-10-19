@@ -674,7 +674,7 @@ export interface FormsGateway {
   /**
    * The forms whose CURRENT step this user may act on now — as the step's actor, or as a delegate
    * under a delegation valid now. Resolved by `workflowRules`. HR's proxy access is not an inbox:
-   * HR finds the form through `listForms`.
+   * HR finds the form through `listForms`. An unknown user (another tenant's too) answers ERR-KPI-02.
    */
   listInbox(tenantId: Id, userId: Id): Promise<FormInstance[]>;
   listFormActions(tenantId: Id, formId: Id): Promise<FormStepAction[]>;
