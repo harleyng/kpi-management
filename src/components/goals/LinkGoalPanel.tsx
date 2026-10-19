@@ -36,7 +36,7 @@ const planLabel = (plan: GoalPlan, lookups: GoalLookups) =>
 /**
  * "Liên kết lên chỉ tiêu cấp trên" (WBS 4.3.4, BR-KPI-07): an employee ties a goal they added to a
  * goal of their manager, their unit or the company (`planAccessRules.linkCandidatePlans`). Only goals
- * the person may SEE are offered (D2). The contribution % is informational in P1 (`ASSUMPTION Q19`).
+ * the person may SEE are offered (D2). The contribution % is informational in P1 (`ASSUMPTION Q31`).
  */
 export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose }: LinkGoalPanelProps) {
   const { tenantId, today } = useSession();
@@ -166,7 +166,7 @@ export function LinkGoalPanel({ data, lookups, goal, readOnly, onClose }: LinkGo
                 <FormField
                   label="Tỉ lệ đóng góp (%)"
                   required
-                  hint="Giả định Q19: chỉ để tham khảo, chưa dùng để tính điểm."
+                  hint="Giả định Q31: chỉ để tham khảo, chưa dùng để tính điểm."
                   error={preIssues.find((i) => i.detail === 'CONTRIBUTION_INVALID') ? firstIssueText(preIssues.filter((i) => i.detail === 'CONTRIBUTION_INVALID')) : undefined}
                 >
                   {(control) => <Input {...control} inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} />}

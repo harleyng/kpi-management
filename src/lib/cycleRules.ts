@@ -141,7 +141,7 @@ const lastDayOf = (year: number, month: number) => new Date(Date.UTC(year, month
  * - **Month** — one per calendar month, labelled `T01…T12` by the calendar month; input / evaluation
  *   deadlines = the month's end + `inputDeadlineDays` / `evalDeadlineDays` (5 and 13 by default).
  * - **Quarter / Half / Year** — consecutive groups of 3 / 6 / 12 months counted from the cycle start
- *   (`ASSUMPTION Q20`: Q1 = the cycle's first three months, January–March only for a calendar
+ *   (`ASSUMPTION Q32`: Q1 = the cycle's first three months, January–March only for a calendar
  *   cycle), labelled `Q1…`, `H1…`, `Y`; only whole groups — a remainder makes no partial period; no
  *   deadlines (the seed's convention).
  * Refused (ERR-KPI-06): the cycle's own issues; a cycle that is not whole months (starts on day 1, ends

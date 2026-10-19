@@ -174,8 +174,8 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
-| Q19 | Tỉ lệ đóng góp của liên kết (link) có dùng để tính điểm không? | Không — chỉ để tham khảo | HR |
-| Q20 | Chu kỳ không bắt đầu từ tháng 1 thì "Q1" là tháng 1–3 hay 3 tháng đầu chu kỳ? | 3 tháng đầu chu kỳ | HR |
+| Q31 | Tỉ lệ đóng góp của liên kết (link) có dùng để tính điểm không? | Không — chỉ để tham khảo | HR |
+| Q32 | Chu kỳ không bắt đầu từ tháng 1 thì "Q1" là tháng 1–3 hay 3 tháng đầu chu kỳ? | 3 tháng đầu chu kỳ | HR |
 
 ## 7. Quyết định đã chốt
 

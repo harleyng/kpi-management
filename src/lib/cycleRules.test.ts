@@ -146,7 +146,7 @@ describe('generatePeriods — "Tạo kỳ tự động" (WBS 4.3.1)', () => {
     expect(feb).toMatchObject({ endDate: '2028-02-29', inputDeadline: '2028-03-05' });
   });
 
-  it('a cycle starting in April counts quarters from its start (ASSUMPTION Q20) and keeps calendar month labels', () => {
+  it('a cycle starting in April counts quarters from its start (ASSUMPTION Q32) and keeps calendar month labels', () => {
     const fiscal = { ...cycle, startDate: '2027-04-01', endDate: '2028-03-31' };
     const periods = ok(fiscal);
     expect(periods.filter((p) => p.periodType === 'Month').map((p) => p.label)).toEqual(['T04', 'T05', 'T06', 'T07', 'T08', 'T09', 'T10', 'T11', 'T12', 'T01', 'T02', 'T03']);

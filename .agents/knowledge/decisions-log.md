@@ -19,8 +19,8 @@ cycle) holding the one edit decision the mock guard and the screens share (parit
 UNKNOWN (read-only) while any input is missing; a `saveGoal` allocation guard only when target / type /
 "tự giao" change; the cascaded child copies the method only when share-safe and never copies levels,
 split or weight; a split tolerance relative to the target, `SPLIT_INCOMPLETE` and `SPLIT_NO_AGGREGATION`;
-periods generated only for ≤ 12 whole months (`ASSUMPTION Q20`); LINK `contributionPct` informational
-(`ASSUMPTION Q19`); detail views as search params; goal edit / split / link inline, dialogs only for lock,
+periods generated only for ≤ 12 whole months (`ASSUMPTION Q32`); LINK `contributionPct` informational
+(`ASSUMPTION Q31`); detail views as search params; goal edit / split / link inline, dialogs only for lock,
 unlock, history and cascade; two-write saves surface partial failure (`PartialGoalSaveError`,
 `CascadeOrphanError`) and refresh on every outcome.
 
@@ -43,7 +43,7 @@ use `planAccessRules` for edit / send decisions and `canSeeGoal` on goal names; 
 `useAuditEntries` to `system.ts`. Phase 5: replace the cascade's two writes with one `cascadeGoal`
 transaction; enforce D2 in RLS.
 
-**Updated alongside.** `business-rules.md` (header, BR-KPI-05, 07, 08, 11, 26–28, Q19, Q20),
+**Updated alongside.** `business-rules.md` (header, BR-KPI-05, 07, 08, 11, 26–28, Q31, Q32),
 `docs/flows/new-flow.md` (§6, §7), `architecture.md` (route table, detail views, mock notes),
 `component-registry.md`, `common-pitfalls.md`, `e2e/specs/smoke.spec.ts` (`BUILT`).
 

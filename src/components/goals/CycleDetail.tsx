@@ -228,7 +228,7 @@ function GeneratePeriods({ cycle, existing, onDone }: { cycle: PerformanceCycle;
           {(control) => <Input {...control} inputMode="numeric" value={evalDays} onChange={(e) => setEvalDays(e.target.value)} />}
         </FormField>
       </div>
-      <p className="text-xs text-muted-foreground">Giả định Q20: quý, nửa năm tính từ tháng đầu của chu kỳ. Kỳ đã có (cùng loại, cùng tên) giữ nguyên mã và trạng thái khóa.</p>
+      <p className="text-xs text-muted-foreground">Giả định Q32: quý, nửa năm tính từ tháng đầu của chu kỳ. Kỳ đã có (cùng loại, cùng tên) giữ nguyên mã và trạng thái khóa.</p>
       {!generated.ok ? (
         <p role="alert" className="text-sm text-support-negative">
           {generated.issues.map(issueText).join(' ')}

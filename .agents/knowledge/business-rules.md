@@ -86,7 +86,7 @@ cycle and the owner's employment; the method copied only when share-safe — RAT
 else the manager picks one; levels, split, weight and KGI not copied) and then the CASCADE alignment; it is
 possible only while the manager may edit the report's plan (their registration form at a step with EDIT for
 the manager — BR-KPI-12 step 1 or 3). A **link**'s `contributionPct` (0, 100] is informational only
-(`ASSUMPTION Q19`).
+(`ASSUMPTION Q31`).
 *Source: HR guide p. 24; email template steps 1–2.*
 - **BR-KPI-08** — A goal is **public or private** (visibility, D2). A PRIVATE goal is seen only by its
   owner (the goal's, or the plan's — the unit head for a unit plan), anyone in that owner's manager chain
@@ -249,7 +249,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   "tự giao" or period split by import in P1.
 - **BR-KPI-27** — **Periods are generated** (`cycleRules.generatePeriods`) for a cycle of whole months, at
   most 12: months `T01…T12` by calendar month with input / evaluation deadlines = the month's end + 5 / + 13
-  days (editable offsets); quarters / halves / the year counted from the cycle start (`ASSUMPTION Q20`), whole
+  days (editable offsets); quarters / halves / the year counted from the cycle start (`ASSUMPTION Q32`), whole
   groups only, no deadlines. Regenerating keeps the id and lock of a period with the same type and label
   (`mergeGeneratedPeriods`).
 - **BR-KPI-28** — **Who may change a plan now and send it** is one decision shared by the gateway and the
@@ -487,8 +487,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
-| Q19 | What does a LINK's `contributionPct` mean (a share of the parent's target, or of the child's result)? | Informational only — shown, never computed | BR-KPI-07 |
-| Q20 | In a cycle that does not start in January, is Q1 January–March or the cycle's first three months? | The cycle's first three months | BR-KPI-27 |
+| Q31 | What does a LINK's `contributionPct` mean (a share of the parent's target, or of the child's result)? | Informational only — shown, never computed | BR-KPI-07 |
+| Q32 | In a cycle that does not start in January, is Q1 January–March or the cycle's first three months? | The cycle's first three months | BR-KPI-27 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 
