@@ -17,7 +17,7 @@
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
 > **Track T6 (2026-10-19)** added the payroll export (BR-KPI-45, `src/lib/payrollRules.ts`, `ASSUMPTION
-> Q19`, `Q20`) and the result screens; the glossary below gained the result and pay terms.
+> Q38`, `Q39`) and the result screens; the glossary below gained the result and pay terms.
 
 ---
 
@@ -328,14 +328,14 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   and NOT_COMPUTABLE stay null, never 0.
 - **BR-KPI-45** — **Payroll export** (`results.exportPayroll`, T6; `payrollRules.buildPayrollSheet`).
   **Who:** `result.export` (C&B, ADMIN) — HR finalises but does not export. **Which results:** the
-  period's **Employee** results that are **Final or Locked** (`ASSUMPTION Q19`); Drafts and Company /
+  period's **Employee** results that are **Final or Locked** (`ASSUMPTION Q38`); Drafts and Company /
   OrgUnit results (no payout, BR-KPI-40) are never in the file, and the screen counts what it leaves out.
   None qualifies → ERR-KPI-04 `NO_FINAL_RESULT`. **What:** one row per person, sorted by employee code
   (ties by result id) — code, name, unit and position of `resultRules.subjectAssignment` (the assignment
   the payout % was read for, from the current assignment rows, by their current names), Điểm KPI,
   điều chỉnh điểm, xếp loại, % hưởng lương KPI, status, finalised-at — **copied from the stored result,
   never recomputed**. A **null payout** is a **blank cell with a note**, never 0 and never a refusal
-  (`ASSUMPTION Q20`): "Chưa có quy tắc quy đổi" (rated, no rule), "Chưa xếp loại" (no rating), "Không tìm
+  (`ASSUMPTION Q39`): "Chưa có quy tắc quy đổi" (rated, no rule), "Chưa xếp loại" (no rating), "Không tìm
   thấy xếp loại" (the level is gone); a person who cannot be found stays in the file with "Thiếu thông tin
   nhân viên". **Effect:** an `.xlsx` file (`FileObject`) and its `PayrollExport` record, at the gateway
   clock's time, `payroll.exported` emitted; **no result changes status**. Allowed in a **Closed** cycle
@@ -469,8 +469,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
-| Q19 | Which results may be exported to payroll, and does exporting lock them? | Employee results that are Final OR Locked; exporting changes no status (locking stays HR's separate act) | BR-KPI-43, 45 |
-| Q20 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-45 |
+| Q38 | Which results may be exported to payroll, and does exporting lock them? | Employee results that are Final OR Locked; exporting changes no status (locking stays HR's separate act) | BR-KPI-43, 45 |
+| Q39 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-45 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

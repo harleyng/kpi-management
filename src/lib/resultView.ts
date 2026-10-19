@@ -17,7 +17,7 @@ export type PayoutState =
   | { kind: 'notApplicable' }
   /** Not rated yet: a goal unscored or weights not 100% (a Draft), or no level matched. */
   | { kind: 'notRated' }
-  /** Rated, but no payout rule in force (BR-KPI-42 "chưa có quy tắc", ASSUMPTION Q20). */
+  /** Rated, but no payout rule in force (BR-KPI-42 "chưa có quy tắc", ASSUMPTION Q39). */
   | { kind: 'noRule' }
   /** The rating level the result names no longer exists. */
   | { kind: 'levelMissing' };

@@ -57,7 +57,7 @@ function sheetOf(d: PayrollData, periodId = 'T01') {
   return outcome.sheet;
 }
 
-describe('isPayrollResult (BR-KPI-45, ASSUMPTION Q19)', () => {
+describe('isPayrollResult (BR-KPI-45, ASSUMPTION Q38)', () => {
   it.each([
     ['Employee', 'Final', true],
     ['Employee', 'Locked', true],
@@ -69,7 +69,7 @@ describe('isPayrollResult (BR-KPI-45, ASSUMPTION Q19)', () => {
   });
 });
 
-describe('payoutNote (ASSUMPTION Q20)', () => {
+describe('payoutNote (ASSUMPTION Q39)', () => {
   it('has no note when there is a payout — 0 included', () => {
     expect(payoutNote({ payoutPct: 80, ratingLevelId: 'rl-B' }, levels)).toBeNull();
     expect(payoutNote({ payoutPct: 0, ratingLevelId: 'rl-D' }, levels)).toBeNull();

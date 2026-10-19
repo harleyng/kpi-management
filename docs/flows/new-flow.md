@@ -146,9 +146,9 @@ Sau khi phiếu đánh giá hoàn thành:
 4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa, không sửa được nữa; bản nháp giữ nguyên. Khóa
    kết quả không khóa kỳ nhập số liệu.
 5. **Xuất file lương (C&B).** C&B xuất file Excel gồm kết quả cá nhân **đã chốt hoặc đã khóa** của kỳ
-   (giả định Q19): mã NV, họ tên, đơn vị, chức danh, điểm KPI (đã gồm điều chỉnh), điều chỉnh điểm, xếp
+   (giả định Q38): mã NV, họ tên, đơn vị, chức danh, điểm KPI (đã gồm điều chỉnh), điều chỉnh điểm, xếp
    loại, % hưởng lương KPI. Bản tạm tính và kết quả phòng ban/công ty không có trong file. Kết quả chưa có
-   % hưởng lương KPI vẫn có trong file, cột % để trống kèm ghi chú (giả định Q20). Xuất file không đổi
+   % hưởng lương KPI vẫn có trong file, cột % để trống kèm ghi chú (giả định Q39). Xuất file không đổi
    trạng thái kết quả; xuất lại bao nhiêu lần cũng được, mỗi lần một file trong lịch sử xuất file.
 6. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
 7. **Nhân viên xem "Kết quả của tôi"** sau khi HR chốt. Bản tạm tính hiện "Đang tổng hợp", không có số.
@@ -181,8 +181,8 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
-| Q19 | Kết quả nào được xuất sang lương, và xuất có khóa kết quả không? | Kết quả cá nhân đã chốt hoặc đã khóa; xuất không đổi trạng thái | Product owner + C&B |
-| Q20 | Kết quả đã chốt nhưng chưa có % hưởng lương KPI (chưa có quy tắc, chưa xếp loại): chặn xuất hay vẫn xuất? | Vẫn xuất, cột % để trống kèm ghi chú | C&B |
+| Q38 | Kết quả nào được xuất sang lương, và xuất có khóa kết quả không? | Kết quả cá nhân đã chốt hoặc đã khóa; xuất không đổi trạng thái | Product owner + C&B |
+| Q39 | Kết quả đã chốt nhưng chưa có % hưởng lương KPI (chưa có quy tắc, chưa xếp loại): chặn xuất hay vẫn xuất? | Vẫn xuất, cột % để trống kèm ghi chú | C&B |
 
 ## 7. Quyết định đã chốt
 
@@ -223,8 +223,8 @@ trực tiếp đến quy trình:
 
 **19/10/2026 — Track T6, kết quả và file lương (product owner duyệt).**
 
-- File lương lấy kết quả cá nhân đã chốt hoặc đã khóa; xuất file không khóa kết quả (giả định Q19).
-- Kết quả chưa có % hưởng lương KPI vẫn có trong file, để trống kèm ghi chú (giả định Q20).
+- File lương lấy kết quả cá nhân đã chốt hoặc đã khóa; xuất file không khóa kết quả (giả định Q38).
+- Kết quả chưa có % hưởng lương KPI vẫn có trong file, để trống kèm ghi chú (giả định Q39).
 - Chỉ C&B (và quản trị hệ thống) xuất file lương; HR tính, điều chỉnh, chốt và khóa.
 - Thang xếp loại mẫu chỉ xem, chưa sửa trên màn hình cho tới khi có câu trả lời Q2; quy tắc quy đổi thì
   sửa được để thử.

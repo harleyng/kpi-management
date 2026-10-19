@@ -30,7 +30,7 @@ import { subjectAssignment } from './resultRules';
 import { foldDiacritics } from './utils';
 
 /**
- * BR-KPI-45 (`ASSUMPTION Q19`) — a payroll file carries the period's EMPLOYEE results that are Final
+ * BR-KPI-45 (`ASSUMPTION Q38`) — a payroll file carries the period's EMPLOYEE results that are Final
  * or Locked. A Draft is not finalised; a Company / OrgUnit result has no payout (BR-KPI-40).
  */
 export const isPayrollResult = (result: Pick<PeriodResult, 'ownerType' | 'status'>): boolean =>
@@ -47,7 +47,7 @@ export const PAYROLL_NOTE_LABEL: Readonly<Record<PayrollNote, string>> = {
 };
 
 /**
- * `ASSUMPTION Q20` — why a payroll row has no payout %. The % is then left BLANK in the file (never
+ * `ASSUMPTION Q39` — why a payroll row has no payout %. The % is then left BLANK in the file (never
  * 0) and the export goes ahead: a Final result is frozen, so refusing would block the period forever.
  */
 export function payoutNote(result: Pick<PeriodResult, 'payoutPct' | 'ratingLevelId'>, levels: readonly Pick<RatingLevel, 'id'>[]): PayrollNote | null {
@@ -73,7 +73,7 @@ export interface PayrollData {
 /** What the export screen shows BEFORE exporting. `exportable` = the rows the file will have. */
 export interface PayrollPreview {
   exportable: number;
-  /** Of those, the rows whose payout % will be blank (`payoutPct === null`, Q20). */
+  /** Of those, the rows whose payout % will be blank (`payoutPct === null`, Q39). */
   noPayout: number;
   /** Of those, the rows whose person cannot be found. */
   missingEmployee: number;
@@ -119,7 +119,7 @@ export interface PayrollRow {
   adjustment: number;
   ratingCode: string | null;
   ratingLabel: string | null;
-  /** As stored; `null` → a blank cell (Q20), never 0. */
+  /** As stored; `null` → a blank cell (Q39), never 0. */
   payoutPct: number | null;
   status: PeriodResultStatus;
   finalizedAt: IsoDateTime | null;

@@ -58,7 +58,7 @@ describe('results.exportPayroll — writes the file and its record, changes no r
     expect(changed.sort()).toEqual(['FileObject:CREATE', 'PayrollExport:CREATE']);
   });
 
-  it('exports a Final period too (ASSUMPTION Q19), and every export is its own record and file', async () => {
+  it('exports a Final period too (ASSUMPTION Q38), and every export is its own record and file', async () => {
     const { gateway } = newGateway();
     const first = await gateway.results.exportPayroll(S, cnb, T02);
     await gateway.results.lockResults(S, admin, T02);
