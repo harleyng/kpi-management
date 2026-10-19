@@ -9,6 +9,15 @@
 
 ---
 
+## 2026-10-19 — Parallel tracks each number "the next free id" — and pick the same one
+
+Seven worktrees forked from one base all added `ASSUMPTION Q19`, and two added BR-KPI-70+. Git merges the
+text without a conflict wherever the lines differ, so two rules end up with one id. **Rule.** Before a
+track merges, renumber the ids it introduced (anything above the base's maximum) to the next free range
+on `main`, on the track's branch, in every file the track changed. Same for two hooks that both claim one
+query key with different data shapes (`useQuery` array vs `useInfiniteQuery` pages): give each its own key
+segment.
+
 ## 2026-10-19 — A dialog rendered inside a form submits that form, even through a portal
 
 A Radix `Dialog` portals its DOM out of the sheet, but React events bubble through the REACT tree: a

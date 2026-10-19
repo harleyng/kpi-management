@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-10-19 — Phase 2 integration: tracks merged T1→T2→T7→T3→T4→T5→T6, ids renumbered, duplicate hooks folded
+
+**Decision.** All seven tracks are on `main` (each merge passed the Phase 4 gate; Playwright smoke green
+at the end). Before merging, each track's own ids were renumbered on its branch so they stay unique: T1
+Q19–24 · BR-KPI-65…73 · ERR-KPI-14…16 (unchanged) · T2 Q25–28, BR-KPI-74…80 · T7 Q29–30 · T3 Q31–32 ·
+T4 Q33–37 · T6 Q38–39. New-flow sections: 4C T1 org, 4D T7 notifications, 4E T4 actuals. Duplicated hooks
+were folded, one owner per read: `useDataSources` → `actuals.ts`; `useWorkflows` / `useWorkflowSteps` →
+`forms.ts` (T7's `workflows.ts` deleted); `useFormList` (T3) joins T5's `forms.ts`; `useAllPeriods` (T5)
+joins T3's `goals.ts`; `useAttachEvidence` (T5) joins T4's `actuals.ts`; `useDownloadFile` (T6) and
+`useAuditEntries` (T3) join T7's `system.ts`; `toastError` lives only in `components/shared/toastError.ts`.
+Form bodies (T5) and the result detail / finalise check (T6) read their own plan with `useGoalRows`; the
+actuals screens (T4) read `useGoals` (visibility, D2).
+
+**Why.** Every track started its open questions at Q19 off the same base, so a merged `business-rules.md`
+had two Q19s meaning different things — and code comments citing `ASSUMPTION Q20` would have pointed at
+the wrong one. T3's `useAuditEntries` and T7's paged `useAuditLog` shared `auditLogKey`: one cache entry
+would have held an array under one hook and `{ pages }` under the other — it now has its own `'all'`
+segment (same for `formListKey`). T3's `useGoals` returns `{ goals, hiddenCount }`, which T4/T5/T6 called
+as an array.
+
+**Consequence.** Follow-ups not done at the merge: one `toastWriteError` / `toastError` helper (four
+remain: `org.ts`, `writeFeedback.ts`, `toasts.ts`, `notify.ts`); one exceljs loader (four modules load it
+lazily — `excel.test.ts` allow-lists them); one `useOpenFile` (T4's mutation and T7's callback); T1's org
+import and T2's library import onto T4's framework. Phase 3 numbers its assumptions from Q40 and rules
+from BR-KPI-81.
+
+**Updated alongside.** `component-registry.md` (hooks table), `architecture.md` (route table, smoke
+`BUILT` set, deferrals: none), `business-rules.md` §8 (Q19–Q39 in order), `docs/flows/new-flow.md` §4C–4E.
+
 ## 2026-10-19 — T1: org and access guards are transition-based rules shared by screen and gateway, run after the structural check
 
 **Decision.** The org rules (BR-KPI-65…73) live in `src/lib/orgAdminRules.ts` and `accessAdminRules.ts`,
