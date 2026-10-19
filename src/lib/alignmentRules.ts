@@ -5,7 +5,7 @@
  * can never exceed their own target. "Chưa giao" is always derived here, never stored.
  */
 
-import type { Employee, Goal, GoalAlignment, Id, IsoDate } from '@/data/types';
+import type { CalcMethod, CalcMethodType, Employee, Goal, GoalAlignment, Id, IsoDate, PerformanceCycle } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 
 type Edge = Pick<GoalAlignment, 'id' | 'childGoalId' | 'parentGoalId'>;
@@ -123,4 +123,119 @@ export function checkAlignment(
     if (pct === null || !Number.isFinite(pct) || pct <= 0 || pct > 100) issues.push(ruleIssue('ERR-KPI-06', ref, 'CONTRIBUTION_INVALID'));
   }
   return issues;
+}
+
+// ─── Re-saving a parent goal (T3) ──────────────────────────────────────────────────────────────
+
+const blankOrInvalid = (v: number | null) => v !== null && (!Number.isFinite(v) || v < 0);
+
+/**
+ * What `saveGoal` must refuse on a goal that others were cascaded from (BR-KPI-07): lowering its target
+ * or raising "tự giao" (`selfAssignedValue`) after cascading must not over-allocate it silently. In
+ * order: "tự giao" null or a finite number ≥ 0 (ERR-KPI-06 `SELF_ASSIGNED_INVALID`); with Active
+ * CASCADE children it stays NUMERIC (06 `PARENT_NOT_NUMERIC`); then the buckets fit the target
+ * (ERR-KPI-11, leavers' allocations not counted — `allocationBuckets`).
+ *
+ * Checked ONLY when the save changes the target, its type or "tự giao" (or creates the goal): a
+ * rename or a weight change on a goal that is already over-allocated (an import, an old row) is
+ * never blocked by it.
+ */
+export function goalAllocationIssues(
+  stored: Pick<Goal, 'targetType' | 'targetValue' | 'selfAssignedValue'> | null,
+  next: Pick<Goal, 'id' | 'targetType' | 'targetValue' | 'selfAssignedValue'>,
+  children: readonly CascadeChild[],
+  asOf: IsoDate,
+): RuleIssue[] {
+  const changed =
+    stored === null || stored.targetType !== next.targetType || stored.targetValue !== next.targetValue || stored.selfAssignedValue !== next.selfAssignedValue;
+  if (!changed) return [];
+  if (blankOrInvalid(next.selfAssignedValue)) return [ruleIssue('ERR-KPI-06', next.id, 'SELF_ASSIGNED_INVALID')];
+  const active = children.filter((c) => c.alignment.alignmentType === 'CASCADE' && c.childGoal.status === 'Active');
+  if (active.length > 0 && next.targetType !== 'NUMERIC') return [ruleIssue('ERR-KPI-06', next.id, 'PARENT_NOT_NUMERIC')];
+  if (next.targetType !== 'NUMERIC') return [];
+  const over = allocationIssue(next, active, asOf);
+  return over ? [over] : [];
+}
+
+// ─── The cascaded child goal (WBS 4.3.4) ───────────────────────────────────────────────────────
+
+/**
+ * Methods whose score of a SHARE means the same as of the whole (actual ÷ allocation): copied to the
+ * child. LEVELS and TIERED thresholds and a FORMULA are written for the parent's full target, so a
+ * share needs its own method — the manager picks one.
+ */
+export const SHARE_SAFE_METHODS: readonly CalcMethodType[] = ['RATIO_UP', 'RATIO_DOWN', 'BINARY'];
+
+/** The child goal a cascade creates — `saveGoal`'s payload (the gateway sets status and `replacesGoalId`). */
+export type CascadedGoalDraft = Omit<Goal, 'id' | 'tenantId' | 'status' | 'replacesGoalId'>;
+
+export interface CascadeInput {
+  goalPlanId: Id;
+  ownerEmployeeId: Id | null;
+  allocatedValue: number;
+  /** Required: copying the parent's weight could break the child plan's 100% (offer `remainingWeight`). */
+  weight: number;
+  sortOrder: number;
+  /** The child's method when the parent's is not share-safe (ignored otherwise). */
+  calcMethodId: Id | null;
+  cycle: Pick<PerformanceCycle, 'startDate' | 'endDate'>;
+  /** The child's owner, to clip the dates to their employment. */
+  owner: Pick<Employee, 'hireDate' | 'leftOn'> | null;
+}
+
+/**
+ * Builds the child goal of a cascade from the parent (BR-KPI-07, D3): the same KPI (library item,
+ * name, description, formula, perspective, unit, data source, visibility), a NUMERIC target equal to
+ * the allocation, the parent's dates clipped to the cycle and to the owner's employment. NOT copied:
+ * the weight (given), target levels and period split (written for the whole target), "tự giao", the
+ * KGI (the child plan's own) and the roll-up flag. The method is copied only when share-safe; otherwise
+ * `input.calcMethodId` is required (ERR-KPI-06 `CALC_METHOD_REQUIRED`).
+ */
+export function cascadedGoalDraft(
+  parent: Goal,
+  parentMethod: Pick<CalcMethod, 'id' | 'methodType'> | null,
+  input: CascadeInput,
+): { ok: true; goal: CascadedGoalDraft } | { ok: false; issues: RuleIssue[] } {
+  const issues: RuleIssue[] = [];
+  const shareSafe = parentMethod !== null && parentMethod.id === parent.calcMethodId && SHARE_SAFE_METHODS.includes(parentMethod.methodType);
+  const calcMethodId = shareSafe ? parent.calcMethodId : input.calcMethodId;
+  if (calcMethodId === null) issues.push(ruleIssue('ERR-KPI-06', 'calcMethodId', 'CALC_METHOD_REQUIRED'));
+  if (parent.targetType !== 'NUMERIC') issues.push(ruleIssue('ERR-KPI-06', parent.id, 'PARENT_NOT_NUMERIC'));
+  if (!Number.isFinite(input.allocatedValue) || input.allocatedValue <= 0) issues.push(ruleIssue('ERR-KPI-06', 'allocatedValue', 'ALLOCATION_REQUIRED'));
+  if (!Number.isFinite(input.weight) || input.weight <= 0) issues.push(ruleIssue('ERR-KPI-06', 'weight', 'WEIGHT_INVALID'));
+
+  const latest = (...dates: (IsoDate | null)[]) => dates.filter((d): d is IsoDate => d !== null).reduce((a, b) => (b > a ? b : a));
+  const earliest = (...dates: (IsoDate | null)[]) => dates.filter((d): d is IsoDate => d !== null).reduce((a, b) => (b < a ? b : a));
+  const startDate = latest(parent.startDate, input.cycle.startDate, input.owner?.hireDate ?? null);
+  const dueDate = earliest(parent.dueDate, input.cycle.endDate, input.owner?.leftOn ?? null);
+  if (dueDate < startDate) issues.push(ruleIssue('ERR-KPI-06', 'dueDate', 'DATES_INVALID'));
+  if (issues.length) return { ok: false, issues };
+
+  return {
+    ok: true,
+    goal: {
+      goalPlanId: input.goalPlanId,
+      kgiId: null,
+      kpiDefId: parent.kpiDefId,
+      name: parent.name,
+      description: parent.description,
+      formulaText: parent.formulaText,
+      perspectiveId: parent.perspectiveId,
+      kriType: parent.kriType,
+      visibility: parent.visibility,
+      unitId: parent.unitId,
+      calcMethodId: calcMethodId as Id,
+      dataSourceId: parent.dataSourceId,
+      weight: input.weight,
+      targetType: 'NUMERIC',
+      targetValue: input.allocatedValue,
+      targetText: null,
+      selfAssignedValue: null,
+      rollUpFromChildren: false,
+      startDate,
+      dueDate,
+      ownerEmployeeId: input.ownerEmployeeId,
+      sortOrder: input.sortOrder,
+    },
+  };
 }

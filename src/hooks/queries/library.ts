@@ -5,7 +5,8 @@ import type { KpiDefinitionFilter } from '@/integrations/data/types';
 import { queryKey } from './keys';
 
 /**
- * G2 · Thư viện KPI — reads the shared `KpiPicker` needs (Phase 1.4). Track T2 adds the writes.
+ * G2 · Thư viện KPI — reads the shared `KpiPicker` needs (Phase 1.4) and T3's goal editor (methods).
+ * Track T2 adds the writes.
  * Keys are `[tenantId, root, ...params]` (CLAUDE.md rule 7). The library changes rarely during a session.
  */
 
@@ -41,6 +42,17 @@ export function useMeasureUnits() {
   return useQuery({
     queryKey: measureUnitsKey(tenantId),
     queryFn: () => getDataGateway().library.listMeasureUnits(tenantId),
+    staleTime: LIBRARY_STALE_MS,
+  });
+}
+
+export const calcMethodsKey = (tenantId: string) => queryKey(tenantId, 'calcMethods');
+
+export function useCalcMethods() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: calcMethodsKey(tenantId),
+    queryFn: () => getDataGateway().library.listCalcMethods(tenantId),
     staleTime: LIBRARY_STALE_MS,
   });
 }

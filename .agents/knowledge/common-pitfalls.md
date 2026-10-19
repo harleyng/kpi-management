@@ -9,6 +9,19 @@
 
 ---
 
+## 2026-10-19 — A PRIVATE goal is hidden by the screens only (T3)
+
+Reads are not filtered per user before Phase 5's RLS, so a PRIVATE goal (D2) reaches the browser and the
+query cache. `planAccessRules.canSeeGoal` hides it in ONE place — `useGoals` / `usePlanWorkspace` in
+`src/hooks/queries/goals.ts`. **Rule.** A screen that lists someone else's goals reads them through those
+hooks, never `useGoalRows` (that one is for totals and buckets, which must still count private goals). T5
+(inbox, evaluation items) and T6 / Phase 3 (dashboard drill-down) must apply `canSeeGoal` too.
+
+## 2026-10-19 — `formatPercent` rounds to one decimal: never use it for a weight total
+
+99,99% renders as "100%" and hides an incomplete plan. Weights use `formatWeight` (two decimals,
+`components/goals/goalCopy.ts`); the 100% check is always `isWeightComplete`, never the formatted text.
+
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 
 `clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not

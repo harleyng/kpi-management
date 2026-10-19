@@ -285,6 +285,11 @@ export function validateCalcMethod(method: CalcMethod, tiers: readonly CalcTier[
 }
 
 /** What `setTargetLevels` must refuse (D1). An empty list is fine — the goal simply has no levels. */
+/** A goal under a LEVELS method needs at least two levels, else it is never computable (ERR-KPI-13 `LEVELS_MISSING`). */
+export function levelsMissingIssue(methodType: CalcMethodType | undefined, levelCount: number, ref: string | null): RuleIssue | null {
+  return methodType === 'LEVELS' && levelCount < 2 ? ruleIssue('ERR-KPI-13', ref, 'LEVELS_MISSING') : null;
+}
+
 export function validateTargetLevels(targetType: TargetType, goalLevels: readonly GoalTargetLevel[]): RuleIssue[] {
   if (goalLevels.length === 0) return [];
   const issues: RuleIssue[] = [];

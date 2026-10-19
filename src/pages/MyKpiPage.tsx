@@ -1,23 +1,51 @@
+import { CyclePicker } from '@/components/goals/CyclePicker';
+import { useSelectedCycle } from '@/components/goals/useSelectedCycle';
+import { GoalPlanWorkspace } from '@/components/goals/GoalPlanWorkspace';
+import { EmptyStateCard } from '@/components/shared/EmptyState';
+import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { PlaceholderPanel } from '@/components/shared/PlaceholderPanel';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useSession } from '@/contexts/useSession';
+import { useGoalPlans } from '@/hooks/queries/goals';
+import { errorSpecOf } from '@/lib/errorCatalog';
 
-/** Placeholder (Phase 0). Replaced by WP 4.3.2–4.3.5, Track T3. */
+/**
+ * "KPI của tôi" (WBS 4.3.2–4.3.5, Track T3): the signed-in person's own Goal Plan in the chosen cycle —
+ * goals, weights, levels, split, links — and "Gửi" at their registration step. Actuals (WBS 4.4.2)
+ * arrive with Track T4.
+ */
 export default function MyKpiPage() {
+  const { user } = useSession();
+  const { cycles, cycle, setCycleId } = useSelectedCycle();
+  const plans = useGoalPlans(
+    { cycleId: cycle?.id, ownerType: 'Employee', ownerEmployeeIds: user.employeeId ? [user.employeeId] : [] },
+    { enabled: cycle !== null && user.employeeId !== null },
+  );
+  const plan = plans.data?.[0] ?? null;
+
+  let body;
+  if (user.employeeId === null) {
+    body = <EmptyStateCard>Tài khoản hệ thống không có KPI cá nhân.</EmptyStateCard>;
+  } else if (cycles.error || plans.error) {
+    body = <ErrorStateCard spec={errorSpecOf(cycles.error ?? plans.error)} onAction={() => void (cycles.error ? cycles.refetch() : plans.refetch())} />;
+  } else if (!cycles.data || (cycle && !plans.data)) {
+    body = <Skeleton className="h-64 w-full" aria-label="Đang tải" />;
+  } else if (!cycle) {
+    body = <EmptyStateCard>Chưa có chu kỳ KPI nào. HR tạo chu kỳ ở mục Quản trị KPI.</EmptyStateCard>;
+  } else if (!plan) {
+    body = <EmptyStateCard>Chưa có Goal Plan trong chu kỳ này. HR sẽ khởi chạy phiếu đăng ký.</EmptyStateCard>;
+  } else {
+    body = <GoalPlanWorkspace goalPlanId={plan.id} />;
+  }
+
   return (
     <>
       <PageHeader
         title="KPI của tôi"
-        description="Goal Plan của bạn trong chu kỳ hiện tại: chỉ tiêu, trọng số, mục tiêu và tiến độ."
+        description="Goal Plan của bạn trong chu kỳ: chỉ tiêu, trọng số, định mức, phân bổ theo kỳ và liên kết lên chỉ tiêu cấp trên."
+        actions={<CyclePicker cycles={cycles.data} cycle={cycle} onChange={setCycleId} />}
       />
-      <PlaceholderPanel
-        spec="WP 4.3.2–4.3.5, Track T3 (nhập số: WP 4.4.2, Track T4)"
-        items={[
-          "Xem Goal Plan cá nhân theo chu kỳ và kỳ đánh giá",
-          "Thêm chỉ tiêu từ thư viện hoặc tự nhập, liên kết với chỉ tiêu của quản lý (cascade/link)",
-          "Kiểm tra tổng trọng số 100% và 5–8 chỉ tiêu trước khi gửi",
-          "Nhập số thực tế kèm bằng chứng cho từng kỳ",
-        ]}
-      />
+      {body}
     </>
   );
 }

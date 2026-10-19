@@ -4,7 +4,7 @@
  */
 
 import type { ErrorCode } from './errorCatalog';
-import type { Goal, GoalChangeItem, GoalDraft, GoalPlan, GoalPlanStatus, Id, IsoDate, Kgi, WorkflowStep } from '@/data/types';
+import type { Aggregation, CyclePeriod, Goal, GoalChangeItem, GoalDraft, GoalPeriodTarget, GoalPlan, GoalPlanStatus, Id, IsoDate, Kgi, PeriodType, WorkflowStep } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { isIsoDate, todayOf, type Clock } from './isoDate';
 
@@ -267,4 +267,117 @@ export function applyGoalChanges(
     if (item.changeType === 'ADD' && item.proposed) create(item.proposed, null);
   }
   return { ok: true, effects };
+}
+
+// ─── Plan summaries (WBS 4.3.2, 4.3.6) ─────────────────────────────────────────────────────────
+
+export interface PlanSummary {
+  /** Σ weight of the Active goals. */
+  totalWeight: number;
+  weightComplete: boolean;
+  /** Active goals (Changed / Cancelled carry no weight and do not count). */
+  goalCount: number;
+  goalCountOk: boolean;
+}
+
+/** The figures the plan header and HR's plan table show — one pass over one goals read, no per-row queries. */
+export function planSummaries(planIds: readonly Id[], goals: readonly Pick<Goal, 'goalPlanId' | 'status' | 'weight'>[]): Map<Id, PlanSummary> {
+  const byPlan = new Map<Id, Pick<Goal, 'goalPlanId' | 'status' | 'weight'>[]>(planIds.map((id) => [id, []]));
+  for (const goal of goals) byPlan.get(goal.goalPlanId)?.push(goal);
+  return new Map([...byPlan].map(([id, list]) => [id, planSummary(list)]));
+}
+
+export function planSummary(goals: readonly Pick<Goal, 'status' | 'weight'>[]): PlanSummary {
+  const total = totalWeight(goals);
+  const count = activeGoals(goals).length;
+  return { totalWeight: total, weightComplete: isWeightComplete(total), goalCount: count, goalCountOk: count >= GOAL_COUNT.min && count <= GOAL_COUNT.max };
+}
+
+/** What is left to reach 100% (never negative) — the weight a new or cascaded goal is offered. */
+export function remainingWeight(goals: readonly Pick<Goal, 'status' | 'weight'>[]): number {
+  return Math.max(0, Math.round((100 - totalWeight(goals)) * 100) / 100);
+}
+
+/** The `sortOrder` a goal added to the plan takes: after every goal it already has. */
+export function nextSortOrder(goals: readonly Pick<Goal, 'sortOrder'>[]): number {
+  return goals.reduce((max, g) => Math.max(max, g.sortOrder + 1), 0);
+}
+
+// ─── Period split (WBS 4.3.5, BR-KPI-11) ───────────────────────────────────────────────────────
+
+/** The precision `evenSplit` works in: 4 decimals, so a share of "tỷ" or of a ratio keeps its meaning. */
+const SPLIT_SCALE = 10_000;
+
+/**
+ * "Chia đều" — the goal's target spread over `periods` (one period type, any order) by the KPI's
+ * aggregation (`ASSUMPTION Q15`): SUM → equal shares at 4 decimals with the remainder on the LAST
+ * period, so Σ is exactly the target; AVG and LAST → the target in every period. A TEXT goal, a goal
+ * with no target, or one with no aggregation (typed in, not from the library) has nothing to spread → [].
+ */
+export function evenSplit(
+  goal: Pick<Goal, 'targetType' | 'targetValue'>,
+  aggregation: Aggregation | null,
+  periods: readonly Pick<CyclePeriod, 'id' | 'startDate'>[],
+): { periodId: Id; targetValue: number }[] {
+  if (goal.targetType !== 'NUMERIC' || goal.targetValue === null || !Number.isFinite(goal.targetValue) || aggregation === null) return [];
+  const ordered = [...periods].sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+  if (ordered.length === 0) return [];
+  const target = goal.targetValue;
+  if (aggregation !== 'SUM') return ordered.map((p) => ({ periodId: p.id, targetValue: target }));
+  const total = Math.round(target * SPLIT_SCALE);
+  const share = Math.trunc(total / ordered.length);
+  return ordered.map((p, i) => ({
+    periodId: p.id,
+    targetValue: (i === ordered.length - 1 ? total - share * (ordered.length - 1) : share) / SPLIT_SCALE,
+  }));
+}
+
+/** Within the split tolerance: relative 1e-6, with an absolute 0.005 floor only for a target below 1. */
+function splitMatches(expected: number, actual: number): boolean {
+  const tolerance = Math.abs(expected) < 1 ? 0.005 : Math.abs(expected) * 1e-6;
+  return Math.abs(actual - expected) <= tolerance + 1e-9;
+}
+
+/**
+ * Warnings on a goal's period split (BR-KPI-11 — they never block a save or "Gửi", product owner,
+ * T3 Phase 1). They matter because quarters and the year are built from the month splits
+ * (`resultRules`), so a wrong split changes every unit and company result. ERR-KPI-06, `ref` = the
+ * goal, in this order (the first that applies):
+ * - nothing split, a TEXT goal, or no target → none (the goal's own target applies to every period);
+ * - `SPLIT_MIXED_TYPES` — months and quarters mixed in one split;
+ * - `SPLIT_NO_AGGREGATION` — informational: a KPI typed in (no library item) has no aggregation, so
+ *   the split applies to its months only and quarters fall back to the goal's target;
+ * - `SPLIT_INCOMPLETE` — some periods of that type have no split (`data`: covered / total): such a
+ *   quarter or year falls back to the goal's FULL target;
+ * - `SPLIT_MISMATCH` — SUM: Σ ≠ target; AVG: the mean ≠ target; LAST: the last period (by date) ≠
+ *   target (`data`: expected, actual, aggregation).
+ */
+export function periodTargetIssues(
+  goal: Pick<Goal, 'id' | 'targetType' | 'targetValue'>,
+  aggregation: Aggregation | null,
+  targets: readonly Pick<GoalPeriodTarget, 'goalId' | 'periodId' | 'targetValue'>[],
+  cyclePeriods: readonly Pick<CyclePeriod, 'id' | 'periodType' | 'startDate'>[],
+): RuleIssue[] {
+  const own = targets.filter((t) => t.goalId === goal.id);
+  if (own.length === 0 || goal.targetType !== 'NUMERIC' || goal.targetValue === null) return [];
+  const byId = new Map(cyclePeriods.map((p) => [p.id, p]));
+  const split = own.flatMap((t) => {
+    const p = byId.get(t.periodId);
+    return p ? [{ ...t, period: p }] : [];
+  });
+  const types = new Set<PeriodType>(split.map((s) => s.period.periodType));
+  if (types.size > 1) return [ruleIssue('ERR-KPI-06', goal.id, 'SPLIT_MIXED_TYPES')];
+  if (aggregation === null) return [ruleIssue('ERR-KPI-06', goal.id, 'SPLIT_NO_AGGREGATION')];
+
+  const [type] = [...types];
+  const total = cyclePeriods.filter((p) => p.periodType === type).length;
+  if (split.length < total) return [ruleIssue('ERR-KPI-06', goal.id, 'SPLIT_INCOMPLETE', { covered: split.length, total })];
+
+  const ordered = [...split].sort((a, b) => (a.period.startDate < b.period.startDate ? -1 : a.period.startDate > b.period.startDate ? 1 : 0));
+  const values = ordered.map((s) => s.targetValue);
+  const sum = values.reduce((acc, v) => acc + v, 0);
+  const actual = aggregation === 'SUM' ? sum : aggregation === 'AVG' ? sum / values.length : values[values.length - 1];
+  return splitMatches(goal.targetValue, actual)
+    ? []
+    : [ruleIssue('ERR-KPI-06', goal.id, 'SPLIT_MISMATCH', { expected: goal.targetValue, actual, aggregation })];
 }

@@ -16,6 +16,10 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
+> **Track T3 (2026-10-19)** added `src/lib/planAccessRules.ts` (who may edit / send a plan, who sees a
+> PRIVATE goal — shared by the gateway guard and the screens), `goalPlanImportRules.ts` (BR-KPI-26), period
+> generation (`cycleRules.generatePeriods`), the period split (`goalPlanRules.evenSplit` /
+> `periodTargetIssues`) and the cascade rules (`alignmentRules.goalAllocationIssues` / `cascadedGoalDraft`).
 
 ---
 
@@ -57,7 +61,10 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   a tolerance of ±0.01 (a sum of 99.99% or 100.01% from rounding counts as 100%). *Source: HR guide
   p. 22; Manager guide p. 26; email template ("if the total weight is less than 100%").*
 - **BR-KPI-05** — **Every KPI has a data source** ("KPI phải đo được"). A goal without one cannot be
-  saved. *Source: NoteX minutes §2.3; ERD `GOAL.data_source_id` (required).*
+  saved: the column is required and must resolve in the tenant (the integrity check, ERR-KPI-06), and the
+  goal editor requires it. Other fields (weight > 0, a target, dates in order) are checked on **Gửi**
+  (`submitIssues`), so a draft can be saved while it is being built (T3). *Source: NoteX minutes §2.3; ERD
+  `GOAL.data_source_id` (required).*
 - **BR-KPI-06** — Every KPI belongs to exactly one **BSC perspective**. DATX's "Hiệu quả / Khối lượng /
   Chi phí" classification is a secondary tag only (`ASSUMPTION Q5`). The KRI type (KRItc / KRIpt) is
   hidden until its meaning is confirmed (`ASSUMPTION Q6`, D4). *Source: HR guide p. 22; DATX sheet
@@ -71,15 +78,36 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   more than the parent target is refused (ERR-KPI-11; ERR-KPI-10 for a cycle). When the owner of a cascaded
 child goal **leaves**, from the day after their last working day their allocation counts as **not
 assigned** again, so the manager can re-cascade it (`alignmentRules.allocationBuckets`).
+**Re-saving a parent** (`saveGoal`, T3): lowering its target, raising "tự giao" or turning it into a TEXT
+goal must not over-allocate it — ERR-KPI-11 / 06 (`goalAllocationIssues`); checked only when the target, its
+type or "tự giao" changes, so a rename never trips over an older over-allocation. **Cascading** creates the
+child goal in the report's plan (`cascadedGoalDraft`: same KPI, target = the allocation, dates clipped to the
+cycle and the owner's employment; the method copied only when share-safe — RATIO_UP / RATIO_DOWN / BINARY —
+else the manager picks one; levels, split, weight and KGI not copied) and then the CASCADE alignment; it is
+possible only while the manager may edit the report's plan (their registration form at a step with EDIT for
+the manager — BR-KPI-12 step 1 or 3). A **link**'s `contributionPct` (0, 100] is informational only
+(`ASSUMPTION Q19`).
 *Source: HR guide p. 24; email template steps 1–2.*
-- **BR-KPI-08** — A goal is **public or private** (visibility, D2). *Source: HR guide pp. 21–22.*
+- **BR-KPI-08** — A goal is **public or private** (visibility, D2). A PRIVATE goal is seen only by its
+  owner (the goal's, or the plan's — the unit head for a unit plan), anyone in that owner's manager chain
+  today, and holders of a Tenant scope over plans (HR, C&B, BOD, Admin) (`planAccessRules.canSeeGoal`,
+  product owner, T3). **Enforced on screens only** — the hooks filter in one place (`useGoals`); the gateway
+  still returns the row until Phase 5's RLS. Totals and allocation buckets still count private goals; a
+  screen says how many were hidden. *Source: HR guide pp. 21–22.*
 - **BR-KPI-09** — A goal may carry **target levels L1/L2/L3** (`GoalTargetLevel`), set per assigned goal
   (not per method). Each level has a numeric or text target (per the goal's `targetType`) and the score
   earned for reaching it, e.g. L1 → 0%, L2 → 100% ("Nguyên tắc đánh giá") (D1). *Source: HR guide
   pp. 23, 28; import columns P–T p. 63.*
 - **BR-KPI-10** — A goal's target is either **numeric** or **text** (Đạt / Không đạt). *Source: HR guide p. 23.*
-- **BR-KPI-11** — A goal's target may be **allocated by period** (monthly/quarterly targets). *Source: DATX
-  column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
+- **BR-KPI-11** — A goal's target may be **allocated by period** (monthly/quarterly targets). "Chia đều"
+  follows the KPI's aggregation (`goalPlanRules.evenSplit`, `ASSUMPTION Q15`): SUM → equal shares at 4
+  decimals, the remainder on the last period; AVG / LAST → the target in every period. A split that does not
+  fit is a **warning, never a block** (product owner, T3): `SPLIT_MISMATCH` (SUM Σ / AVG mean / LAST last
+  period by date ≠ target, tolerance relative 1e-6, 0.005 absolute below 1), `SPLIT_INCOMPLETE` (some periods
+  of the type missing — that quarter / year then falls back to the FULL target), `SPLIT_MIXED_TYPES`,
+  `SPLIT_NO_AGGREGATION` (a typed-in KPI: the split applies to its months only). It shows on the goal row and
+  the plan's readiness strip, because quarters and the year are built from the month splits
+  (`resultRules`). *Source: DATX column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
 
 ## 2. Processes (P1)
 
@@ -209,6 +237,27 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   ERR-KPI-04): registration while Planning or Active; evaluation while Active or Evaluating; an
   adjustment at any time before Closed. *Source: Phase 1.5 workflow design (Gate 1); ERD
   `PERFORMANCE_CYCLE`.*
+- **BR-KPI-26** — **Goal Plan import** (WBS 4.3.7, plan §5.2; `goalPlanImportRules`, the screen comes with
+  T4's batch framework). One goal per row; the batch's cycle holds the plans. Row errors stop the batch (all
+  or none): login → an Active account of an employee still employed; perspective code known; a library code
+  that resolves (else unit, method and data source are required — given codes must resolve); weight > 0;
+  dates real, ordered, inside the cycle (blank → the cycle's); the target matches its type and a TEXT target
+  never sits under a numeric-only method; valid levels (ERR-KPI-13, LEVELS needs ≥ 2); no duplicate (person +
+  goal name, or person + library KPI) in the file or the plan; a Locked plan or a Closed cycle → ERR-KPI-04.
+  Per plan, weight ≠ 100 ± 0.01 (07) and a count outside 5–8 (08) are **warnings** — HR completes and then
+  locks the plan. A person with no plan in the cycle gets a Draft one at commit (`goalplan.import`). No KGI,
+  "tự giao" or period split by import in P1.
+- **BR-KPI-27** — **Periods are generated** (`cycleRules.generatePeriods`) for a cycle of whole months, at
+  most 12: months `T01…T12` by calendar month with input / evaluation deadlines = the month's end + 5 / + 13
+  days (editable offsets); quarters / halves / the year counted from the cycle start (`ASSUMPTION Q20`), whole
+  groups only, no deadlines. Regenerating keeps the id and lock of a period with the same type and label
+  (`mergeGeneratedPeriods`).
+- **BR-KPI-28** — **Who may change a plan now and send it** is one decision shared by the gateway and the
+  screens (`planAccessRules.planEditability` / `submitAvailability`): `goalplan.edit` over the owner, then
+  `canEditPlan` with the open registration form's EDIT standing; "Gửi" is a dry run of `checkAction` (step
+  allows SUBMIT, the person is entitled, content passes `canSubmit`). Before the owner's step the button is
+  "Chuyển cho nhân viên" and 100% / 5–8 are information only. A screen that cannot load an input shows the
+  plan read-only ("UNKNOWN"), never editable.
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
@@ -438,6 +487,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
+| Q19 | What does a LINK's `contributionPct` mean (a share of the parent's target, or of the child's result)? | Informational only — shown, never computed | BR-KPI-07 |
+| Q20 | In a cycle that does not start in January, is Q1 January–March or the cycle's first three months? | The cycle's first three months | BR-KPI-27 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

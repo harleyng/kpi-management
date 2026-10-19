@@ -1,18 +1,19 @@
 import type { CollectionName, RowOf } from '@/data/fixtures/types';
 import { GOAL_PLAN_INITIAL_STATUS, type FormInstance, type FormLaunch, type FormType, type GoalPlan, type Id, type WorkflowStep } from '@/data/types';
 import { KpiError, toKpiError, type RuleIssue } from '@/lib/errorCatalog';
-import { canEditPlan, planStatusOnEnterStep, type Decision } from '@/lib/goalPlanRules';
+import { planStatusOnEnterStep, type Decision } from '@/lib/goalPlanRules';
+import { planEditability, type OpenRegistration } from '@/lib/planAccessRules';
 import { todayOf } from '@/lib/isoDate';
 import { resourceOfSubject } from '@/lib/permissionRules';
 import {
   assigneesOf,
   editRefusal,
   editStanding,
+  entitlementContextOf,
   isTerminal,
   launchDueDate,
   resolveRecipients,
   resolveStepActors,
-  userOfEmployee,
   type ActorDirectory,
   type EntitlementContext,
   type Recipients,
@@ -105,17 +106,14 @@ export const openFormOn = (tx: Tx, goalPlanId: Id, formType: FormType): FormInst
  * actors now, the delegations, and the actor's proxy / cancel rights over the subject (Phase 1.3).
  */
 export function entitlementCtx(tx: Tx, form: FormInstance, step: WorkflowStep | undefined): EntitlementContext {
-  const dir = directoryOf(tx);
-  const clock = clockOf(tx);
   const subject = resourceOfSubject(tx.tenantId, form.subjectEmployeeId);
-  return {
-    stepActors: step ? resolveStepActors(step, form.subjectEmployeeId, dir, clock) : [],
+  return entitlementContextOf(form, step, {
+    dir: directoryOf(tx),
     delegations: tx.all('Delegation'),
+    clock: clockOf(tx),
     actorMayProxy: actorCan(tx, 'form.proxy', subject),
     actorMayCancel: actorCan(tx, 'form.cancel', subject),
-    subjectUserId: userOfEmployee(form.subjectEmployeeId, dir.users)?.id ?? null,
-    clock,
-  };
+  });
 }
 
 /** Who must act on the form's current step now (step actors and their valid delegates). */
@@ -155,22 +153,22 @@ export function assertPlanEditable(tx: Tx, goalPlanId: Id | null | undefined): v
   if (!plan) return;
   const actor = authorizeActor(tx, tx.ctx.actorUserId as Id);
   const open = openFormOn(tx, plan.id, 'GOAL_SETTING');
-  let openRegistrationForm: { actorMayEditNow: boolean } | null = null;
+  let openRegistration: OpenRegistration | null = null;
   if (open) {
     const steps = stepsOf(tx, open.workflowId);
-    const ctx = entitlementCtx(tx, open, stepOf(open, steps));
-    const standing = editStanding(open, actor.id, ctx);
-    const mayEdit = editRefusal(open, steps, plan, standing, ctx) === null;
-    openRegistrationForm = { actorMayEditNow: mayEdit };
-    if (mayEdit) tx.onBehalfOfUserId = standing.onBehalfOfUserId;
+    openRegistration = { form: open, steps, ctx: entitlementCtx(tx, open, stepOf(open, steps)) };
   }
-  const decision = canEditPlan(plan, {
-    cycleClosed: tx.find('PerformanceCycle', plan.cycleId)?.status === 'Closed',
-    openRegistrationForm,
-    actorIsOwner: actor.employeeId !== null && actor.employeeId === planOwnerEmployeeId(tx, plan),
+  const editable = planEditability({
+    plan,
+    cycleStatus: tx.find('PerformanceCycle', plan.cycleId)?.status ?? 'Active',
+    openRegistration,
+    actor: { userId: actor.id, employeeId: actor.employeeId },
+    planOwnerEmployeeId: planOwnerEmployeeId(tx, plan),
     actorIsPlanAdmin: actorCan(tx, 'goalplan.edit', { kind: 'Tenant', tenantId: tx.tenantId }),
   });
-  throwDecision(decision, `goal plan ${plan.id} cannot be edited by this user now`);
+  // The edit names the person acted for when made as a delegate or proxy (BR-KPI-21, 23).
+  if (editable.decision.ok && editable.standing) tx.onBehalfOfUserId = editable.standing.onBehalfOfUserId;
+  throwDecision(editable.decision, `goal plan ${plan.id} cannot be edited by this user now`);
 }
 
 // ─── Plan status ───────────────────────────────────────────────────────────────────────────────

@@ -31,6 +31,8 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/audit-log', 'Nhật ký'],
 ];
 
+/** Pages a Phase 2 track has built — they no longer show the "Chưa xây dựng" placeholder. */
+const BUILT = new Set(['/my/kpi', '/team/kpi', '/admin/cycles']);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -89,7 +91,13 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (BUILT.has(path)) {
+        // A built page settles into content or its own empty state — never the placeholder.
+        await expect(page.getByText('Chưa xây dựng', { exact: true })).toHaveCount(0);
+        await page.waitForLoadState('networkidle');
+      } else {
+        await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      }
       expect(errors).toEqual([]);
     });
   }

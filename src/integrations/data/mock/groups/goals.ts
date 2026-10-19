@@ -10,7 +10,7 @@ import {
   type Id,
   type IsoDate,
 } from '@/data/types';
-import { checkAlignment, type CascadeChild } from '@/lib/alignmentRules';
+import { checkAlignment, goalAllocationIssues, type CascadeChild } from '@/lib/alignmentRules';
 import { validateTargetLevels } from '@/lib/calcRules';
 import { canEditCycle, canLockPeriod, cycleIssues, periodIssues, statusChangeIssues } from '@/lib/cycleRules';
 import { KpiError } from '@/lib/errorCatalog';
@@ -35,6 +35,18 @@ function goalIdsOf(tx: Tx, scope: GoalScope): Set<Id> {
 }
 
 const periodOrder = (p: CyclePeriod) => `${p.startDate}|${PERIOD_TYPES.indexOf(p.periodType)}`;
+
+/** The CASCADE children of `parentGoalId`, as the allocation rules read them (an edited alignment left out). */
+function cascadeChildrenOf(tx: Tx, parentGoalId: Id, exceptAlignmentId?: Id): CascadeChild[] {
+  return tx
+    .all('GoalAlignment')
+    .filter((a) => a.parentGoalId === parentGoalId && a.alignmentType === 'CASCADE' && a.id !== exceptAlignmentId)
+    .flatMap((a) => {
+      const goal = tx.find('Goal', a.childGoalId);
+      const owner = goal?.ownerEmployeeId ? (tx.find('Employee', goal.ownerEmployeeId) ?? null) : null;
+      return goal ? [{ alignment: a, childGoal: goal, childOwner: owner }] : [];
+    });
+}
 
 /** An update may not move a row to another plan (the owner column) — said before any guard reads the plan. */
 function samePlan(c: 'Goal' | 'Kgi', stored: { goalPlanId: Id } | null, input: { goalPlanId?: Id }): void {
@@ -153,6 +165,9 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
       const stored = input.id !== undefined ? tx.get('Goal', input.id) : null;
       samePlan('Goal', stored, input);
       assertPlanEditable(tx, stored?.goalPlanId ?? input.goalPlanId);
+      // A parent's target / "tự giao" may not drop below what it already handed down (BR-KPI-07, T3).
+      const children = stored ? cascadeChildrenOf(tx, stored.id) : [];
+      throwIssues(goalAllocationIssues(stored, { ...input, id: stored?.id ?? 'new' }, children, todayOf(clockOf(tx))));
       return upsert(tx, 'Goal', input, { create: () => ({ status: GOAL_INITIAL_STATUS, replacesGoalId: null }) });
     }),
     deleteGoal: rt.write('goals.deleteGoal', { permission: 'goalplan.edit', resource: (tx, goalId) => goalResource(tx, goalId) }, (tx, goalId: Id) => {
@@ -192,13 +207,7 @@ export function goalsGroup(rt: Runtime): GoalsGateway {
       // Unknown goals are answered by the integrity check, exactly as any missing id.
       if (child && parent) {
         const alignments = tx.all('GoalAlignment');
-        const existingChildren: CascadeChild[] = alignments
-          .filter((a) => a.parentGoalId === parent.id && a.alignmentType === 'CASCADE' && a.id !== input.id)
-          .flatMap((a) => {
-            const goal = tx.find('Goal', a.childGoalId);
-            const owner = goal?.ownerEmployeeId ? (tx.find('Employee', goal.ownerEmployeeId) ?? null) : null;
-            return goal ? [{ alignment: a, childGoal: goal, childOwner: owner }] : [];
-          });
+        const existingChildren = cascadeChildrenOf(tx, parent.id, input.id);
         throwIssues(checkAlignment({ ...input, id: input.id }, { alignments, parentGoal: parent, existingChildren, asOf: todayOf(clockOf(tx)) }));
       }
       return upsert(tx, 'GoalAlignment', input, { create: () => ({}) });

@@ -52,6 +52,21 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SectionTitle` | A titled section inside a page body |
 | `CopyButton` | Hover-revealed copy-to-clipboard with an announced confirmation |
 
+## `src/components/goals/` (Track T3)
+
+| Component | Purpose |
+|---|---|
+| `GoalPlanWorkspace` | One Goal Plan end to end: `PlanHeader` (+ readiness strip and "Gửi"), `KgiSection`, `GoalTable`, the inline panels by `?goal=&mode=`, `CascadeDialog`; loading / error / not-found states; every decision from `usePlanWorkspace` |
+| `PlanHeader` | Owner, status, registration step, weight / goal / KGI counts, the read-only reason, "Cần xử lý trước khi gửi" / "Lưu ý" (each item jumps to its row), "Gửi" / "Chuyển cho nhân viên" with confirm |
+| `GoalTable` | Goals ordered by perspective (Changed / Cancelled muted, struck), weight-total footer, optional D3 bucket columns, a row menu whose disabled items carry their reason |
+| `GoalEditorPanel` | §5.1 fields inline; a library pick fills only untouched fields; levels section (ASSUMPTION Q1 hint); partial-save handling |
+| `PeriodSplitPanel` / `LinkGoalPanel` | Split by month / quarter with "Chia đều" and live warnings; link up to the manager's / unit's / company's goals (visible ones only) |
+| `CascadeDialog` | "Phân giao": reports with a disabled reason, share, weight (remaining to 100%), method when the parent's is not share-safe, bucket preview, ERR-KPI-11 inline |
+| `PlanLockActions` | HR's lock (confirm), unlock (reason + new due date when a form is open), lock history from the audit log |
+| `CycleDetail` / `CycleFormDialog` | The selected cycle: next-status action, periods (generate → preview → apply, lock switches), the cycle's plans table (filters, create Company / OrgUnit plan) |
+| `CyclePicker` + `useSelectedCycle` | `?cycle=` with `cycleRules.defaultCycleId` |
+| `goalCopy.ts` | `EDIT_REASON_COPY`, `issueText` (catalogue title + the detail's words), `formatTarget`, `formatWeight`, `planOwnerName` |
+
 ## `src/contexts/`
 
 | File | Purpose |
@@ -87,15 +102,18 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 |---|---|
 | `calcRules.ts` | `achievement` / `achievementPct` (6 methods → SCORED / NO_ACTUAL / NOT_COMPUTABLE), `applyFloorCap`, `targetForPeriod`, `goalAchievementInput`, `validateCalcMethod`, `validateTargetLevels`, `parseFormula` / `evaluateFormula` (safe, no `eval`) |
 | `scoreRules.ts` | `weightedScore` (provisional + `complete`), `lineWeightedScore`, `finalizeIssues` / `canFinalize`, `adjustedScore`, `roundScore`, `ratedScore`, `rollUpActual`, `aggregatePeriodActuals` |
-| `goalPlanRules.ts` | `WEIGHT_TOLERANCE`, `totalWeight`, `isWeightComplete`, `submitIssues`, `canEditPlan`, `planStatusOnEnterStep`, `statusAfterUnlock`, `canLock` / `canUnlock`, `planAfterChanges`, `applyGoalChanges`, `changeItemIssues` (`{ draft }`) |
-| `alignmentRules.ts` | `wouldCreateCycle`, `allocationBuckets` ("chưa giao", leavers), `allocationIssue`, `checkAlignment` |
+| `goalPlanRules.ts` | T3: `planSummaries` / `planSummary`, `remainingWeight`, `nextSortOrder`, `evenSplit`, `periodTargetIssues`. `WEIGHT_TOLERANCE`, `totalWeight`, `isWeightComplete`, `submitIssues`, `canEditPlan`, `planStatusOnEnterStep`, `statusAfterUnlock`, `canLock` / `canUnlock`, `planAfterChanges`, `applyGoalChanges`, `changeItemIssues` (`{ draft }`) |
+| `alignmentRules.ts` | `wouldCreateCycle`, `allocationBuckets` ("chưa giao", leavers), `allocationIssue`, `checkAlignment`; T3: `goalAllocationIssues`, `cascadedGoalDraft`, `SHARE_SAFE_METHODS` |
 | `ratingRules.ts` | `ratingFor`, `validateRatingScale`, `payoutPctFor`, `validatePayoutRule` |
 | `formRules.ts` | `canSubmit` (KPI_EVAL / GOAL_SETTING / GOAL_CHANGE), `validateScoreInput`, `evaluationTotal`, `columnPct` |
 | `workflowRules.ts` | `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
-| `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25) |
+| `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25); T3: `generatePeriods`, `mergeGeneratedPeriods`, `periodInput`, `nextCycleStatus`, `defaultCycleId` |
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
 | `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
+| `planAccessRules.ts` (T3) | Above goalPlan + workflow rules: `planEditability` / `planEditabilityFrom` (+ `PlanEditReason`, `UNKNOWN_EDITABILITY`), `submitAvailability(From)` (a `checkAction` dry run), `canSeeGoal` / `visibleGoals` (D2), `planReadiness`, `linkCandidatePlans`, `openRegistrationOf`, `planOwnerOf` |
+| `goalPlanImportRules.ts` (T3) | `GOAL_PLAN_IMPORT_COLUMNS`, `goalPlanImportIssues`, `goalPlanImportDrafts` + the `GoalPlanImportDraft` hand-off type for T4 (BR-KPI-26) |
+| `numberInput.ts` | `parseDecimalInput` (vi-VN `9.600.000.000` / `92,5`; blank → `null`, never 0), `formatDecimalInput` |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).
@@ -119,6 +137,9 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |
+| `goals.ts` (T3) | G3 reads with `*Key` (cycles, periods, plans, KGIs, goals, levels, splits, alignments); `useGoals` = VISIBLE goals (D2), `useGoalRows` = every row for aggregates; writes via `useGatewayWrite` (catalogue toast, refresh on every outcome); `useSaveGoal` (+ `PartialGoalSaveError`), `useCascadeGoal` (+ `CascadeOrphanError`), `useSubmitPlanForm`; composites `usePlanWorkspace`, `usePlanSummaries`, `usePlansEditability`, `useGoalLookups` |
+| `forms.ts` / `actuals.ts` / `system.ts` (T3 reads; T5 / T4 / T7 extend) | `useFormList`, `useWorkflowSteps`, `useDelegations` · `useDataSources` · `useAuditEntries` |
+| `toasts.ts` | `toastWriteError` (catalogue copy, optional persistent), `toastSaved` |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |
 | `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
 

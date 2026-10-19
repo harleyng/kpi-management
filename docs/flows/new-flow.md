@@ -174,6 +174,8 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
+| Q19 | Tỉ lệ đóng góp của liên kết (link) có dùng để tính điểm không? | Không — chỉ để tham khảo | HR |
+| Q20 | Chu kỳ không bắt đầu từ tháng 1 thì "Q1" là tháng 1–3 hay 3 tháng đầu chu kỳ? | 3 tháng đầu chu kỳ | HR |
 
 ## 7. Quyết định đã chốt
 
@@ -211,3 +213,20 @@ trực tiếp đến quy trình:
 - Chốt kết quả theo nguyên tắc "tất cả hoặc không": còn một kết quả vướng thì không chốt kết quả nào.
 - Phòng ban/công ty được xếp loại nhưng không có % lương.
 - Kỳ đã chốt kết quả thì không nhập thêm số thực tế; chưa đến kỳ thì cũng chưa nhập được (giả định Q18).
+
+**19/10/2026 — Track T3, kế hoạch mục tiêu (product owner duyệt).** Chi tiết: `business-rules.md` BR-KPI-05,
+07, 08, 11, 26–28.
+
+- **Kỳ tạo tự động**: 12 tháng (hạn nhập số ngày 5, hạn đánh giá ngày 13 tháng sau) và 4 quý; HR xem trước
+  rồi mới áp dụng. Tạo lại không làm mất kỳ đã có.
+- **Phân giao (cascade)**: quản lý giao một phần chỉ tiêu cho nhân viên khi phiếu đăng ký của nhân viên đang
+  ở bước của quản lý (bước 1, hoặc bước duyệt). Hệ thống tạo chỉ tiêu trong Goal Plan của nhân viên, mục tiêu
+  bằng phần giao; giao vượt mục tiêu thì báo ngay. Sau khi đã giao, hạ mục tiêu hay tăng "tự giao" của chỉ
+  tiêu cha mà vượt phần đã giao thì không lưu được.
+- **"Gửi" nằm trên trang Goal Plan**, cạnh danh sách "Cần xử lý trước khi gửi"; ở bước của quản lý nút là
+  "Chuyển cho nhân viên". Duyệt / trả lại vẫn ở trang Duyệt & đánh giá.
+- **Chỉ tiêu riêng tư**: chỉ chủ chỉ tiêu, quản lý các cấp của họ và HR / C&B / Ban điều hành xem được.
+- **Phân bổ theo kỳ lệch mục tiêu chỉ cảnh báo**, không chặn lưu hay gửi — nhưng cảnh báo hiện cả trên
+  Goal Plan và danh sách của quản lý / HR, vì số quý và năm cộng từ các tháng.
+- **Import Goal Plan** (mẫu một chỉ tiêu một dòng): quy tắc kiểm tra đã có; màn hình tải file làm cùng khung
+  import của track số liệu (T4).

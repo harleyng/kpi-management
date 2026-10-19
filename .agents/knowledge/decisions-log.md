@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-10-19 — Track T3: Goal Plans, cascade, cycles; one shared "may I edit / send" decision
+
+**Decision.** T3 builds `/my/kpi`, `/team/kpi` and `/admin/cycles` with NO contract or fixture change.
+Product owner (Phase 1): 4.3.7 ships its pure rules now (`goalPlanImportRules`, BR-KPI-26) and its screen
+with T4's framework; "Gửi" lives on the plan page (T3), approve / return stay T5; PRIVATE goals are seen by
+the owner, their manager chain and Tenant scopes, enforced on screens (RLS in Phase 5); a period split that
+does not fit is a warning only. Design reviews (cto, ui-ux, system-architect, workflow-expert,
+hr-performance-expert) added: `planAccessRules.ts` ABOVE goalPlan / workflow rules (avoids an import
+cycle) holding the one edit decision the mock guard and the screens share (parity test over the seed);
+"Gửi" as a dry run of `checkAction` (the first draft enabled it for a manager at step 3); editability
+UNKNOWN (read-only) while any input is missing; a `saveGoal` allocation guard only when target / type /
+"tự giao" change; the cascaded child copies the method only when share-safe and never copies levels,
+split or weight; a split tolerance relative to the target, `SPLIT_INCOMPLETE` and `SPLIT_NO_AGGREGATION`;
+periods generated only for ≤ 12 whole months (`ASSUMPTION Q20`); LINK `contributionPct` informational
+(`ASSUMPTION Q19`); detail views as search params; goal edit / split / link inline, dialogs only for lock,
+unlock, history and cascade; two-write saves surface partial failure (`PartialGoalSaveError`,
+`CascadeOrphanError`) and refresh on every outcome.
+
+**Pre-merge review.** QA: parity also checked after a RETURN, an HR lock with the form open, expired
+delegations and a Closed cycle. UI/UX critique (31/40, 15/20): amber is carried by icons, never by text
+(contrast); the goal name column is sticky beside the D3 buckets. **Exception kept:** "Phân giao" stays a
+dialog (operate-craft reserves modals for confirmations) — it is a short write over one parent goal whose
+bucket preview sits inside it; revisit if the dialog grows. Open P2s: hook-level tests for the composite
+hooks, 768 px table columns, cycle-row selection affordance, toast position.
+
+**Why.** A control the screen enables must be a write the gateway accepts — one function, tested against
+the gateway, cannot drift. Quarters and years are built from month splits, so a split warning must be
+visible everywhere a plan is listed even though it never blocks.
+
+**Other tracks.** T4: `saveGoal` may now refuse 11 / 06 on a cascaded parent; import `GoalPlanImportDraft`
+from `goalPlanImportRules` (don't redeclare), commit with `goalplan.import`, a missing plan is created as
+Draft; extend `actuals.ts`. T5: extend `forms.ts` (`useFormList`, `useWorkflowSteps`, `useDelegations`);
+use `planAccessRules` for edit / send decisions and `canSeeGoal` on goal names; Gửi is in T3, labelled
+"Chuyển cho nhân viên" before the owner's step. T6: use `canSeeGoal`; the `saveGoal` guard. T7: T3 added
+`useAuditEntries` to `system.ts`. Phase 5: replace the cascade's two writes with one `cascadeGoal`
+transaction; enforce D2 in RLS.
+
+**Updated alongside.** `business-rules.md` (header, BR-KPI-05, 07, 08, 11, 26–28, Q19, Q20),
+`docs/flows/new-flow.md` (§6, §7), `architecture.md` (route table, detail views, mock notes),
+`component-registry.md`, `common-pitfalls.md`, `e2e/specs/smoke.spec.ts` (`BUILT`).
+
+---
+
 ## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
 
 **Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or

@@ -188,6 +188,37 @@ export interface EntitlementContext {
   clock: Clock;
 }
 
+/** What `entitlementContextOf` needs besides the form and step — all loaded for one tenant. */
+export interface EntitlementInputs {
+  dir: ActorDirectory;
+  delegations: readonly Delegation[];
+  clock: Clock;
+  /** `can(profile, 'form.proxy', subject)` — from the same access profile the gateway builds. */
+  actorMayProxy: boolean;
+  /** `can(profile, 'form.cancel', subject)`. */
+  actorMayCancel: boolean;
+}
+
+/**
+ * The `EntitlementContext` of a form's current step — the ONE builder the gateway (`workflowContext`)
+ * and the screens share (T3), so a button the screen enables is the button `forms.act` accepts.
+ * `step` undefined (a closed form) → nobody is a step actor.
+ */
+export function entitlementContextOf(
+  form: Pick<FormInstance, 'subjectEmployeeId'>,
+  step: WorkflowStep | undefined,
+  inputs: EntitlementInputs,
+): EntitlementContext {
+  return {
+    stepActors: step ? resolveStepActors(step, form.subjectEmployeeId, inputs.dir, inputs.clock) : [],
+    delegations: inputs.delegations,
+    actorMayProxy: inputs.actorMayProxy,
+    actorMayCancel: inputs.actorMayCancel,
+    subjectUserId: userOfEmployee(form.subjectEmployeeId, inputs.dir.users)?.id ?? null,
+    clock: inputs.clock,
+  };
+}
+
 export type Entitlement =
   | { ok: true; mode: 'ACTOR' | 'DELEGATE' | 'PROXY' | 'ADMIN'; actorUserId: Id; onBehalfOfUserId: Id | null; delegationId: Id | null }
   | Refusal;
