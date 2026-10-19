@@ -116,3 +116,16 @@ trực tiếp đến quy trình:
 ## 7. Quyết định đã chốt
 
 *(Ghi ngày, quyết định và lý do khi từng điểm trên được chốt.)*
+
+**19/10/2026 — Phase 1.5, các quy tắc tính và quy trình (product owner duyệt).** Chi tiết: `business-rules.md`.
+
+- **Không có điểm thì không phải 0%.** Chỉ tiêu chưa có số thực tế hoặc không tính được (mục tiêu = 0,
+  không khớp bậc/định mức) được coi là chưa có điểm; còn chỉ tiêu như vậy thì HR không chốt được kết quả.
+- **Trần bắt buộc** với các phương pháp tỷ lệ và công thức. Không đặt sàn thì sàn là 0%.
+- **Định mức L1/L2/L3:** cần ít nhất 2 mức; giữa hai mức thì nội suy; vượt mức cao nhất thì lấy điểm mức
+  cao nhất; chưa đạt L1 thì 0%.
+- **Xếp loại** đọc điểm đã làm tròn 2 chữ số (89,995 → 90,00 → loại B).
+- **Người nghỉ việc giữa kỳ** vẫn được đánh giá cho kỳ có làm việc; phần chỉ tiêu đã giao cho họ quay
+  về "chưa giao"; % lương KPI không chia theo số ngày làm việc (giả định Q12).
+- **Khóa khi quá hạn** chỉ dùng cho phiếu đăng ký. Không ai được duyệt phiếu của chính mình. HR được làm
+  thay ở bước không có người xử lý, để phiếu không bị kẹt.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ERROR_CATALOG, KpiError, errorSpecOf, isRetryable, type ErrorCode } from './errorCatalog';
+import { ERROR_CATALOG, KpiError, errorSpecOf, isRetryable, ruleIssue, toKpiError, type ErrorCode } from './errorCatalog';
 
 describe('ERROR_CATALOG', () => {
   const entries = Object.entries(ERROR_CATALOG) as [ErrorCode, (typeof ERROR_CATALOG)[ErrorCode]][];
@@ -58,5 +58,43 @@ describe('isRetryable', () => {
     for (const code of ['ERR-KPI-02', 'ERR-KPI-04', 'ERR-KPI-05', 'ERR-KPI-06'] as const) {
       expect(isRetryable(new KpiError(code))).toBe(false);
     }
+  });
+});
+
+describe('rule-specific codes ERR-KPI-07…13 (Phase 1.5)', () => {
+  it('numbers the catalogue contiguously from 01, with no gap', () => {
+    const numbers = Object.keys(ERROR_CATALOG).map((code) => Number(code.slice(-2))).sort((a, b) => a - b);
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+  });
+
+  it.each([
+    ['ERR-KPI-07', 'Tổng trọng số chưa đạt 100%'],
+    ['ERR-KPI-08', 'Số chỉ tiêu phải từ 5 đến 8'],
+    ['ERR-KPI-09', 'Còn chỉ tiêu chưa chấm điểm hoặc chưa nhận xét'],
+    ['ERR-KPI-10', 'Liên kết này tạo vòng lặp giữa các chỉ tiêu'],
+    ['ERR-KPI-11', 'Phân giao vượt mục tiêu của chỉ tiêu cha'],
+    ['ERR-KPI-12', 'Chưa tính được % hoàn thành'],
+    ['ERR-KPI-13', 'Cấu hình tính điểm chưa hợp lệ'],
+  ] as const)('%s is an inline message: %s', (code, title) => {
+    expect(ERROR_CATALOG[code].title).toBe(title);
+    expect(ERROR_CATALOG[code].surface).toBe('inline');
+    expect(isRetryable(new KpiError(code))).toBe(false);
+  });
+});
+
+describe('toKpiError', () => {
+  it('throws the first issue\'s code and keeps every issue for the screen', () => {
+    const issues = [ruleIssue('ERR-KPI-09', 'item-1'), ruleIssue('ERR-KPI-09', 'item-2')];
+    const error = toKpiError(issues);
+    expect(error.code).toBe('ERR-KPI-09');
+    expect(error.issues.map((issue) => issue.ref)).toEqual(['item-1', 'item-2']);
+  });
+
+  it('refuses an empty list — there is nothing to report', () => {
+    expect(() => toKpiError([])).toThrow();
+  });
+
+  it('gives a plain KpiError an empty issue list', () => {
+    expect(new KpiError('ERR-KPI-04').issues).toEqual([]);
   });
 });

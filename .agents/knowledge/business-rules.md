@@ -5,9 +5,10 @@
 > page numbers). A value that depends on an open question (plan §9) is marked **`ASSUMPTION Qn`** and
 > uses the plan's default until the question is answered.
 >
-> Status on 2026-10-19 (Phase 1.1 done): the **state sets are declared** in `src/data/types.ts` and the
-> data contract in `src/integrations/data/types.ts`. The rules are still **specified, not implemented**
-> — they are implemented in Phase 1.5 (`src/lib/*Rules.ts`).
+> Status on 2026-10-19 (Phase 1.5 done): the **state sets are declared** in `src/data/types.ts`, the
+> data contract in `src/integrations/data/types.ts`, and the rules below are **implemented** as pure
+> functions in `src/lib/*Rules.ts` (calc, score, goalPlan, alignment, rating, form, workflow, org)
+> with co-located tests. A rule names the function that enforces it.
 
 ---
 
@@ -57,7 +58,10 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   employees** = Σ `allocatedValue` (derived); **self-assigned / tự giao** = the parent's
   `selfAssignedValue` (stored); **not yet assigned** = parent target − assigned − self-assigned (derived,
   never stored); **self-performed / tự thực hiện** is not tracked in P1 (`ASSUMPTION Q11`). Allocating
-  more than the parent target is refused. *Source: HR guide p. 24; email template steps 1–2.*
+  more than the parent target is refused (ERR-KPI-11; ERR-KPI-10 for a cycle). When the owner of a cascaded
+child goal **leaves**, from the day after their last working day their allocation counts as **not
+assigned** again, so the manager can re-cascade it (`alignmentRules.allocationBuckets`).
+*Source: HR guide p. 24; email template steps 1–2.*
 - **BR-KPI-08** — A goal is **public or private** (visibility, D2). *Source: HR guide pp. 21–22.*
 - **BR-KPI-09** — A goal may carry **target levels L1/L2/L3** (`GoalTargetLevel`), set per assigned goal
   (not per method). Each level has a numeric or text target (per the goal's `targetType`) and the score
@@ -76,7 +80,11 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   goals to the employee; (2) the employee adds new goals and links them to the manager's goals, until
   the weights reach 100%; (3) the direct manager approves, edits or returns the plan to the employee;
   (4) HR records the final Goal Plan (and locks it). *Source: email template "Email khởi chạy"; SF4C
-  PMGM.03.*
+  PMGM.03.* The plan's status follows its form (`goalPlanRules.planStatusOnEnterStep`): up to the
+  owner's (SELF) step **Draft** (**Returned** when sent back), after it **Submitted**, at the last step
+  **Approved** when a reviewer already approved, and **Locked** on the final APPROVE; cancelling the
+  form puts it back to Draft. 100% / 5–8 goals is required only from the owner's step on — the
+  manager's step-1 SUBMIT hands an unfinished plan to the employee (`formRules.canSubmit`).
 - **BR-KPI-13** — When a step's deadline passes, the step's **overdue behaviour** applies, and it is
   configured per step: **lock** the Goal Plan (registration: "the goal plan will be locked and can not be
   editable after running out of time"), **auto-forward** to the next actor (evaluation: an employee who
@@ -84,8 +92,14 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   deadline = min(entered + `slaDays`, the form's due date), in the tenant's time zone. The behaviour
   applies **once per entry into the step** (`overdueHandledAt`) and is recorded as an `AUTO_FORWARD` or
   `AUTO_LOCK` action with no actor. An auto-locked form stays at its step, frozen; HR unlocking the plan
-  must give a **new due date**, and the step starts again from the unlock. A step may also send a
-  reminder `remindDaysBefore` its deadline. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
+  must give a **new due date**, and the step starts again from the unlock (`workflowRules.onUnlock`). A
+  step may also send a reminder `remindDaysBefore` its deadline, once per step entry (`reminderKey` is
+  the notification's `sourceEventId`). **LOCK is allowed only on registration steps** — a GOAL_CHANGE
+  plan is already locked and an evaluation has no plan, so the form could never be released; AUTO_FORWARD
+  never on the last step (`validateWorkflow`; a misconfigured one falls back to REMIND). REMIND records
+  no action. The deadline day itself is on time. One move per form per scheduler tick. A form is also
+  **frozen** while HR has its registration plan locked by hand. *Source: email template "Email nhắc
+  Deadline"; SF4C PMGM.09.*
 - **BR-KPI-14** — HR can **lock and unlock** a Goal Plan; every lock/unlock is kept in its history. A
   locked plan cannot be edited except through the adjustment process. *Source: HR guide pp. 47–49;
   SF4C PMGM.03, PMGM.06.*
@@ -121,14 +135,24 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-21** — An action taken **as proxy or under delegation** records both the person who acted
   and the person acted for (and the delegation used). A delegation is valid only for its form type,
   between `validFrom` and `validTo`, and until it is revoked; it stops granting the right the moment it
-  expires. Delegations are revoked, never deleted. Validity is checked against the gateway clock.
-  *Source: ERD `FORM_STEP_ACTION`, `DELEGATION`; plan §8.1.*
+  expires. Delegations are revoked, never deleted. Validity is checked against the gateway clock, in
+  the tenant's time zone, and the delegator must still be the step's actor. HR may act as proxy on a
+  step **nobody is assigned to** (a top manager, an unfilled role) so no form gets stuck. **Nobody acts
+  on a review step of their own form** — the subject is never an actor, delegate or proxy of a non-SELF
+  step (HR's own evaluation goes to another HR user) (`workflowRules.entitlement`). *Source: ERD
+  `FORM_STEP_ACTION`, `DELEGATION`; plan §8.1; Phase 1.5 workflow review.*
 - **BR-KPI-23** — On a form, **EDIT is a permission, not an action**: it lets the step's actor change the
   subject's plan or scores; those edits are audited, and the form does not move. Only SUBMIT, APPROVE,
   RETURN and CANCEL are recorded by a person; RETURN goes to the step's `returnToStepNo` (default the
   previous step). CANCEL is HR/ADMIN only, with a reason; cancelling a registration form puts its plan
   back to Draft. An action names the step the screen showed — if the form has moved on, it is refused
   (ERR-KPI-04). *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
+- **BR-KPI-24** — **Someone who leaves mid-period** is evaluated for every period they worked at least
+  one day of (left on 15 Jan → January's evaluation still launches on 1 Feb); their own SELF step has no
+  actor, so its overdue behaviour carries the form on to the manager, and their lines are read as of
+  their last working day. Registration launches reach only people employed on the launch day. Payout is
+  **not prorated** (`ASSUMPTION Q12`; `orgRules.employedFraction` is ready if it is). *Source: plan
+  §8.1; Phase 1.5 review.*
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
@@ -142,29 +166,59 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   tiêu / thực tế"), **TIERED** (value ranges → fixed %, e.g. one stock-out = 70%), **BINARY** (Đạt /
   Không đạt), **FORMULA** (an expression), **LEVELS** (L1/L2/L3 per goal, BR-KPI-09).
 - **BR-KPI-31** — Each method has a **cap** and a **floor** (e.g. cap 120%). The raw result is computed
-  first, then the floor, then the cap.
-- **BR-KPI-32** — A **missing actual** gives no achievement (`null`) — it is never scored as 0. Division
-  by zero is answered explicitly per method (RATIO_UP with target 0, RATIO_DOWN with actual 0) and the
-  answer is documented here when Phase 1.5 decides it.
-- **BR-KPI-33** — **LEVELS** interpolates linearly between levels and is capped at the highest level's
-  score (`ASSUMPTION Q1`).
+  first, then the floor, then the cap. With no floor configured the floor is **0** — a negative
+  achievement would pull the plan below a goal that achieved nothing. **RATIO_UP, RATIO_DOWN and
+  FORMULA must have a cap** (target 1, actual 1000 would otherwise be 100 000% and carry the plan to the
+  top rating); floor ≤ cap (`calcRules.validateCalcMethod`, ERR-KPI-13). An uncapped one that reaches
+  the engine anyway is not computable, never scored.
+- **BR-KPI-32** — A **missing actual** gives no achievement — never 0. When the data cannot give an
+  answer the goal is **not computable** (ERR-KPI-12) and is treated exactly like a missing actual —
+  never 0, never silently dropped. The answers (`calcRules.achievement`):
+
+  | Method | Edge | Answer |
+  |---|---|---|
+  | RATIO_UP | target 0 / negative / missing | not computable |
+  | RATIO_UP | actual 0 | 0% (a real zero is scored) |
+  | RATIO_DOWN | actual 0, target > 0 | the **cap** (the best possible result) |
+  | RATIO_DOWN | actual 0, target 0 | 100% · target 0, actual > 0 → 0% · negatives → not computable |
+  | TIERED | value | the tier `[fromValue, toValue)` holding the actual (`null` = open); a gap → not computable; overlapping tiers refused |
+  | BINARY | text | Đạt when the actual equals the target text ignoring case and tone marks → 100%, else 0%; numeric: actual ≥ target |
+  | FORMULA | | numbers, `actual`, `target`, `+ - * /`, parentheses, `min`, `max` — nothing else; ÷0 or a missing target → not computable |
+  | any | text actual blank | missing |
+- **BR-KPI-33** — **LEVELS** (`ASSUMPTION Q1`): exactly on a level → its score; between two levels →
+  linear interpolation; past the top level → the top level's score; **below the lowest level → 0** (a
+  deliberate cliff when L1 scores more than 0). A goal's levels must be **at least two**, with strictly
+  increasing scores L1 < L2 < L3 and strictly monotonic targets — which makes the direction explicit
+  (L3's target below L1's = lower is better). A text result matching no level is not computable, so a
+  typo never scores 0.
 - **BR-KPI-34** — "Tỉ lệ KH cũ" is **higher-is-better** (RATIO_UP) despite the DATX workbook using both
   directions (`ASSUMPTION Q4`).
 - **BR-KPI-35** — The **weighted score** of a Goal Plan for a period = Σ (achievement% × weight) / Σ
-  weight over its active goals; cancelled goals are excluded. Rounding happens once, at finalisation.
+  weight over its **Active** goals (Changed and Cancelled excluded). A goal without an achievement is
+  left out of both sums and marks the score **incomplete** — the score shown is then provisional, and
+  the result **cannot be finalised** (`scoreRules.finalizeIssues`: ERR-KPI-09 per unscored goal,
+  ERR-KPI-07 for weights). Rounding happens once, at finalisation: 2 decimals, half away from zero
+  (`roundScore`, 89.995 → 90.00).
 - **BR-KPI-36** — A parent KPI's actual is **measured independently**; it is summed from its children
   only when that KPI is explicitly flagged to roll up (`ASSUMPTION Q8`).
 
 ## 4. Results and pay
 
 - **BR-KPI-40** — A period result per Goal Plan holds the total score, the rating level, the payout %
-  and an **adjustment %** (rule violations, attendance). *Source: ERD `PERIOD_RESULT`; DATX sheet "TH KQ"
+  and an **adjustment** (rule violations, attendance) in **points added to the score**, positive or
+  negative; the adjusted score never goes below 0 (`scoreRules.adjustedScore`). *Source: ERD `PERIOD_RESULT`; DATX sheet "TH KQ"
   columns.*
 - **BR-KPI-41** — The **rating scale** maps a score range to a level. Default sample scale
   **A+ / A / B / C / D** (`ASSUMPTION Q2` — the DATX "TH KQ" sheet is broken with `#REF!`, so no real
-  scale is available yet).
+  scale is available yet). Each level holds `[minScore, maxScore)`; the top level also takes anything
+  above its max; levels must start at 0 and be contiguous (`ratingRules`). The rating reads the
+  **rounded, adjusted** score, so it matches the number on screen. Sample for the seed: A+ ≥ 110 ·
+  A [100, 110) · B [90, 100) · C [70, 90) · D [0, 70); payout 120 / 100 / 80 / 50 / 0%.
 - **BR-KPI-42** — A **payout rule** maps a rating level to a % of the KPI salary component, optionally
-  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`).
+  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`). The most
+  specific rule in force wins: **Position**, then the **nearest org unit** up the employee's unit chain,
+  then All; among equals the latest `effectiveFrom`. A rule naming both a unit and a position is
+  invalid. No rule → **no payout figure** ("chưa có quy tắc"), never 0% (`ratingRules.payoutPctFor`).
 - **BR-KPI-43** — Results move **Draft → Final → Locked**; only finalised results are exported to
   payroll, and the export is recorded. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
 
@@ -236,8 +290,18 @@ Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
 | ERR-KPI-05 | The actor is not entitled (not the step's actor, no valid delegation, no permission) | toast | Bạn không có quyền thực hiện thao tác này |
 | ERR-KPI-06 | Invalid input (missing field, unresolved or cross-tenant reference, duplicate) | inline | Dữ liệu chưa hợp lệ |
 
+| ERR-KPI-07 | Active weights ≠ 100% ± 0.01 | inline | Tổng trọng số chưa đạt 100% |
+| ERR-KPI-08 | Goal count outside 5–8 | inline | Số chỉ tiêu phải từ 5 đến 8 |
+| ERR-KPI-09 | An item lacks the step's score or required comment; an unscored goal at finalisation | inline | Còn chỉ tiêu chưa chấm điểm hoặc chưa nhận xét |
+| ERR-KPI-10 | An alignment would create a cycle | inline | Liên kết này tạo vòng lặp giữa các chỉ tiêu |
+| ERR-KPI-11 | Allocations + self-assigned exceed the parent target | inline | Phân giao vượt mục tiêu của chỉ tiêu cha |
+| ERR-KPI-12 | Achievement not computable from the data | inline | Chưa tính được % hoàn thành |
+| ERR-KPI-13 | Invalid scoring configuration (method, tiers, levels, rating scale, payout rule) | inline | Cấu hình tính điểm chưa hợp lệ |
+
 Only ERR-KPI-01 and 03 are retried automatically (`isRetryable`). A failed write shows as a toast
-whatever the entry's surface. Rule-specific codes are added beside their rule in Phase 1.5.
+whatever the entry's surface. Rules return `RuleIssue { code, ref, detail, data }` lists (`ref` = the row
+to mark, `data` = the numbers shown beside the copy); an adapter throws them with `toKpiError(issues)`
+— the first issue's code, every issue on `KpiError.issues`.
 
 ## 7. Tenancy and data
 
@@ -265,3 +329,4 @@ whatever the entry's surface. Rule-specific codes are added beside their rule in
 | Q9 | Does a KGI have a numeric target? | Optional field, not scored | BR-KPI-02 |
 | Q10 | CMC's monthly work plan in P1? | No | BR-KPI-22 |
 | Q11 | Does P1 track "tự thực hiện" (what a manager personally achieved on a cascaded goal)? | No — shown as "—" | BR-KPI-07 |
+| Q12 | Is the KPI payout prorated for someone who joins or leaves mid-period? | No — full payout % for any period worked | BR-KPI-24, 42 |

@@ -6,6 +6,49 @@
 
 ---
 
+## 2026-10-19 — Phase 1.5: the rule engines and their edge answers
+
+**Decision.** `src/lib/` holds the rules as pure functions with tests: `calcRules`, `scoreRules`,
+`goalPlanRules`, `alignmentRules`, `ratingRules`, `formRules`, `workflowRules`, plus `orgRules` (shared
+org lookups and role-scope semantics, reused by 1.3's `permissionRules` and 1.2's mock) and `isoDate`
+(tenant-zone dates; every time-aware rule takes a `Clock { now, tz }`). Edge answers approved by the
+product owner:
+- no floor means floor 0;
+- RATIO_UP/RATIO_DOWN/FORMULA must have a cap;
+- RATIO_UP with target 0 is not computable;
+- RATIO_DOWN with actual 0 earns the cap;
+- LEVELS interpolates, scores 0 below L1, and needs at least 2 levels;
+- tiers and rating bands are `[min, max)`;
+- the rating reads the rounded, adjusted score;
+- a not-computable goal counts as missing, never 0, and blocks finalising;
+- payout specificity is Position > nearest unit > All, and no rule gives null;
+- a leaver is evaluated for any period they worked; their cascade returns to "chưa giao"; no proration
+  (new `ASSUMPTION Q12`);
+- LOCK is allowed only on registration;
+- no self-approval;
+- HR may proxy on a step nobody is assigned to.
+`workflowRules.checkAction` is the only entry for a person's action: stale step → frozen → entitled →
+table → `canSubmit` → move, returning the history row with both people. Errors ERR-KPI-07…13 and
+`RuleIssue` / `toKpiError`.
+
+**Why.**
+- Each edge decides someone's pay. An uncapped ratio pushed a plan to A+.
+- A dropped not-computable goal renormalised everyone's score upward.
+- A partial score could reach payroll.
+- Inferring the LEVELS direction from one level was undecidable.
+- LOCK on an evaluation froze a form nothing could release.
+- A caller-side `canSubmit` could be forgotten on one `act` path.
+- The reviewers (hr-performance-expert, qa, workflow-expert, system-architect) required these
+  corrections before approving.
+
+**Frozen at merge** (a change costs every track): the signatures of `achievement`, `weightedScore`,
+`canSubmit`, `checkAction` / `transition`, and the `RuleIssue` shape.
+
+**Updated alongside.** `business-rules.md` BR-KPI-07, 12, 13, 21, 24 (new), 31–33, 35, 40–42, §6, §8
+(Q12); `component-registry.md`; `new-flow.md` §7; the `WorkflowStep` comment in `types.ts`.
+
+---
+
 ## 2026-10-19 — Phase 1.1: the DataGateway contract is fixed (gate passed with changes)
 
 **Decision.** `src/integrations/data/types.ts` is the contract for Phase 1.2 and the seven tracks. Every

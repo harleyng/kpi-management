@@ -939,8 +939,9 @@ export const EVALUATION_COLUMN_LABEL: Readonly<Record<EvaluationColumn, string>>
  *
  * The step's deadline = min(`FormInstance.currentStepEnteredAt` + `slaDays`, form `dueDate`), in the
  * tenant's time zone; with `slaDays = null` it is the form's `dueDate`. `onOverdue` applies once per
- * entry into the step (`FormInstance.overdueHandledAt`). `saveWorkflow` refuses: RETURN on step 1,
- * AUTO_FORWARD on the last step, `onOverdue` without a deadline, and LOCK on a KPI_EVAL workflow.
+ * entry into the step (`FormInstance.overdueHandledAt`). `saveWorkflow` refuses what
+ * `workflowRules.validateWorkflow` lists: RETURN on step 1, AUTO_FORWARD on the last step, and LOCK
+ * outside GOAL_SETTING (a GOAL_CHANGE plan is already locked and an evaluation has no plan to lock).
  */
 export interface WorkflowStep extends TenantScoped {
   workflowId: Id;
