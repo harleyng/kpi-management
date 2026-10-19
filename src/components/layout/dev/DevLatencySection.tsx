@@ -3,7 +3,7 @@ import { SectionTitle } from '@/components/shared/SectionTitle';
 import { useSetLatency } from '@/hooks/queries/dev';
 import { LATENCY_CHOICES, useDevStore } from '@/lib/devStore';
 import { PendingButton } from './PendingButton';
-import { toastError } from './toastError';
+import { toastError } from '@/components/shared/toastError';
 
 const LABELS: Record<(typeof LATENCY_CHOICES)[number], string> = {
   0: 'Không (0 ms)',

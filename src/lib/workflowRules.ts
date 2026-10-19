@@ -513,6 +513,23 @@ export interface OverdueAction {
 }
 
 /**
+ * What a step will REALLY do when it runs over — its configured `onOverdue`, except that a
+ * misconfigured AUTO_FORWARD on the last step, or LOCK outside registration, falls back to REMIND
+ * (BR-KPI-13). `null` = nothing configured. The scheduler acts on it and the deadline reminder (T7)
+ * warns about it, so the warning never promises a lock or a hand-on that will not happen.
+ */
+export function effectiveOverdueBehaviour(
+  form: Pick<FormInstance, 'formType'>,
+  step: Pick<WorkflowStep, 'onOverdue' | 'stepNo'>,
+  workflowSteps: readonly Pick<WorkflowStep, 'stepNo'>[],
+): OverdueBehaviour | null {
+  const behaviour = step.onOverdue;
+  if (behaviour === 'AUTO_FORWARD' && step.stepNo >= Math.max(...workflowSteps.map((s) => s.stepNo))) return 'REMIND';
+  if (behaviour === 'LOCK' && form.formType !== 'GOAL_SETTING') return 'REMIND';
+  return behaviour;
+}
+
+/**
  * What one scheduler tick must do about overdue forms (BR-KPI-13). Once per entry into a step
  * (`overdueHandledAt` is null), one move per form per tick — call it ONCE per tick on the forms as
  * they were. REMIND only sets `overdueHandledAt` and emits `form.overdue`. A misconfigured
@@ -524,10 +541,8 @@ export function overdueActions(forms: readonly FormInstance[], steps: readonly W
     if (isTerminal(form) || form.overdueHandledAt !== null) continue;
     const own = steps.filter((s) => s.workflowId === form.workflowId);
     const step = own.find((s) => s.id === form.currentStepId);
-    if (!step || step.onOverdue === null || !isOverdue(form, step, clock)) continue;
-    let behaviour = step.onOverdue;
-    if (behaviour === 'AUTO_FORWARD' && step.stepNo >= lastStepNo(own)) behaviour = 'REMIND';
-    if (behaviour === 'LOCK' && form.formType !== 'GOAL_SETTING') behaviour = 'REMIND';
+    const behaviour = step ? effectiveOverdueBehaviour(form, step, own) : null;
+    if (!step || behaviour === null || !isOverdue(form, step, clock)) continue;
     actions.push({
       formId: form.id,
       stepId: step.id,

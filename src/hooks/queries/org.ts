@@ -40,3 +40,15 @@ export function useEmployees(filter: EmployeeFilter = {}) {
     staleTime: ORG_STALE_MS,
   });
 }
+
+export const userAccountsKey = (tenantId: string) => queryKey(tenantId, 'userAccounts');
+
+/** Every account of the tenant, Inactive and system accounts included (the audit log names them all). */
+export function useUserAccounts() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: userAccountsKey(tenantId),
+    queryFn: () => getDataGateway().org.listUserAccounts(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}

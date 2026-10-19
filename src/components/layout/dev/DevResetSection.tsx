@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useResetSeed } from '@/hooks/queries/session';
 import { PendingButton } from './PendingButton';
-import { toastError } from './toastError';
+import { toastError } from '@/components/shared/toastError';
 
 /** Back to the seed for every company — behind a confirmation, since every entry is lost. */
 export function DevResetSection() {

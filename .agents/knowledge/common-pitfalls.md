@@ -9,6 +9,17 @@
 
 ---
 
+## 2026-10-19 — A system listener's writes arrive AFTER the action you awaited
+
+The notification listener reacts to an event by reading and writing through the gateway — asynchronously.
+`await gateway.forms.act(...)` resolves before its notices exist, and a test that then lists
+notifications (or collects every event) races it. **Rule.** The shared test gateway runs with the
+listener OFF; a test that needs it passes `notifications: true` and awaits
+`gateway.notificationsSettled()` before reading. jsdom also has no `URL.createObjectURL` — stub it in a
+test that opens a file.
+
+---
+
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 
 `clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not

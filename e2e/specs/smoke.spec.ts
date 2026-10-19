@@ -11,7 +11,11 @@ import { expect, test, type Page } from '@playwright/test';
  * tests that need a session skip themselves; once `src/data/fixtures/index.ts` exists they run, and a
  * session that fails to load FAILS them. The banner test runs either way — no state may hide it.
  */
-const ROUTES: [path: string, title: string][] = [
+/**
+ * A route still on its placeholder shows "Chưa xây dựng"; a BUILT route names (third field) a table it
+ * shows once its data loaded — a track that builds its screen moves its route to that form.
+ */
+const ROUTES: [path: string, title: string, builtTable?: string][] = [
   ['/my/kpi', 'KPI của tôi'],
   ['/my/tasks', 'Việc cần xử lý'],
   ['/my/results', 'Kết quả của tôi'],
@@ -27,8 +31,8 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/org', 'Tổ chức'],
   ['/system/users', 'Người dùng & quyền'],
   ['/system/data-sources', 'Nguồn dữ liệu'],
-  ['/system/notification-templates', 'Mẫu thông báo'],
-  ['/system/audit-log', 'Nhật ký'],
+  ['/system/notification-templates', 'Mẫu thông báo', 'Mẫu thông báo theo sự kiện'],
+  ['/system/audit-log', 'Nhật ký', 'Nhật ký thay đổi'],
 ];
 
 
@@ -72,7 +76,7 @@ test.describe('@smoke app shell', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Dữ liệu giả lập' })).toBeVisible();
   });
 
-  for (const [path, title] of ROUTES) {
+  for (const [path, title, builtTable] of ROUTES) {
     test(`${path} opens "${title}" from the menu without console errors`, async ({ page }) => {
       const errors: string[] = [];
       page.on('console', (msg) => {
@@ -89,7 +93,11 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (builtTable) {
+        await expect(page.getByRole('table', { name: builtTable }).getByRole('row').nth(1)).toBeVisible();
+      } else {
+        await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      }
       expect(errors).toEqual([]);
     });
   }

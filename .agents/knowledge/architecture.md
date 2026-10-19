@@ -106,7 +106,10 @@ who holds every permission and sees all five groups.
 | `/system/audit-log` | Nhật ký | Hệ thống · `audit.view` | 4.8.4 (T7) |
 | `*` | Không tìm thấy trang | — | — |
 
-The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step.
+The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step. A route still on its
+placeholder must show "Chưa xây dựng"; a track that builds its screen gives the route a third field —
+the accessible name of a table the page shows once loaded (T7: "Mẫu thông báo theo sự kiện", "Nhật ký
+thay đổi").
 
 ---
 
@@ -165,6 +168,16 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   `sourceEventId` (the scheduler does not dedupe reminders, BR-KPI-13). T7 and the query-cache
   invalidation listen; listeners are idempotent by `event.id`, registered once at gateway construction,
   and a rejected listener is reported, never swallowed.
+- **Notifications (T7)** — `src/integrations/data/notificationListener.ts`, adapter-agnostic: it reads
+  through the contract after the commit (directory, delegations, steps, templates, periods, plans) and
+  writes `system.recordNotification`, idempotent per (source key, recipient). Who is told what is
+  `notificationRules` + `workflowRules` (BR-KPI-45…47). It ignores every event it does not handle —
+  including its own `Notification` writes — so it cannot feed itself; a failure goes to the diagnostics
+  and never touches the write that emitted. The mock registers it with `rt.bus.subscribeAll`
+  (`MockGatewayOptions.notifications`, default on; the shared test gateway turns it OFF unless a test
+  passes `notifications: true` and awaits `gateway.notificationsSettled()`); `dev.resetSeed` bumps a
+  generation so work started on the old data writes nothing. A real backend runs it as a server-side
+  outbox (Phase 5).
 - **Imports** — the client parses Excel (exceljs) into typed rows; `actuals.stageImport` validates and
   stores rows + row errors on the `ImportBatch`; `commitImport` applies all rows or none.
 - **IDs** — strings (`crypto.randomUUID()` at runtime; deterministic UUID-shaped `seedId(...)` in
@@ -193,7 +206,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `bus.ts` | Per-tenant subscribers + system listeners; events only after commit; a listener's throw / rejection goes to `onDiagnostic` (console.error), never fails the write |
 | `authorize.ts` | The ONE authorization hook (`authorizeWrite`), run for every user write before its body with the write's declared `WriteAuth`: the actor is an Active account of the tenant (else 05), then `can()` on every resource the resolver names (else 05) — see "Authorization" above. Also the resource resolvers (`planIdResource`, `goalResource`, `formResource`, `userResource`: `undefined` = no such row → code only; `null` = owner unresolvable → deny), `profileOf` / `actorCan` (the actor's profile, cached per transaction, for workflow inputs that are permissions: `form.proxy`, `form.cancel`, `delegation.manage`) and `clockOf` |
 | `workflowContext.ts` | The workflow methods' shared plumbing: `throwRefusal` / `throwIssues` / `throwDecision` (a rule's answer → `KpiError`), `refOrInvalid` (a payload id → ERR-KPI-06 worded like the integrity check), `directoryOf`, `entitlementCtx`, `assigneesFor`, `assertMayEdit` (EDIT standing + `editRefusal`), `assertPlanEditable` (`canEditPlan` with its context from the rows), `setPlanStatus` (the one plan-status write: LOCK / UNLOCK audit + `goalPlan.statusChanged`), `fireLaunch` (recipients → Draft plans → forms → evaluation items with actual snapshots → Launched → `form.launched`). Decides nothing |
-| `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
+| `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. The notification listener (T7) is registered in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 

@@ -103,8 +103,9 @@ sequenceDiagram
   *Đang đánh giá* (tháng 12). HR cũng có thể khởi chạy *ngay* hoặc *hẹn ngày*; đợt hẹn ngày chỉ hủy
   được khi chưa chạy.
 - Số thực tế trên phiếu là **ảnh chụp lúc khởi chạy**, không sửa trên phiếu.
-- Nhắc hạn gửi trước hạn bước 1 ngày; hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ
-  nhận **một** thông báo cho mỗi lần vào bước.
+- Nhắc hạn gửi trước hạn bước **theo cấu hình của bước** ("Nhắc trước … ngày", mẫu hiện tại: 1 ngày);
+  hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ nhận **một** thông báo cho mỗi lần vào bước.
+  Ai nhận thông báo gì: mục 4C.
 
 ## 4A. Ai thấy gì, ai làm gì (Phase 1.3)
 
@@ -146,6 +147,31 @@ Sau khi phiếu đánh giá hoàn thành:
 4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa để chuyển lương; bản nháp giữ nguyên.
 5. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
 
+## 4C. Thông báo và nhật ký (Track T7)
+
+Thông báo hiện trên **chuông** ở thanh trên cùng; bấm vào một thông báo thì mở màn hình liên quan và
+thông báo được đánh dấu đã đọc. Giai đoạn này **chỉ gửi trong ứng dụng**, chưa gửi email.
+
+| Khi nào | Ai nhận | Thông báo |
+|---|---|---|
+| Một đợt khởi chạy tạo phiếu | Người được đánh giá | Khởi chạy phiếu (quy trình mấy bước, đang ở bước nào, hạn) |
+| Như trên, khi bước 1 không phải của người được đánh giá (đăng ký: bước 1 là quản lý) | Người xử lý bước 1 | Có phiếu cần xử lý |
+| Phiếu chuyển sang bước tiếp theo (gửi, duyệt, hoặc tự chuyển do quá hạn) | Người xử lý bước mới | Có phiếu cần xử lý |
+| Phiếu bị trả lại | Người nhận lại phiếu | Phiếu bị trả lại (ai trả, lý do) |
+| HR mở khóa Goal Plan và đặt hạn mới | Người đang giữ phiếu | Có phiếu cần xử lý (hạn mới) |
+| Trước hạn bước, theo lịch nhắc của bước | Người đang giữ phiếu | Nhắc hạn (và điều xảy ra khi quá hạn: khóa Goal Plan / tự chuyển bước) |
+
+- Người được ủy quyền nhận thông báo **cùng** người ủy quyền.
+- **Không ai nhận thông báo về thao tác của chính mình**, kể cả khi HR làm thay hay người được ủy quyền
+  làm thay.
+- Không có thông báo khi phiếu hoàn thành, bị hủy, hoặc khi bước đã quá hạn (giả định Q19): lời nhắc
+  trước hạn đã nói điều gì sẽ xảy ra.
+- Nội dung lấy từ **Mẫu thông báo** (Hệ thống → Mẫu thông báo); sự kiện nào thiếu mẫu thì không gửi.
+- **Nhật ký** (Hệ thống → Nhật ký) ghi mọi thay đổi dữ liệu: ai làm, làm thay ai, lúc nào, trước/sau và
+  lý do (khóa, mở khóa, hủy phiếu). Hiện chỉ Quản trị hệ thống xem được.
+- Tệp đính kèm (bằng chứng, file import) tối đa 10 MB, chỉ nhận PDF, ảnh, Word, Excel, CSV, văn bản
+  (giả định Q20).
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -174,6 +200,9 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
+| Q19 | Có báo cho người giữ phiếu khi bước đã quá hạn (phiếu tự chuyển hoặc Goal Plan bị khóa) không? | Không — lời nhắc trước hạn đã nói trước | Product owner + HR |
+| Q20 | Giới hạn dung lượng và định dạng tệp đính kèm? | 10 MB; PDF, ảnh, Word, Excel, CSV, văn bản | Product owner + HR |
+| — | HR có được xem Nhật ký không? (Hiện chỉ Quản trị hệ thống) | Chưa — chỉ Quản trị hệ thống | Product owner |
 
 ## 7. Quyết định đã chốt
 
@@ -211,3 +240,10 @@ trực tiếp đến quy trình:
 - Chốt kết quả theo nguyên tắc "tất cả hoặc không": còn một kết quả vướng thì không chốt kết quả nào.
 - Phòng ban/công ty được xếp loại nhưng không có % lương.
 - Kỳ đã chốt kết quả thì không nhập thêm số thực tế; chưa đến kỳ thì cũng chưa nhập được (giả định Q18).
+
+**19/10/2026 — Track T7, thông báo và nhật ký (product owner duyệt theo khuyến nghị).**
+
+- Không gửi thông báo khi bước đã quá hạn (giả định Q19); lời nhắc trước hạn nói rõ điều sẽ xảy ra.
+- Tệp đính kèm tối đa 10 MB, chỉ các định dạng văn phòng, ảnh và văn bản (giả định Q20).
+- Nhật ký giữ quyền xem như hiện tại (Quản trị hệ thống); việc mở cho HR chờ product owner chốt.
+- Người được ủy quyền nhận thông báo cùng người ủy quyền.

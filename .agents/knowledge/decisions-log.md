@@ -6,6 +6,72 @@
 
 ---
 
+## 2026-10-19 — T7: notifications come from one adapter-agnostic listener; nobody is told about their own action
+
+**Decision.** `src/integrations/data/notificationListener.ts` turns `form.launched`, `form.stepActed`,
+`form.dueSoon` and a form created by hand / re-entering its step (HR unlock) into in-app notices,
+reading only through the `DataGateway` contract and writing `system.recordNotification`. Who is told
+what is BR-KPI-45: subjects get FORM_LAUNCHED, the people now holding a form get STEP_ASSIGNED /
+RETURNED / DEADLINE_REMIND; delegates are told alongside their delegator; neither the actor nor the
+person they acted for is ever told. The mock registers it once (`rt.bus.subscribeAll`); the shared test
+gateway turns it off unless asked (`notifications: true` + `notificationsSettled()`).
+
+**Why.** Inside the mock it could have read the transaction directly, but then Phase 5 would rewrite it;
+built on the contract it moves to a server outbox unchanged. Without "ignore every other event" its own
+`Notification` writes would wake it again. Left on in every test, its asynchronous writes would land in
+the middle of the many tests that collect every event and assert the exact list. Without the unlock
+rule, a frozen employee unlocked by HR heard nothing until the reminder window, days later
+(workflow-expert review).
+
+**Consequence.** A failed read loses that notice (reported to the diagnostics, never thrown into the
+action) — accepted for the prototype. `dev.resetSeed` bumps a generation so work started on the old
+data writes nothing.
+
+**Updated alongside.** `business-rules.md` §4b BR-KPI-45, 46; `architecture.md` "Notifications (T7)";
+`docs/flows/new-flow.md` §4C.
+
+## 2026-10-19 — T7: the reminder warns what the scheduler WILL do (`effectiveOverdueBehaviour`)
+
+**Decision.** The fallback "AUTO_FORWARD on the last step, LOCK outside registration → REMIND" moved out
+of `overdueActions` into `workflowRules.effectiveOverdueBehaviour`, called by the scheduler, by the
+reminder's `{{consequence}}` and by the "Lịch nhắc hạn" table.
+
+**Why.** Reading the step's raw `onOverdue`, a misconfigured step's reminder promised "Goal Plan sẽ bị
+khóa" for a lock that never happens — two copies of one rule drifting apart.
+
+**Updated alongside.** `business-rules.md` BR-KPI-45; `component-registry.md` (workflowRules).
+
+## 2026-10-19 — T7 assumptions: no overdue notice (Q19), 10 MB attachments (Q20), audit log stays ADMIN-only
+
+**Decision.** (Q19) No notice when a step goes overdue — `NOTIFICATION_EVENTS` has no such code; the
+deadline reminder already says what will happen and an auto-forward tells the next person. (Q20) An
+attachment is ≤ 10 MB and one of PDF, images, Word, Excel, CSV, text — enforced in the upload button
+and in `system.uploadFile`. Templates naming a variable their event does not supply are refused in
+`saveNotificationTemplate` (`templateIssues`). The audit log keeps `audit.view` (ADMIN) — flagged to
+the product owner, not changed.
+
+**Why.** Reusing DEADLINE_REMIND after the deadline would read "Sắp đến hạn" for something already late;
+adding a code is a frozen-set + fixture change (Large). An unvalidated template variable renders empty
+in every notice without anyone noticing. Opening the audit log to HR changes the permission matrix
+(Large) — a product decision, not a track's.
+
+**Updated alongside.** `business-rules.md` §4b BR-KPI-47…49 and §8 Q19, Q20; `new-flow.md` §6, §7.
+
+## 2026-10-19 — T7: keyset lists page with "Tải thêm"; a built route names its table in the smoke spec
+
+**Decision.** `listNotifications` / `listAuditLog` return keyset `Page<T>` with no total, so their
+screens use `useInfiniteQuery` + `flattenPages` + `LoadMoreFooter`, not `DataTable`'s `serverPage`
+(which needs a total). `ENTITY_NAME_LABEL` was added beside `ENTITY_NAMES`. In
+`e2e/specs/smoke.spec.ts` a built route gives the name of a table it shows instead of expecting
+"Chưa xây dựng".
+
+**Why.** Page numbers over a keyset cursor would need a total the contract does not have (a Large
+change); a refetch while rows arrive can put one row on two pages, hence the dedupe. The smoke spec
+failed as soon as the first placeholder was replaced.
+
+**Updated alongside.** `component-registry.md` (`LoadMoreFooter`, `flattenPages`); `architecture.md`
+route table note; `business-rules.md` §5 (entity names).
+
 ## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
 
 **Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or

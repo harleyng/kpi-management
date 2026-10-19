@@ -2,6 +2,7 @@ import { buildSeed, SEED_NOW, SEED_VERSION } from '@/data/fixtures';
 import type { Seed } from '@/data/fixtures/types';
 import type { IsoDateTime } from '@/data/types';
 import { KpiError } from '@/lib/errorCatalog';
+import { createNotificationListener } from '../notificationListener';
 import type { DataGateway } from '../types';
 import { consoleDiagnostic, type DiagnosticSink } from './bus';
 import { actualsGroup } from './groups/actuals';
@@ -29,10 +30,19 @@ export interface MockGatewayOptions {
   realNow?: () => number;
   /** Where listener failures go (default console.error). */
   onDiagnostic?: DiagnosticSink;
+  /**
+   * Run T7's notification listener (default `true`). The shared test gateway turns it off unless a
+   * test asks for it, so tests that collect every event do not see its asynchronous writes.
+   */
+  notifications?: boolean;
 }
 
 /** The mock adapter, plus its registry (which methods are deferred / guarded) for tests and Gate 1. */
-export type MockDataGateway = DataGateway & { readonly registry: Registry };
+export type MockDataGateway = DataGateway & {
+  readonly registry: Registry;
+  /** Resolves once the notification listener has handled every event so far (tests). */
+  notificationsSettled(): Promise<void>;
+};
 
 const defaultLatency = () => (import.meta.env.MODE === 'test' ? 0 : 150);
 
@@ -47,9 +57,14 @@ export function createMockGateway(options: MockGatewayOptions = {}): MockDataGat
     onDiagnostic: options.onDiagnostic ?? consoleDiagnostic,
   });
 
+  // Bumped by `resetSeed`: a notification still being prepared from the old data writes nothing.
+  let generation = 0;
+  let settled = () => Promise.resolve();
+
   const gateway: MockDataGateway = {
     adapter: 'mock',
     registry: rt.registry,
+    notificationsSettled: () => settled(),
     clock: { now: () => rt.clock.now() },
     platform: platformGroup(rt),
     org: orgGroup(rt),
@@ -68,6 +83,7 @@ export function createMockGateway(options: MockGatewayOptions = {}): MockDataGat
     },
     dev: {
       async resetSeed() {
+        generation += 1;
         rt.resetSeed();
       },
       setNow(now) {
@@ -83,8 +99,17 @@ export function createMockGateway(options: MockGatewayOptions = {}): MockDataGat
     },
   };
 
-  // Notification rendering (T7, WBS 4.8.1–4.8.2) registers its system listener here, once, with
-  // `rt.bus.subscribeAll` — never in a React effect. The audit trail is written by the runtime itself
-  // (`audit.ts`), in the transaction of the change it records.
+  // Notification rendering (T7, WBS 4.8.1–4.8.2): its system listener is registered here, once per
+  // gateway — never in a React effect, which StrictMode runs twice. It hears every tenant and reads and
+  // writes through the gateway itself. The audit trail is written by the runtime (`audit.ts`), in the
+  // transaction of the change it records.
+  if (options.notifications !== false) {
+    const notifications = createNotificationListener(gateway, {
+      onDiagnostic: options.onDiagnostic ?? consoleDiagnostic,
+      generation: () => generation,
+    });
+    rt.bus.subscribeAll(notifications.listener);
+    settled = () => notifications.settled();
+  }
   return gateway;
 }
