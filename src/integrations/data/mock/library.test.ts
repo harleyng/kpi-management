@@ -4,7 +4,7 @@ import type { DataGateway, DomainEvent } from '../types';
 import { flush, newGateway, rejection } from './gateway.test-util';
 
 /**
- * The library's write rules in the mock (track T2, BR-KPI-70…76): what each save refuses, what it
+ * The library's write rules in the mock (track T2, BR-KPI-74…76): what each save refuses, what it
  * normalises, and that the seed — which predates the rules — still saves unchanged. The rules'
  * own edge cases are in `src/lib/libraryRules.test.ts`.
  */
@@ -87,7 +87,7 @@ describe('library.saveKpiDefinition', () => {
     expect([error.code, error.issues[0].detail]).toEqual(['ERR-KPI-06', 'CODE_TAKEN']);
   });
 
-  it('a standard item keeps its code, but its name and definition can change (BR-KPI-75)', async () => {
+  it('a standard item keeps its code, but its name and definition can change (BR-KPI-79)', async () => {
     const { gateway } = newGateway();
     const revenue = (await library(gateway)).kpi('KPI-DOANH-THU');
     expect(revenue.isSystem).toBe(true);
@@ -97,7 +97,7 @@ describe('library.saveKpiDefinition', () => {
     expect(renamed).toMatchObject({ code: 'KPI-DOANH-THU', name: 'Doanh thu thuần', isSystem: true });
   });
 
-  it('an Active item needs a default data source; a Draft does not (BR-KPI-72)', async () => {
+  it('an Active item needs a default data source; a Draft does not (BR-KPI-76)', async () => {
     const { gateway } = newGateway();
     const lib = await library(gateway);
     const error = await rejection(gateway.library.saveKpiDefinition(S, hr, { ...newKpi(lib, 'KPI-X'), defaultDataSourceId: null }));
@@ -124,7 +124,7 @@ describe('library.saveKpiDefinition', () => {
   });
 });
 
-describe('library.savePerspective (BR-KPI-71)', () => {
+describe('library.savePerspective (BR-KPI-75)', () => {
   it('renames and reorders, but never creates a perspective or changes its code', async () => {
     const { gateway } = newGateway();
     const [fin] = (await library(gateway)).perspectives;
@@ -136,7 +136,7 @@ describe('library.savePerspective (BR-KPI-71)', () => {
   });
 });
 
-describe('library.saveMeasureUnit (BR-KPI-70, 76)', () => {
+describe('library.saveMeasureUnit (BR-KPI-74, 76)', () => {
   it('a unit in use keeps its code (ERR-KPI-04); its name and decimals can change', async () => {
     const { gateway } = newGateway();
     const pct = (await library(gateway)).unit('PCT');
@@ -156,7 +156,7 @@ describe('library.saveMeasureUnit (BR-KPI-70, 76)', () => {
   });
 });
 
-describe('library.saveCalcMethod (BR-KPI-76)', () => {
+describe('library.saveCalcMethod (BR-KPI-80)', () => {
   it('a method goals use keeps its scoring fields (ERR-KPI-04) but can be renamed', async () => {
     const { gateway } = newGateway();
     const lib = await library(gateway);
@@ -205,7 +205,7 @@ describe('library.saveCalcMethod (BR-KPI-76)', () => {
   });
 });
 
-describe('library.saveKpiTemplate (BR-KPI-73, 74)', () => {
+describe('library.saveKpiTemplate (BR-KPI-77, 74)', () => {
   it('refuses ADDING a Draft or Archived KPI; keeps a stored one', async () => {
     const { gateway } = newGateway();
     const lib = await library(gateway);
@@ -218,7 +218,7 @@ describe('library.saveKpiTemplate (BR-KPI-73, 74)', () => {
     expect(error.issues[0]).toMatchObject({ code: 'ERR-KPI-06', ref: draftKpi.id, detail: 'KPI_NOT_ACTIVE' });
   });
 
-  it('saves a total off 100% and an off count — those are warnings, not refusals (Q20)', async () => {
+  it('saves a total off 100% and an off count — those are warnings, not refusals (Q26)', async () => {
     const { gateway } = newGateway();
     const lib = await library(gateway);
     const active = lib.definitions.filter((d) => d.status === 'Active').slice(0, 3);

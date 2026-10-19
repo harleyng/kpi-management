@@ -95,7 +95,7 @@ export interface CalcMethodSheetProps {
  * Edits one calculation method (WBS 4.2.2). The arithmetic of each type is `calcRules`'; the sheet
  * runs the same checks the gateway does (`validateCalcMethod` + `libraryRules.calcMethodIssues`), so a
  * tier overlap or a missing cap shows on the row before saving. A method that goals use keeps its
- * scoring fields (BR-KPI-76): they are read-only here, with the reason.
+ * scoring fields (BR-KPI-80): they are read-only here, with the reason.
  */
 export function CalcMethodSheet({ editing, ...rest }: CalcMethodSheetProps) {
   const key = editing === null ? 'closed' : editing === 'new' ? 'new' : editing.id;

@@ -86,8 +86,8 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 
 None of the CMC guides describes a library screen; the nearest references are HR guide p. 22 (the BSC
 goal type) and pp. 61–63 (the import template the library export's column order anticipates). The
-library's write rules BR-KPI-70…76 are therefore **Syntra decisions** (product owner, 2026-10-19), on
-`ASSUMPTION Q19`–`Q22`; the catalogue itself comes from the DATX sheet above.
+library's write rules BR-KPI-74…76 are therefore **Syntra decisions** (product owner, 2026-10-19), on
+`ASSUMPTION Q25`–`Q28`; the catalogue itself comes from the DATX sheet above.
 
 ### DATX KPI guide 2023 (slides)
 

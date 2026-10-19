@@ -98,7 +98,7 @@ export function useKpiTemplateItems() {
 }
 
 /**
- * Data sources — a definition's default source (BR-KPI-72). G4 is track T4's domain; this read lives
+ * Data sources — a definition's default source (BR-KPI-76). G4 is track T4's domain; this read lives
  * here until T4's hooks exist, and T4 may move it (keep `dataSourcesKey`'s root `dataSources`).
  */
 export const dataSourcesKey = (tenantId: string) => queryKey(tenantId, 'dataSources');

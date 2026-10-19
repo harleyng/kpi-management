@@ -87,7 +87,7 @@ export interface TemplateEditorProps {
 /**
  * The detail side of `/admin/templates` (WBS 4.2.4): the template's header, its items with default
  * weights, and the footer every edit settles — the live weight total and item count. Those two are
- * WARNINGS (`ASSUMPTION Q20`): the template saves, and the Goal Plan made from it is what must reach
+ * WARNINGS (`ASSUMPTION Q26`): the template saves, and the Goal Plan made from it is what must reach
  * 100% and 5–8 KPIs (BR-KPI-03/04). Applying a template to a plan is track T3's.
  */
 export function TemplateEditor(props: TemplateEditorProps) {

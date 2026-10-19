@@ -166,7 +166,7 @@ to the workbook — each marked `// Q14` in `catalog.ts`:
 
 The seed predates the library's write rules (business-rules.md §3b, track T2) and is NOT changed by them:
 the HCNS template is Active while holding the three Draft HCNS KPIs, and Demo Co's two Active templates
-total 50% / 40%. Those are exactly the warning cases the template screen shows (`ASSUMPTION Q20`); saving
+total 50% / 40%. Those are exactly the warning cases the template screen shows (`ASSUMPTION Q26`); saving
 any seed row unchanged succeeds (`mock/library.test.ts`).
 
 Other defaults: every KPI is monthly; aggregation SUM for money and counts, AVG for ratios, LAST for

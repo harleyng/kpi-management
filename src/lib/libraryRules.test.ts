@@ -21,7 +21,7 @@ import {
 
 const details = (issues: readonly { detail: string | null }[]) => issues.map((i) => i.detail);
 
-describe('codes (BR-KPI-70)', () => {
+describe('codes (BR-KPI-74)', () => {
   it('trims and upper-cases', () => {
     expect(normaliseCode('  kpi-1 ')).toBe('KPI-1');
   });
@@ -43,7 +43,7 @@ describe('codes (BR-KPI-70)', () => {
   });
 });
 
-describe('perspectiveIssues (BR-KPI-71)', () => {
+describe('perspectiveIssues (BR-KPI-75)', () => {
   it('refuses creating a perspective — the four are fixed', () => {
     expect(details(perspectiveIssues({ code: 'FIN', name: 'X', sortOrder: 1 }, null))).toEqual(['PERSPECTIVE_FIXED']);
   });
@@ -58,7 +58,7 @@ describe('perspectiveIssues (BR-KPI-71)', () => {
   });
 });
 
-describe('measureUnitIssues (BR-KPI-70, 76)', () => {
+describe('measureUnitIssues (BR-KPI-74, 76)', () => {
   const stored = measureUnit();
   const ok = { code: 'PCT', name: '%', decimals: 1 };
 
@@ -85,7 +85,7 @@ describe('measureUnitIssues (BR-KPI-70, 76)', () => {
   });
 });
 
-describe('calcMethodIssues (BR-KPI-76) and methodScoringChanged', () => {
+describe('calcMethodIssues (BR-KPI-80) and methodScoringChanged', () => {
   const stored = calcMethod({ code: 'CM-UP', capPct: 120, floorPct: 0 });
   const used = { otherCodes: [], goalsUsing: 12 };
   const unused = { otherCodes: [], goalsUsing: 0 };
@@ -142,7 +142,7 @@ describe('calcMethodIssues (BR-KPI-76) and methodScoringChanged', () => {
   });
 });
 
-describe('kpiDefinitionIssues (BR-KPI-70…75)', () => {
+describe('kpiDefinitionIssues (BR-KPI-74…75)', () => {
   const ctx = { otherCodes: [] as string[], activeTemplatesContaining: [] as string[] };
 
   it('accepts a complete Active definition', () => {
@@ -159,12 +159,12 @@ describe('kpiDefinitionIssues (BR-KPI-70…75)', () => {
     expect(details(kpiDefinitionIssues(bad, null, ctx))).toEqual(['FREQUENCY_INVALID', 'AGGREGATION_INVALID', 'CATEGORY_INVALID', 'STATUS_INVALID']);
   });
 
-  it('Active needs a default data source; Draft does not (BR-KPI-72, Q19)', () => {
+  it('Active needs a default data source; Draft does not (BR-KPI-76, Q25)', () => {
     expect(details(kpiDefinitionIssues(kpiDefinition({ defaultDataSourceId: null }), null, ctx))).toEqual(['DATA_SOURCE_REQUIRED']);
     expect(kpiDefinitionIssues(kpiDefinition({ defaultDataSourceId: null, status: 'Draft' }), null, ctx)).toEqual([]);
   });
 
-  it('a standard item keeps its code but can be edited otherwise (BR-KPI-75, Q22)', () => {
+  it('a standard item keeps its code but can be edited otherwise (BR-KPI-79, Q28)', () => {
     const stored = kpiDefinition({ isSystem: true });
     expect(details(kpiDefinitionIssues({ ...stored, code: 'KPI-NEW' }, stored, ctx))).toEqual(['SYSTEM_CODE_LOCKED']);
     expect(kpiDefinitionIssues({ ...stored, code: ' kpi-1 ', name: 'Doanh thu thuần', status: 'Archived' }, stored, ctx)).toEqual([]);
@@ -195,7 +195,7 @@ describe('activeTemplatesContaining', () => {
   });
 });
 
-describe('templateIssues (BR-KPI-73, 74)', () => {
+describe('templateIssues (BR-KPI-77, 74)', () => {
   const defs = (entries: [Id, LibraryStatus][]) => new Map<Id, Pick<KpiDefinition, 'status'>>(entries.map(([id, status]) => [id, { status }]));
   const five = ['a', 'b', 'c', 'd', 'e'];
   const allActive = defs([...five, 'f', 'g', 'h', 'i'].map((id) => [id, 'Active']));
@@ -231,7 +231,7 @@ describe('templateIssues (BR-KPI-73, 74)', () => {
     expect(templateWeightTotal([])).toBe(0);
   });
 
-  it('a NEW Draft/Archived item is refused; a stored one is only a warning (BR-KPI-74)', () => {
+  it('a NEW Draft/Archived item is refused; a stored one is only a warning (BR-KPI-78)', () => {
     const map = defs([['a', 'Active'], ['b', 'Active'], ['c', 'Active'], ['d', 'Draft'], ['e', 'Archived']]);
     const items = itemsOf([20, 20, 20, 20, 20]);
     const fresh = templateIssues(kpiTemplate(), items, map, new Set(['a', 'b', 'c']));

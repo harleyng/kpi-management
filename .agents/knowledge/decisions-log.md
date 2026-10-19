@@ -8,16 +8,16 @@
 
 ## 2026-10-19 — Track T2: library write rules, export now, import on T4's framework
 
-**Decision.** The KPI library (WBS 4.2.1–4.2.4) enforces BR-KPI-70…76 through `src/lib/libraryRules.ts`,
+**Decision.** The KPI library (WBS 4.2.1–4.2.4) enforces BR-KPI-74…76 through `src/lib/libraryRules.ts`,
 called inside each `library.save*` of the mock — no contract or fixture change. Product-owner choices:
 1. **Export now, import later**: "Xuất Excel" (library, templates, code lists) ships; Library import waits
    for T4's shared framework (4.4.3) and the `LibraryImportRow` columns it needs (a contract change then);
 2. **Templates warn, they do not block**: weight total ≠ 100% and item count outside 5–8 are warnings
-   (`ASSUMPTION Q20`); only ADDING a Draft/Archived KPI is refused;
+   (`ASSUMPTION Q26`); only ADDING a Draft/Archived KPI is refused;
 3. **A method used by any goal keeps its scoring fields** (type, cap, floor, formula, tiers): a goal reads
    its method live, so an edit would re-score open periods; create a new method instead;
-4. standard (`isSystem`) items are editable except their code (`Q22`) — every seed KPI is standard;
-5. archiving a KPI is refused only while an Active template holds it (`Q21`); goals keep working.
+4. standard (`isSystem`) items are editable except their code (`Q28`) — every seed KPI is standard;
+5. archiving a KPI is refused only while an Active template holds it (`Q27`); goals keep working.
 Hook placement: `useDataSources` (G4) lives in `hooks/queries/library.ts` until T4 moves it (cto suggested
 `actuals.ts`, system-architect `library.ts` — picked the one that cannot add/add-conflict with T4).
 
@@ -26,7 +26,7 @@ Hook placement: `useDataSources` (G4) lives in `hooks/queries/library.ts` until 
 finalised and draft scores from drifting silently (hr-performance-expert confirmed `resultRules` reads
 `Goal.calcMethodId` live). A one-off Library importer would be thrown away when T4 lands.
 
-**Updated alongside.** `business-rules.md` (§0, BR-KPI-03, new §3b, §5, §8 Q19–Q22), `docs/flows/new-flow.md`
+**Updated alongside.** `business-rules.md` (§0, BR-KPI-03, new §3b, §5, §8 Q25–Q28), `docs/flows/new-flow.md`
 (§1A, §5 row 8, §6, §7), `docs/source-map.md`, `architecture.md` (routes, mock table, phases),
 `component-registry.md`, fixtures README.
 

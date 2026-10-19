@@ -16,7 +16,7 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
-> **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-70…76), enforced by
+> **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-74…76), enforced by
 > `src/lib/libraryRules.ts` in every `library.save*` of the mock.
 
 ---
@@ -56,7 +56,7 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   Goal Plan has exactly one owner of one tier. *Source: NoteX minutes; ERD `GOAL_PLAN.owner_type`.*
 - **BR-KPI-02** — A Goal Plan holds **3–5 KGI**. A KGI may carry a numeric target but is **not scored**
   (`ASSUMPTION Q9`). *Source: DATX department sheets; DATX slides pp. 21–22.*
-- **BR-KPI-03** — A Goal Plan holds **5–8 KPIs**. It applies to PLANS, not to library templates (BR-KPI-73). *Source: plan §6.2 (1.5 `goalPlanRules`), NoteX minutes.*
+- **BR-KPI-03** — A Goal Plan holds **5–8 KPIs**. It applies to PLANS, not to library templates (BR-KPI-77). *Source: plan §6.2 (1.5 `goalPlanRules`), NoteX minutes.*
 - **BR-KPI-04** — A Goal Plan can be submitted only when its goals' weights sum to **100%**, compared with
   a tolerance of ±0.01 (a sum of 99.99% or 100.01% from rounding counts as 100%). *Source: HR guide
   p. 22; Manager guide p. 26; email template ("if the total weight is less than 100%").*
@@ -271,32 +271,32 @@ refusal before it happens. The checks that read OTHER tables — codes of the ca
 or method, Active templates holding a KPI — become an RPC or a trigger in Phase 5. Updates re-check only
 what they change: the seed predates these rules, and saving a seed row unchanged always succeeds.
 
-- **BR-KPI-70** — **Codes** of KPI definitions, measure units and calculation methods are stored trimmed
+- **BR-KPI-74** — **Codes** of KPI definitions, measure units and calculation methods are stored trimmed
   and upper-cased, are required, and are **unique per tenant ignoring case** (ERR-KPI-06 `CODE_TAKEN`).
   A name is required. A definition needs a perspective, unit, method, frequency and aggregation from the
   fixed sets. *Source: Syntra decision (T2); ERD unique codes.* `codeIssues`, `kpiDefinitionIssues`.
-- **BR-KPI-71** — The **four BSC perspectives are fixed**: they can be renamed and reordered, never
+- **BR-KPI-75** — The **four BSC perspectives are fixed**: they can be renamed and reordered, never
   created and never re-coded (ERR-KPI-06 `PERSPECTIVE_FIXED` / `CODE_LOCKED`). Every definition has one
   (BR-KPI-06). *Source: HR guide p. 22; plan Q5.* `perspectiveIssues`.
-- **BR-KPI-72** — A definition may lack a **default data source** while Draft, but needs one to be
+- **BR-KPI-76** — A definition may lack a **default data source** while Draft, but needs one to be
   **Active** (ERR-KPI-06 `DATA_SOURCE_REQUIRED`) — "KPI phải đo được" applied to the library
-  (`ASSUMPTION Q19`). A goal still needs its own source (BR-KPI-05). *Source: NoteX §2.3; ERD (nullable).*
-- **BR-KPI-73** — A **template** is for one org unit, one position, or everyone (both set → ERR-KPI-06).
+  (`ASSUMPTION Q25`). A goal still needs its own source (BR-KPI-05). *Source: NoteX §2.3; ERD (nullable).*
+- **BR-KPI-77** — A **template** is for one org unit, one position, or everyone (both set → ERR-KPI-06).
   Items: no duplicate KPI, weight ≥ 0, a default target that is a number or blank (ERR-KPI-06). The
   **weight total of 100% (±0.01) and the 5–8 item count are WARNINGS, never refusals** (`ASSUMPTION
-  Q20`): the template saves, and the Goal Plan made from it is what BR-KPI-03/04 gate. *Source: ERD
+  Q26`): the template saves, and the Goal Plan made from it is what BR-KPI-03/04 gate. *Source: ERD
   `KPI_TEMPLATE`; DATX's 4-item sets (fixtures README, Q14).* `templateIssues` → `{ errors, warnings }`.
-- **BR-KPI-74** — **Library status** Draft ⇄ Active ⇄ Archived; any move is allowed and "Lưu trữ" never
+- **BR-KPI-78** — **Library status** Draft ⇄ Active ⇄ Archived; any move is allowed and "Lưu trữ" never
   deletes. Only Active items can be newly picked (KpiPicker). A KPI cannot **leave Active** while an
   **Active template** holds it (ERR-KPI-04 `IN_ACTIVE_TEMPLATE`, listing the templates). Archiving a KPI
   that goals or API mappings use is allowed — a goal holds its own perspective, unit, method and
   formula ids and never reads the definition when it scores. A Draft or Archived KPI cannot be **added**
   to a template (ERR-KPI-06 `KPI_NOT_ACTIVE`); one already there stays, with a warning (`ASSUMPTION
-  Q21`). *Source: Syntra decision (T2).* `kpiDefinitionIssues`, `activeTemplatesContaining`.
-- **BR-KPI-75** — A **standard item** ("Chuẩn", `isSystem`, seed only) can be edited like any item
+  Q27`). *Source: Syntra decision (T2).* `kpiDefinitionIssues`, `activeTemplatesContaining`.
+- **BR-KPI-79** — A **standard item** ("Chuẩn", `isSystem`, seed only) can be edited like any item
   except its **code** (ERR-KPI-06 `SYSTEM_CODE_LOCKED`). Every seeded KPI is standard, so a stricter rule
-  would freeze the whole library (`ASSUMPTION Q22`). A tenant-created item is never standard.
-- **BR-KPI-76** — **Catalogue rows in use.** A measure unit referenced anywhere (a definition, goal, KGI
+  would freeze the whole library (`ASSUMPTION Q28`). A tenant-created item is never standard.
+- **BR-KPI-80** — **Catalogue rows in use.** A measure unit referenced anywhere (a definition, goal, KGI
   or pending change proposal) keeps its **code** (ERR-KPI-04 `UNIT_CODE_IN_USE`); its name and decimals
   (display only, 0–6) can change. A **calculation method used by any goal** — any status, any cycle,
   closed ones included — or a pending proposal keeps its **scoring fields**: type, cap, floor, formula
@@ -390,7 +390,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Calc method | RATIO_UP · RATIO_DOWN · TIERED · BINARY · FORMULA · LEVELS | ERD + D1 |
 | KPI frequency | Week · Month · Quarter · Year | ERD "Tuần/Tháng/Quý/Năm" |
 | Aggregation | SUM · AVG · LAST | ERD |
-| Library (KPI, template) | Draft · Active · Archived — any move allowed; leaving Active is refused while an Active template holds the KPI (BR-KPI-74) | ERD |
+| Library (KPI, template) | Draft · Active · Archived — any move allowed; leaving Active is refused while an Active template holds the KPI (BR-KPI-78) | ERD |
 | KPI category tag | EFFICIENCY · VOLUME · COST — secondary tag only | DATX, `ASSUMPTION Q5` |
 | Cycle | Planning · Active · Evaluating · Closed | ERD |
 | Period type | Month · Quarter · Half · Year | ERD |
@@ -492,10 +492,10 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
-| Q19 | Must a library item name its data source? | Only to be Active; a Draft may leave it blank | BR-KPI-72 |
-| Q20 | Must a template's weights total 100% and hold 5–8 items? | No — both are warnings; the plan made from it is gated | BR-KPI-73 |
-| Q21 | What does archiving a library item do? | Hides it from new picks only; refused while an Active template holds it; goals keep working | BR-KPI-74 |
-| Q22 | May a tenant edit a standard (seeded) library item? | Yes, except its code | BR-KPI-75 |
+| Q25 | Must a library item name its data source? | Only to be Active; a Draft may leave it blank | BR-KPI-76 |
+| Q26 | Must a template's weights total 100% and hold 5–8 items? | No — both are warnings; the plan made from it is gated | BR-KPI-77 |
+| Q27 | What does archiving a library item do? | Hides it from new picks only; refused while an Active template holds it; goals keep working | BR-KPI-78 |
+| Q28 | May a tenant edit a standard (seeded) library item? | Yes, except its code | BR-KPI-79 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

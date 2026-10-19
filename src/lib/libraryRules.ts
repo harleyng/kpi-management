@@ -24,7 +24,7 @@ import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { GOAL_COUNT, isWeightComplete } from './goalPlanRules';
 
 /**
- * The KPI library's write rules (track T2, WBS 4.2.1–4.2.4) — BR-KPI-70…76 in business-rules.md §3b.
+ * The KPI library's write rules (track T2, WBS 4.2.1–4.2.4) — BR-KPI-74…76 in business-rules.md §3b.
  *
  * Pure functions over plain rows: the mock reads what a rule needs inside its transaction and throws
  * the issues with `toKpiError`; a Phase 5 RPC reads the same rows and calls the same functions. The
@@ -38,7 +38,7 @@ import { GOAL_COUNT, isWeightComplete } from './goalPlanRules';
  * Draft KPIs or miss 100%), and editing an unrelated field of such a row must still save.
  */
 
-// ─── Codes (BR-KPI-70) ─────────────────────────────────────────────────────────────────────────
+// ─── Codes (BR-KPI-74) ─────────────────────────────────────────────────────────────────────────
 
 /** Trimmed and upper-cased — the form every library code is stored and compared in. */
 export function normaliseCode(code: string): string {
@@ -62,7 +62,7 @@ export function otherCodesOf(rows: readonly { id: Id; code: string }[], selfId: 
   return rows.filter((r) => r.id !== selfId).map((r) => r.code);
 }
 
-// ─── Perspectives (BR-KPI-71) ──────────────────────────────────────────────────────────────────
+// ─── Perspectives (BR-KPI-75) ──────────────────────────────────────────────────────────────────
 
 type PerspectiveInput = Pick<BscPerspective, 'code' | 'name' | 'sortOrder'>;
 
@@ -76,7 +76,7 @@ export function perspectiveIssues(next: PerspectiveInput, stored: BscPerspective
   return issues;
 }
 
-// ─── Measure units (BR-KPI-70, 76) ─────────────────────────────────────────────────────────────
+// ─── Measure units (BR-KPI-74, 76) ─────────────────────────────────────────────────────────────
 
 type UnitInput = Pick<MeasureUnit, 'code' | 'name' | 'decimals'>;
 
@@ -100,7 +100,7 @@ export function measureUnitIssues(
   return issues;
 }
 
-// ─── Calculation methods (BR-KPI-70, 76; BR-KPI-31 stays in calcRules.validateCalcMethod) ───────
+// ─── Calculation methods (BR-KPI-74, 76; BR-KPI-31 stays in calcRules.validateCalcMethod) ───────
 
 type MethodInput = Pick<CalcMethod, 'code' | 'name' | 'methodType' | 'formulaExpr' | 'capPct' | 'floorPct'>;
 type TierInput = Pick<CalcTier, 'fromValue' | 'toValue' | 'achievementPct'>;
@@ -129,7 +129,7 @@ export function methodScoringChanged(
  * What the library adds to `validateCalcMethod` (which the adapter runs too, between these and the
  * lock): code and name; fields a type does not read are refused rather than kept as dead data
  * (tiers only on TIERED, a formula only on FORMULA, no cap or floor on LEVELS — its ceiling is the
- * top level, BR-KPI-33); and `goalsUsing > 0` locks the scoring fields (BR-KPI-76), because a goal
+ * top level, BR-KPI-33); and `goalsUsing > 0` locks the scoring fields (BR-KPI-80), because a goal
  * reads its method LIVE (`Goal.calcMethodId`) — editing it would re-score every open period.
  * Returns `[...input issues, ...shape issues]` and, separately, the lock — the adapter puts the
  * lock LAST so a configuration problem is reported first.
@@ -154,7 +154,7 @@ export function calcMethodIssues(
   return { issues, lock };
 }
 
-// ─── KPI definitions (BR-KPI-70, 71, 72, 74, 75) ───────────────────────────────────────────────
+// ─── KPI definitions (BR-KPI-74, 71, 72, 74, 75) ───────────────────────────────────────────────
 
 type DefinitionInput = Pick<
   KpiDefinition,
@@ -162,11 +162,11 @@ type DefinitionInput = Pick<
 >;
 
 /**
- * - code / name / perspective / unit / method / frequency / aggregation required (BR-KPI-70, 71);
- * - Active needs a default data source (BR-KPI-72, `ASSUMPTION Q19`);
- * - a standard item (`isSystem`) keeps its code (BR-KPI-75, `ASSUMPTION Q22`);
- * - leaving Active while an ACTIVE template holds it is refused, naming the templates (BR-KPI-74,
- *   `ASSUMPTION Q21`). Goals do not read the definition when they score, so archiving one that
+ * - code / name / perspective / unit / method / frequency / aggregation required (BR-KPI-74, 71);
+ * - Active needs a default data source (BR-KPI-76, `ASSUMPTION Q25`);
+ * - a standard item (`isSystem`) keeps its code (BR-KPI-79, `ASSUMPTION Q28`);
+ * - leaving Active while an ACTIVE template holds it is refused, naming the templates (BR-KPI-78,
+ *   `ASSUMPTION Q27`). Goals do not read the definition when they score, so archiving one that
  *   goals or API mappings use is allowed.
  */
 export function kpiDefinitionIssues(
@@ -200,7 +200,7 @@ export function activeTemplatesContaining(
   return templates.filter((t) => t.status === 'Active' && holding.has(t.id)).map((t) => t.name);
 }
 
-// ─── Templates (BR-KPI-73, 74) ─────────────────────────────────────────────────────────────────
+// ─── Templates (BR-KPI-77, 74) ─────────────────────────────────────────────────────────────────
 
 type TemplateInput = Pick<KpiTemplate, 'name' | 'orgUnitId' | 'positionId' | 'status'>;
 type ItemInput = Pick<KpiTemplateItem, 'kpiDefId' | 'defaultWeight' | 'defaultTarget'>;
@@ -209,7 +209,7 @@ export interface TemplateCheck {
   /** Refused on save (ERR-KPI-06). */
   errors: RuleIssue[];
   /**
-   * Shown, never refused (`ASSUMPTION Q20`): weight total off 100% (ERR-KPI-07 data `totalWeight`),
+   * Shown, never refused (`ASSUMPTION Q26`): weight total off 100% (ERR-KPI-07 data `totalWeight`),
    * item count outside 5–8 (ERR-KPI-08 data `count`), a stored item whose KPI is no longer Active
    * (ref = kpiDefId, data `status`). The PLAN made from the template is still gated (BR-KPI-03/04).
    */
@@ -223,7 +223,7 @@ export function templateWeightTotal(items: readonly Pick<ItemInput, 'defaultWeig
 
 /**
  * `storedItemKpiIds` = the KPIs the template already held: only a NEW item must point at an Active
- * KPI (BR-KPI-74); an old one that has since been archived is a warning, so saving a seed template
+ * KPI (BR-KPI-78); an old one that has since been archived is a warning, so saving a seed template
  * unchanged always succeeds. A KPI id that does not resolve is left to the reference check.
  */
 export function templateIssues(
@@ -361,7 +361,7 @@ export const TEMPLATE_EXPORT_COLUMNS = [
 
 export type TemplateExportRow = Record<(typeof TEMPLATE_EXPORT_COLUMNS)[number]['key'], string | number | null>;
 
-/** Who a template is for — a unit, a position, or everyone (`ASSUMPTION Q20`'s companion: the ERD allows neither). */
+/** Who a template is for — a unit, a position, or everyone (`ASSUMPTION Q26`'s companion: the ERD allows neither). */
 export type TemplateAudience = 'OrgUnit' | 'Position' | 'General';
 export const TEMPLATE_AUDIENCE_LABEL: Readonly<Record<TemplateAudience, string>> = {
   OrgUnit: 'Đơn vị',

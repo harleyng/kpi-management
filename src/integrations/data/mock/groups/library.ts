@@ -20,7 +20,7 @@ import { REVERSE_REFS, valuesAt } from '../schema';
 import type { Row, Tx } from '../store';
 
 /**
- * G2 · Thư viện KPI (T2). Every save runs `libraryRules` (BR-KPI-70…76) on what it is about to
+ * G2 · Thư viện KPI (T2). Every save runs `libraryRules` (BR-KPI-74…76) on what it is about to
  * write, inside the transaction, so a refusal rolls the whole save back. The checks that read OTHER
  * tables (codes of the catalogue, rows that use a unit or method, Active templates holding a KPI)
  * become an RPC or a trigger in Phase 5 — the rule functions stay the same.
@@ -40,7 +40,7 @@ function referencesTo(tx: Tx, target: CollectionName, id: Id, except: readonly C
   return count;
 }
 
-/** `code` stored trimmed and upper-cased (BR-KPI-70); a missing code is left for `writableOf` to refuse. */
+/** `code` stored trimmed and upper-cased (BR-KPI-74); a missing code is left for `writableOf` to refuse. */
 function withNormalCode<T extends object>(input: T): T {
   const code = (input as { code?: unknown }).code;
   return typeof code === 'string' ? { ...input, code: normaliseCode(code) } : input;
@@ -50,7 +50,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
   return {
     listPerspectives: rt.read('library.listPerspectives', (tx) => tx.all('BscPerspective').sort((a, b) => a.sortOrder - b.sortOrder)),
     savePerspective: rt.write('library.savePerspective', { permission: 'library.manage' }, (tx, input: Parameters<LibraryGateway['savePerspective']>[2]) => {
-      // BR-KPI-71: the four BSC perspectives are fixed — rename and reorder only.
+      // BR-KPI-75: the four BSC perspectives are fixed — rename and reorder only.
       const stored = input.id === undefined ? null : tx.get('BscPerspective', input.id);
       const saved = upsert(tx, 'BscPerspective', input, { create: () => ({}) });
       throwIf(perspectiveIssues(saved, stored));
@@ -61,7 +61,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
     saveMeasureUnit: rt.write('library.saveMeasureUnit', { permission: 'library.manage' }, (tx, input: Parameters<LibraryGateway['saveMeasureUnit']>[2]) => {
       const stored = input.id === undefined ? null : tx.get('MeasureUnit', input.id);
       const saved = upsert(tx, 'MeasureUnit', withNormalCode(input), { create: () => ({}) });
-      // BR-KPI-76: a unit used anywhere (library item, goal, KGI, pending proposal) keeps its code.
+      // BR-KPI-80: a unit used anywhere (library item, goal, KGI, pending proposal) keeps its code.
       const inUse = stored !== null && referencesTo(tx, 'MeasureUnit', stored.id) > 0;
       throwIf(measureUnitIssues(saved, stored, { otherCodes: otherCodesOf(tx.all('MeasureUnit'), saved.id), inUse }));
       return saved;
@@ -77,7 +77,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
         const stored = input.id === undefined ? null : tx.get('CalcMethod', input.id);
         const storedTiers = stored === null ? [] : tx.all('CalcTier').filter((t) => t.calcMethodId === stored.id);
         // A goal reads its method LIVE (`Goal.calcMethodId`): every goal of any status or cycle, and
-        // every pending proposal, counts — the library's own rows do not (BR-KPI-76).
+        // every pending proposal, counts — the library's own rows do not (BR-KPI-80).
         const goalsUsing = stored === null ? 0 : referencesTo(tx, 'CalcMethod', stored.id, ['KpiDefinition', 'CalcTier']);
         const parent = upsert(tx, 'CalcMethod', withNormalCode(input), { create: () => ({}) });
         const children = saveChildren(tx, 'CalcTier', 'calcMethodId', parent.id, tiers);
@@ -128,7 +128,7 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
         );
         const parent = upsert(tx, 'KpiTemplate', input, { create: () => ({}) });
         const children = saveChildren(tx, 'KpiTemplateItem', 'templateId', parent.id, items);
-        // BR-KPI-73/74: only the errors refuse; weight total and item count are the screen's warnings (Q20).
+        // BR-KPI-77/74: only the errors refuse; weight total and item count are the screen's warnings (Q26).
         const definitions = new Map(tx.all('KpiDefinition').map((d) => [d.id, d]));
         throwIf(templateIssues(parent, children, definitions, storedKpiIds).errors);
         return { parent, children };

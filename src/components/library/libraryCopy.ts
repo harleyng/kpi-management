@@ -90,7 +90,7 @@ export function methodLockedMessage(goals: number | null): string {
   return `Phương pháp ${who} nên loại, trần, sàn, công thức và bậc không sửa được. Tạo phương pháp mới để thay đổi cách tính.`;
 }
 
-/** How far a template's weight total is from 100% (`ASSUMPTION Q20`): a warning, never a block. */
+/** How far a template's weight total is from 100% (`ASSUMPTION Q26`): a warning, never a block. */
 export function weightGapMessage(total: number): string {
   const diff = total - 100;
   return diff < 0 ? `Thiếu ${formatPercent(-diff)} so với 100%.` : `Vượt ${formatPercent(diff)} so với 100%.`;
