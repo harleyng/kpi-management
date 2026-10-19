@@ -11,7 +11,7 @@
 
 alert-dialog · badge (semantic tones `positive` / `warning` / `negative` / `info` / `muted`) · button ·
 card · command · dialog · dropdown-menu · input · label · popover · progress · scroll-area · select ·
-separator · skeleton · slider · sonner (top-right toaster) · switch · table (added in 1.4) · tabs · textarea · tooltip.
+separator · skeleton · slider · sonner (top-right toaster) · switch · table (added in 1.4) · tabs · textarea · tooltip · sheet (added in T2: right-hand side panel, `SheetHeader` / `SheetBody` / sticky `SheetFooter`).
 
 ## `src/components/layout/`
 
@@ -51,6 +51,19 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SearchInput` | Magnifier-in-a-field; the caller filters (with `foldDiacritics`) |
 | `SectionTitle` | A titled section inside a page body |
 | `CopyButton` | Hover-revealed copy-to-clipboard with an announced confirmation |
+| `notify.ts` | `toastError(error)` (catalogue copy) and `toastSuccess(title)` — write feedback for every screen (T2) |
+
+## `src/components/library/` (track T2)
+
+| Component | Purpose |
+|---|---|
+| `KpiDefinitionsPanel` / `KpiDefinitionSheet` | "Chỉ tiêu mẫu" table (filters in the URL, goal-usage count) and its side-sheet editor: live `libraryRules` reasons (blocked status, missing source), server issues mapped to fields, closes only on success, discard guard, focus back to the row |
+| `CataloguesPanel` | Perspectives (rename / reorder) and measure units (inline edit, code locked while in use) |
+| `CalcMethodsPanel` / `CalcMethodSheet` | Methods with "Đang dùng" counts; editor with the tier editor and the in-use lock (BR-KPI-76), live `validateCalcMethod` per tier |
+| `TemplateList` / `TemplateEditor` | `/admin/templates` master list ("Cần xem lại" in words) and editor with the sticky weight-total / item-count footer (warnings, Q20) and `KpiPicker` to add items |
+| `LibraryExportButton` / `LibraryActions` / `exportLibrary.ts` | "Xuất Excel" (exceljs loaded on click) + the disabled "Nhập từ Excel — sắp có" |
+| `DiscardChangesDialog` | "Bỏ thay đổi chưa lưu?" on top of `ConfirmDialog` |
+| `libraryCopy.ts` | `issueMessage(issue)` (inline copy per rule `detail`), `fieldErrors`, `methodLockedMessage`, `weightGapMessage`, `parseNumberInput` ("12,5" → 12.5; garbage → NaN, never 0), `numberText` |
 
 ## `src/contexts/`
 
@@ -92,6 +105,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `ratingRules.ts` | `ratingFor`, `validateRatingScale`, `payoutPctFor`, `validatePayoutRule` |
 | `formRules.ts` | `canSubmit` (KPI_EVAL / GOAL_SETTING / GOAL_CHANGE), `validateScoreInput`, `evaluationTotal`, `columnPct` |
 | `workflowRules.ts` | `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
+| `libraryRules.ts` (T2) | BR-KPI-70…76: `normaliseCode`, `codeIssues`, `otherCodesOf`, `perspectiveIssues`, `measureUnitIssues`, `calcMethodIssues` (+ separate `lock`), `methodScoringChanged`, `kpiDefinitionIssues`, `activeTemplatesContaining`, `templateIssues` → `{ errors, warnings }`, `templateWeightTotal`, `libraryUsage`, `templateAudience`; export rows `libraryExportRows`, `templateExportRows` |
 | `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25) |
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
 | `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
@@ -115,8 +129,8 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 
 | File | Hooks |
 |---|---|
-| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`) |
-| `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
+| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`), `usePositions` (`positionsKey`, T2) |
+| `library.ts` | Reads `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits`, `useCalcMethods`, `useCalcTiers`, `useKpiTemplates`, `useKpiTemplateItems`, `useDataSources` (G4 read kept here until T4), `useLibraryGoalUsage` (root `goals`); writes `useSavePerspective`, `useSaveMeasureUnit`, `useSaveCalcMethod`, `useSaveKpiDefinition`, `useSaveKpiTemplate` — reject to the caller (`mutateAsync`), invalidate their root (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |

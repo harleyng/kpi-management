@@ -5,6 +5,7 @@
  */
 
 import type {
+  BscPerspective,
   CalcMethod,
   CalcTier,
   CyclePeriod,
@@ -23,6 +24,10 @@ import type {
   GoalTargetLevel,
   JobPosition,
   Kgi,
+  KpiDefinition,
+  KpiTemplate,
+  KpiTemplateItem,
+  MeasureUnit,
   OrgUnit,
   PayoutRule,
   RatingLevel,
@@ -214,4 +219,28 @@ export function sampleScale(): RatingLevel[] {
 export const payoutRule = (o: Partial<PayoutRule> = {}): PayoutRule => ({
   id: 'pr1', tenantId: TENANT, ratingScaleId: 'rs1', ratingLevelId: 'rl-B', appliesTo: 'All',
   orgUnitId: null, positionId: null, payoutPct: 80, effectiveFrom: '2027-01-01', ...o,
+});
+
+// ─── Library (track T2) ────────────────────────────────────────────────────────────────────────
+
+export const perspective = (o: Partial<BscPerspective> = {}): BscPerspective => ({
+  id: 'p-fin', tenantId: TENANT, code: 'FIN', name: 'Tài chính', sortOrder: 1, ...o,
+});
+
+export const measureUnit = (o: Partial<MeasureUnit> = {}): MeasureUnit => ({
+  id: 'u-pct', tenantId: TENANT, code: 'PCT', name: '%', decimals: 1, ...o,
+});
+
+export const kpiDefinition = (o: Partial<KpiDefinition> = {}): KpiDefinition => ({
+  id: 'kd1', tenantId: TENANT, code: 'KPI-1', name: 'Doanh thu', perspectiveId: 'p-fin', unitId: 'u-pct',
+  calcMethodId: 'cm1', defaultDataSourceId: 'ds1', definition: null, formulaText: null, frequency: 'Month',
+  aggregation: 'SUM', isSystem: false, categoryTag: null, status: 'Active', ...o,
+});
+
+export const kpiTemplate = (o: Partial<KpiTemplate> = {}): KpiTemplate => ({
+  id: 'tpl1', tenantId: TENANT, name: 'Bộ mẫu', orgUnitId: null, positionId: null, status: 'Active', ...o,
+});
+
+export const templateItem = (o: Partial<KpiTemplateItem> = {}): KpiTemplateItem => ({
+  id: `ti-${o.kpiDefId ?? 'kd1'}`, tenantId: TENANT, templateId: 'tpl1', kpiDefId: 'kd1', defaultWeight: 20, defaultTarget: null, ...o,
 });

@@ -16,6 +16,8 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
+> **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-70…76), enforced by
+> `src/lib/libraryRules.ts` in every `library.save*` of the mock.
 
 ---
 
@@ -31,7 +33,9 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 | **KGI** | Key Goal Indicator — one of the 3–5 key goals of a Goal Plan (DATX: "Mục tiêu chung (3-5) - KGI") |
 | **CSF** | Critical success factor — the bridge KGI → CSF → KPI (DATX slides) |
 | **KPI / chỉ tiêu** | One measurable goal in a Goal Plan, with weight, target, calculation method and data source |
-| **KPI definition** | A reusable item in the KPI library, which a goal may be created from |
+| **Chỉ tiêu mẫu (KPI definition)** | A reusable item in the KPI library, which a goal may be created from. "Chuẩn" = a standard item from the seed (`isSystem`) |
+| **Bộ mẫu (KPI template)** | A set of library items with default weights, for one org unit, one position, or everyone (Chung) |
+| **Danh mục (catalogues)** | The library's reference lists: the four BSC perspectives (Viễn cảnh) and the measure units (Đơn vị đo) |
 | **Goal Plan** | One owner's set of goals for one cycle; owner = company, org unit or employee |
 | **Cascade** | A manager hands part of their own goal down to a report (parent → child, with an allocated value) |
 | **Link** | An employee ties a goal they added to a manager's goal (contribution) |
@@ -52,7 +56,7 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   Goal Plan has exactly one owner of one tier. *Source: NoteX minutes; ERD `GOAL_PLAN.owner_type`.*
 - **BR-KPI-02** — A Goal Plan holds **3–5 KGI**. A KGI may carry a numeric target but is **not scored**
   (`ASSUMPTION Q9`). *Source: DATX department sheets; DATX slides pp. 21–22.*
-- **BR-KPI-03** — A Goal Plan holds **5–8 KPIs**. *Source: plan §6.2 (1.5 `goalPlanRules`), NoteX minutes.*
+- **BR-KPI-03** — A Goal Plan holds **5–8 KPIs**. It applies to PLANS, not to library templates (BR-KPI-73). *Source: plan §6.2 (1.5 `goalPlanRules`), NoteX minutes.*
 - **BR-KPI-04** — A Goal Plan can be submitted only when its goals' weights sum to **100%**, compared with
   a tolerance of ±0.01 (a sum of 99.99% or 100.01% from rounding counts as 100%). *Source: HR guide
   p. 22; Manager guide p. 26; email template ("if the total weight is less than 100%").*
@@ -259,6 +263,56 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
 - **BR-KPI-36** — A parent KPI's actual is **measured independently**; it is summed from its children
   only when that KPI is explicitly flagged to roll up (`ASSUMPTION Q8`).
 
+## 3b. KPI library (track T2, WBS 4.2.1–4.2.4)
+
+Every rule below is a pure function in `src/lib/libraryRules.ts` that the mock's `library.save*` calls
+inside the write's transaction (a refusal rolls the whole save back) and the screens call to explain a
+refusal before it happens. The checks that read OTHER tables — codes of the catalogue, rows using a unit
+or method, Active templates holding a KPI — become an RPC or a trigger in Phase 5. Updates re-check only
+what they change: the seed predates these rules, and saving a seed row unchanged always succeeds.
+
+- **BR-KPI-70** — **Codes** of KPI definitions, measure units and calculation methods are stored trimmed
+  and upper-cased, are required, and are **unique per tenant ignoring case** (ERR-KPI-06 `CODE_TAKEN`).
+  A name is required. A definition needs a perspective, unit, method, frequency and aggregation from the
+  fixed sets. *Source: Syntra decision (T2); ERD unique codes.* `codeIssues`, `kpiDefinitionIssues`.
+- **BR-KPI-71** — The **four BSC perspectives are fixed**: they can be renamed and reordered, never
+  created and never re-coded (ERR-KPI-06 `PERSPECTIVE_FIXED` / `CODE_LOCKED`). Every definition has one
+  (BR-KPI-06). *Source: HR guide p. 22; plan Q5.* `perspectiveIssues`.
+- **BR-KPI-72** — A definition may lack a **default data source** while Draft, but needs one to be
+  **Active** (ERR-KPI-06 `DATA_SOURCE_REQUIRED`) — "KPI phải đo được" applied to the library
+  (`ASSUMPTION Q19`). A goal still needs its own source (BR-KPI-05). *Source: NoteX §2.3; ERD (nullable).*
+- **BR-KPI-73** — A **template** is for one org unit, one position, or everyone (both set → ERR-KPI-06).
+  Items: no duplicate KPI, weight ≥ 0, a default target that is a number or blank (ERR-KPI-06). The
+  **weight total of 100% (±0.01) and the 5–8 item count are WARNINGS, never refusals** (`ASSUMPTION
+  Q20`): the template saves, and the Goal Plan made from it is what BR-KPI-03/04 gate. *Source: ERD
+  `KPI_TEMPLATE`; DATX's 4-item sets (fixtures README, Q14).* `templateIssues` → `{ errors, warnings }`.
+- **BR-KPI-74** — **Library status** Draft ⇄ Active ⇄ Archived; any move is allowed and "Lưu trữ" never
+  deletes. Only Active items can be newly picked (KpiPicker). A KPI cannot **leave Active** while an
+  **Active template** holds it (ERR-KPI-04 `IN_ACTIVE_TEMPLATE`, listing the templates). Archiving a KPI
+  that goals or API mappings use is allowed — a goal holds its own perspective, unit, method and
+  formula ids and never reads the definition when it scores. A Draft or Archived KPI cannot be **added**
+  to a template (ERR-KPI-06 `KPI_NOT_ACTIVE`); one already there stays, with a warning (`ASSUMPTION
+  Q21`). *Source: Syntra decision (T2).* `kpiDefinitionIssues`, `activeTemplatesContaining`.
+- **BR-KPI-75** — A **standard item** ("Chuẩn", `isSystem`, seed only) can be edited like any item
+  except its **code** (ERR-KPI-06 `SYSTEM_CODE_LOCKED`). Every seeded KPI is standard, so a stricter rule
+  would freeze the whole library (`ASSUMPTION Q22`). A tenant-created item is never standard.
+- **BR-KPI-76** — **Catalogue rows in use.** A measure unit referenced anywhere (a definition, goal, KGI
+  or pending change proposal) keeps its **code** (ERR-KPI-04 `UNIT_CODE_IN_USE`); its name and decimals
+  (display only, 0–6) can change. A **calculation method used by any goal** — any status, any cycle,
+  closed ones included — or a pending proposal keeps its **scoring fields**: type, cap, floor, formula
+  and tiers (compared order-insensitively) are locked (ERR-KPI-04 `METHOD_IN_USE`, with the goal count);
+  name, description and code stay editable. A goal reads its method live (`Goal.calcMethodId`), so an
+  edit would silently re-score every open period. To change how goals score, create a new method.
+  Shape rules on any method (ERR-KPI-13): tiers only on TIERED, a formula only on FORMULA, no cap or
+  floor on LEVELS (its ceiling is the top level, BR-KPI-33); BR-KPI-31 (`validateCalcMethod`) still
+  applies, and is reported before the lock. *Source: product owner decision 2026-10-19;
+  hr-performance-expert review.* `calcMethodIssues`, `methodScoringChanged`, `measureUnitIssues`.
+- **Export (WBS 4.2.5)** — "Xuất Excel" writes the library (items by code; references as codes; sets as
+  their Vietnamese labels), the templates (one row per item) and the code lists, in the column order the
+  Library import will read. **Library import is deferred** to T4's shared import framework (WBS 4.4.3);
+  it needs `LibraryImportRow` to gain the tag, data-source and status columns — a contract change.
+  `libraryExportRows`, `templateExportRows`.
+
 ## 4. Results and pay
 
 - **BR-KPI-40** — A period result per Goal Plan holds the total score, the rating level, the payout %
@@ -336,7 +390,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Calc method | RATIO_UP · RATIO_DOWN · TIERED · BINARY · FORMULA · LEVELS | ERD + D1 |
 | KPI frequency | Week · Month · Quarter · Year | ERD "Tuần/Tháng/Quý/Năm" |
 | Aggregation | SUM · AVG · LAST | ERD |
-| Library (KPI, template) | Draft · Active · Archived | ERD |
+| Library (KPI, template) | Draft · Active · Archived — any move allowed; leaving Active is refused while an Active template holds the KPI (BR-KPI-74) | ERD |
 | KPI category tag | EFFICIENCY · VOLUME · COST — secondary tag only | DATX, `ASSUMPTION Q5` |
 | Cycle | Planning · Active · Evaluating · Closed | ERD |
 | Period type | Month · Quarter · Half · Year | ERD |
@@ -438,6 +492,10 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
+| Q19 | Must a library item name its data source? | Only to be Active; a Draft may leave it blank | BR-KPI-72 |
+| Q20 | Must a template's weights total 100% and hold 5–8 items? | No — both are warnings; the plan made from it is gated | BR-KPI-73 |
+| Q21 | What does archiving a library item do? | Hides it from new picks only; refused while an Active template holds it; goals keep working | BR-KPI-74 |
+| Q22 | May a tenant edit a standard (seeded) library item? | Yes, except its code | BR-KPI-75 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

@@ -40,3 +40,15 @@ export function useEmployees(filter: EmployeeFilter = {}) {
     staleTime: ORG_STALE_MS,
   });
 }
+
+export const positionsKey = (tenantId: string) => queryKey(tenantId, 'positions');
+
+/** Job positions — e.g. who a KPI template is for (T2). */
+export function usePositions() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: positionsKey(tenantId),
+    queryFn: () => getDataGateway().org.listPositions(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}

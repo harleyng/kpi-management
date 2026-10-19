@@ -11,7 +11,12 @@ import { expect, test, type Page } from '@playwright/test';
  * tests that need a session skip themselves; once `src/data/fixtures/index.ts` exists they run, and a
  * session that fails to load FAILS them. The banner test runs either way — no state may hide it.
  */
-const ROUTES: [path: string, title: string][] = [
+/**
+ * A route a track has BUILT names the landmark its page must show instead of the placeholder:
+ * `[role, accessible name]`.
+ */
+type Landmark = [role: 'table' | 'list', name: string];
+const ROUTES: [path: string, title: string, built?: Landmark][] = [
   ['/my/kpi', 'KPI của tôi'],
   ['/my/tasks', 'Việc cần xử lý'],
   ['/my/results', 'Kết quả của tôi'],
@@ -19,8 +24,8 @@ const ROUTES: [path: string, title: string][] = [
   ['/team/reviews', 'Duyệt & đánh giá'],
   ['/dashboard', 'Dashboard'],
   ['/admin/cycles', 'Chu kỳ'],
-  ['/admin/library', 'Thư viện KPI'],
-  ['/admin/templates', 'Bộ mẫu'],
+  ['/admin/library', 'Thư viện KPI', ['table', 'Danh sách chỉ tiêu mẫu']],
+  ['/admin/templates', 'Bộ mẫu', ['list', 'Danh sách bộ mẫu']],
   ['/admin/launches', 'Khởi chạy phiếu'],
   ['/admin/actuals', 'Số liệu & import'],
   ['/admin/results', 'Kết quả & lương'],
@@ -72,7 +77,7 @@ test.describe('@smoke app shell', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Dữ liệu giả lập' })).toBeVisible();
   });
 
-  for (const [path, title] of ROUTES) {
+  for (const [path, title, built] of ROUTES) {
     test(`${path} opens "${title}" from the menu without console errors`, async ({ page }) => {
       const errors: string[] = [];
       page.on('console', (msg) => {
@@ -89,7 +94,8 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (built) await expect(page.getByRole(built[0], { name: built[1] })).toBeVisible();
+      else await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
