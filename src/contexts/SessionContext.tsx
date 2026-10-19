@@ -5,7 +5,7 @@ import { HOME_URL, NAV_GROUPS } from '@/components/layout/navConfig';
 import { SessionEmpty, SessionError, SessionLoading } from '@/components/layout/SessionScreens';
 import type { Id, IsoDate, RoleCode } from '@/data/types';
 import {
-  canResetSeed,
+  hasDevControls,
   readGatewayNow,
   useResetSeed,
   useSessionDirectory,
@@ -154,9 +154,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [tenant, account, profile, today, people, activeTenants, switchTenant, switchUser]);
 
   const resetSeed = useResetSeed();
-  const onResetSeed = canResetSeed() ? () => resetSeed.mutate() : undefined;
+  const onResetSeed = hasDevControls() ? () => resetSeed.mutate() : undefined;
 
-  if (tenantsQuery.error) return <SessionError error={tenantsQuery.error} onRetry={() => void tenantsQuery.refetch()} />;
+  // Only a FIRST load that failed replaces the app: a failed background refetch (the demo toolbar's
+  // simulated failure) keeps the tenants already loaded — otherwise the toolbar that switched the
+  // failure on would unmount with the app and could not switch it off.
+  if (tenantsQuery.error && !tenantsQuery.data) {
+    return <SessionError error={tenantsQuery.error} onRetry={() => void tenantsQuery.refetch()} />;
+  }
   if (!tenantsQuery.data) return <SessionLoading />;
   if (!tenant) {
     return (

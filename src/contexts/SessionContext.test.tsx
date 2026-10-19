@@ -92,7 +92,7 @@ function renderApp(path = '/my/kpi', withShell = false) {
   ) : (
     <Route path="*" element={<Probe />} />
   );
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
@@ -103,6 +103,7 @@ function renderApp(path = '/my/kpi', withShell = false) {
       </TooltipProvider>
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 
 const who = () => screen.findByTestId('who').then((el) => el.textContent);
@@ -153,6 +154,17 @@ describe('SessionProvider — loading, failure, empty', () => {
     renderApp();
     expect(await screen.findByText(ERROR_CATALOG['ERR-KPI-01'].title)).toBeInTheDocument();
     expect(screen.queryByTestId('who')).toBeNull();
+  });
+
+  it('keeps the session when a BACKGROUND refetch fails (the demo toolbar failing every call)', async () => {
+    const { client } = renderApp();
+    expect(await who()).toBe('t1|t1-user-ceo');
+    state.failTenants = true;
+    state.failDirectory = true;
+    await act(() => client.invalidateQueries());
+    await waitFor(() => expect(state.calls.length).toBeGreaterThan(8));
+    expect(screen.getByTestId('who')).toHaveTextContent('t1|t1-user-ceo');
+    expect(screen.queryByText(ERROR_CATALOG['ERR-KPI-01'].title)).toBeNull();
   });
 
   it('treats a failing clock as the error state, not a crash', async () => {

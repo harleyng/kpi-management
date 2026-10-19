@@ -81,3 +81,92 @@ export interface Clock {
 export function todayOf(clock: Clock): IsoDate {
   return toZonedDate(clock.now, clock.tz);
 }
+
+// ─── Wall-clock time in a zone (the dev toolbar's simulated clock) ───────────────────────────────
+
+/** No formatter cache: a rule module holds no state (`rulesPurity.test.ts`). */
+function wallFormat(timeZone: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function parseInstant(instant: IsoDateTime): number {
+  const ms = Date.parse(instant);
+  if (Number.isNaN(ms)) throw new RangeError(`Not an ISO instant: ${instant}`);
+  return ms;
+}
+
+/**
+ * The wall clock `ms` shows in `timeZone`, as if it were UTC — so calendar arithmetic on it (add a
+ * day, read the parts) is plain UTC arithmetic. Read through `formatToParts`, never by slicing.
+ */
+function wallMsOf(ms: number, timeZone: string): number {
+  const parts = wallFormat(timeZone).formatToParts(new Date(ms));
+  const n = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? NaN);
+  return Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'), n('second'), ((ms % 1000) + 1000) % 1000);
+}
+
+/** The zone's offset from UTC at instant `ms`, in milliseconds (UTC+7 → +25 200 000). */
+function offsetMsAt(ms: number, timeZone: string): number {
+  return wallMsOf(ms, timeZone) - ms;
+}
+
+/**
+ * The instant a wall-clock reading in `timeZone` names. Two passes, so a reading near a DST change
+ * resolves to the offset in force at the result; a reading skipped by a spring-forward resolves to
+ * the instant just after the gap.
+ */
+function wallToInstantMs(wallMs: number, timeZone: string): number {
+  const guess = wallMs - offsetMsAt(wallMs, timeZone);
+  return wallMs - offsetMsAt(guess, timeZone);
+}
+
+/**
+ * `instant` moved by `days` calendar days in `timeZone`, keeping its wall-clock time — `+1` from
+ * 31/01 10:00 is 01/02 10:00 in the zone, across month and year ends and DST changes alike.
+ */
+export function addDaysToInstant(instant: IsoDateTime, days: number, timeZone: string): IsoDateTime {
+  if (!Number.isInteger(days)) throw new RangeError(`Not a whole number of days: ${days}`);
+  const wall = wallMsOf(parseInstant(instant), timeZone);
+  return new Date(wallToInstantMs(wall + days * 86_400_000, timeZone)).toISOString();
+}
+
+/** `instant` as a `datetime-local` value (`YYYY-MM-DDTHH:mm`) in `timeZone`. */
+export function toZonedLocalInput(instant: IsoDateTime, timeZone: string): string {
+  return new Date(wallMsOf(parseInstant(instant), timeZone)).toISOString().slice(0, 16);
+}
+
+const LOCAL_INPUT = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+/**
+ * The instant a `datetime-local` value (`YYYY-MM-DDTHH:mm`, optional `:ss`) names in `timeZone`, or
+ * `null` when it is not a real date and time (`2027-02-30T10:00`, `24:00`, an empty string).
+ */
+export function fromZonedLocalInput(value: string, timeZone: string): IsoDateTime | null {
+  const match = LOCAL_INPUT.exec(value);
+  if (!match) return null;
+  const [, date, hh, mm, ss = '00'] = match;
+  const [hour, minute, second] = [hh, mm, ss].map(Number);
+  if (!isIsoDate(date) || hour > 23 || minute > 59 || second > 59) return null;
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(wallToInstantMs(Date.UTC(y, m - 1, d, hour, minute, second), timeZone)).toISOString();
+}
+
+/** The zone's offset at `instant` as a label — `GMT+7`, `GMT-4`, `GMT+5:30`, `GMT`. */
+export function zoneOffsetLabel(instant: IsoDateTime, timeZone: string): string {
+  const minutes = Math.round(offsetMsAt(parseInstant(instant), timeZone) / 60_000);
+  if (minutes === 0) return 'GMT';
+  const sign = minutes > 0 ? '+' : '-';
+  const abs = Math.abs(minutes);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `GMT${sign}${h}${m ? `:${String(m).padStart(2, '0')}` : ''}`;
+}

@@ -9,6 +9,16 @@
 
 ---
 
+## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
+
+`clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not
+refetch until something re-renders it — after a reseed the screen kept showing rows that no longer
+existed. **Rule.** To drop everything AND reload what is mounted, use `queryClient.resetQueries()`
+(`useResetSeed`). Likewise, an app-level error screen must check `error && !data`: a failed BACKGROUND
+refetch keeps its data, and replacing the app over it unmounts the controls (the dev toolbar) that caused it.
+
+---
+
 ## 2026-10-19 — Seed rows never pass through the gateway, so nothing validates them unless a test does
 
 The mock loads the seed straight into its tables — no transaction, no integrity check. A fixture that

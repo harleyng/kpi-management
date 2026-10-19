@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getDataGateway } from '@/integrations/data';
 import type { Id, IsoDateTime } from '@/data/types';
+import { DEFAULT_LATENCY_MS, devActions } from '@/lib/devStore';
 import type { SessionDirectory } from '@/lib/sessionRules';
 import { queryKey, TENANTS_KEY } from './keys';
 
@@ -69,12 +70,24 @@ export function readGatewayNow(): IsoDateTime {
   return getDataGateway().clock.now();
 }
 
-/** Whether the adapter offers mock-only controls (`dev`) — the empty session state's reseed button. */
-export function canResetSeed(): boolean {
+/**
+ * Whether the adapter offers mock-only controls (`dev`) — the demo toolbar and the empty session
+ * state's reseed button. Shown whenever they exist, not gated on the build mode: the Vercel
+ * prototype is itself a demo.
+ */
+export function hasDevControls(): boolean {
   return getDataGateway().dev !== undefined;
 }
 
-/** Reloads the seed (mock only) and refetches everything. */
+/**
+ * Reloads the seed for every tenant (mock only), puts latency and failure mode back to their
+ * defaults, and clears the whole cache — `resetSeed` emits no events, and every cached row may be
+ * one that no longer exists.
+ *
+ * The cache is cleared with `resetQueries()`: it drops every query's data like `clear()`, but also
+ * refetches the queries on screen — after `clear()` a mounted `useQuery` keeps showing its old
+ * result and never refetches.
+ */
 export function useResetSeed() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -82,7 +95,13 @@ export function useResetSeed() {
       const dev = getDataGateway().dev;
       if (!dev) throw new Error('resetSeed is only available on the mock adapter');
       await dev.resetSeed();
+      // Before the refetch below: a refetch under an injected failure would fail the fresh seed.
+      dev.setFailureMode({ enabled: false });
+      dev.setLatency(DEFAULT_LATENCY_MS);
     },
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      devActions.reset();
+      return queryClient.resetQueries();
+    },
   });
 }

@@ -72,3 +72,9 @@ export function rootsAffectedBy(entity: EntityName): KeyRoot[] {
 
 /** The tenant list has no tenant to key by (the platform exception, `session.ts`). */
 export const TENANTS_KEY = ['platform', 'tenants'] as const;
+
+/**
+ * The simulated clock's reading (dev toolbar) — not tenant data: one clock serves every tenant
+ * (`DataGateway.clock`), so like the tenant list it is keyed apart.
+ */
+export const DEV_NOW_KEY = ['dev', 'now'] as const;

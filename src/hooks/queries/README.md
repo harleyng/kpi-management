@@ -39,8 +39,9 @@ components/pages → src/hooks/queries/<domain>.ts → getDataGateway() → mock
   they touch, so nobody does: `useGatewayEventInvalidation` (mounted once by `GatewayEventBridge` in
   `main.tsx`) turns every `entity.changed` of the session's tenant into "invalidate every root of
   `KEY_ROOTS` that reads this entity", once per microtask. No track maintains another track's keys.
-- **`dev.resetSeed()` emits no events** — whoever calls it (the 1.4 dev toolbar, `useResetSeed`)
-  invalidates or clears the whole cache.
+- **`dev.resetSeed()` emits no events** — `useResetSeed` drops the whole cache with
+  `resetQueries()` (never a bare `clear()`: mounted queries would keep their old rows). The dev
+  toolbar's other controls live in `dev.ts`, the only hooks that touch `gateway.dev`.
 - **Time** comes from `getDataGateway().clock.now()`, never `new Date()` — the dev toolbar moves it.
 - **No arithmetic here.** A hook that needs a score, a roll-up or a "can submit" answer calls a pure
   function in `src/lib/*Rules.ts`.
