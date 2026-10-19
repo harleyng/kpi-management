@@ -5,7 +5,13 @@ description: Pre-push checklist for changes going to main — Syntra KPI.
 # Before pushing to main
 
 Work is committed and pushed to `main` — no pull request. The repository owner is **@harleyng**.
-**A push to `main` is a production deploy** (Vercel is connected to the repository; see `README.md`).
+
+- Repository: https://github.com/harleyng/kpi-management (private)
+- Production: https://kpi-management-theta.vercel.app (Deployment Protection on — team members only)
+
+**A push to `main` is a production deploy** — Vercel is connected to the repository, so the gate below
+is the last thing standing between a commit and the production URL. Other branches get preview
+deployments.
 
 ## 1. Technical gates (required)
 

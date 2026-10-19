@@ -53,8 +53,12 @@ npm run typecheck && npm run test && npm run build && npm run lint
 
 ## Deployment
 
-- **Repository:** _set in Phase 0 step 10_
-- **Production:** _set in Phase 0 step 10_
-- **A push to `main` is a production deploy.** Every other branch gets a preview deployment.
+- **Repository:** https://github.com/harleyng/kpi-management (private)
+- **Production:** https://kpi-management-theta.vercel.app (Vercel project `kpi-management`, team
+  *harleyng's projects*)
+- **A push to `main` is a production deploy** — Vercel is connected to the GitHub repository. Every
+  other branch gets its own preview deployment.
 - Vercel environment (Production and Preview): `VITE_DATA_ADAPTER=mock`.
-- Deployment Protection is on: only team members can open the deployments.
+- **Deployment Protection is on** (Vercel Authentication, all deployments except custom domains): only
+  members of the Vercel team can open the URLs. Ask before making a link public.
+- CI (GitHub Actions, `.github/workflows/ci.yml`) runs the Phase 4 gate on every push to `main`.
