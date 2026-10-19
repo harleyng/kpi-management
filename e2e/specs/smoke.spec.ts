@@ -37,7 +37,7 @@ const ROUTES: [path: string, title: string, built?: Landmark][] = [
 ];
 
 /** Routes whose page is built (no "Chưa xây dựng" placeholder any more) — add a track's routes as it lands. */
-const BUILT = new Set(['/system/org', '/system/users']);
+const BUILT = new Set(['/system/org', '/system/users', '/my/kpi', '/team/kpi', '/admin/cycles']);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -96,8 +96,15 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      if (built) await expect(page.getByRole(built[0], { name: built[1] })).toBeVisible();
-      else if (!BUILT.has(path)) await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (built) {
+        await expect(page.getByRole(built[0], { name: built[1] })).toBeVisible();
+      } else if (BUILT.has(path)) {
+        // A built page settles into content or its own empty state — never the placeholder.
+        await expect(page.getByText('Chưa xây dựng', { exact: true })).toHaveCount(0);
+        await page.waitForLoadState('networkidle');
+      } else {
+        await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      }
       expect(errors).toEqual([]);
     });
   }

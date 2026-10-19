@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { useSession } from '@/contexts/useSession';
-import type { Id, NotificationTemplate } from '@/data/types';
+import type { AuditLog, Id, NotificationTemplate } from '@/data/types';
 import { getDataGateway } from '@/integrations/data';
 import type { AuditLogFilter, Upsert, UploadFileInput } from '@/integrations/data/types';
 import { isInAppNotification } from '@/lib/notificationRules';
@@ -189,4 +189,32 @@ export function useOpenFile() {
     },
     [tenantId],
   );
+}
+
+// ─── One record's history (T3, WBS 4.3.6) ─────────────────────────────────────────────────────
+
+/**
+ * Every entry matching `filter`, all pages read at once — meant for one record's history (a plan's
+ * lock / unlock trail), not the whole log. Its own key segment (`'all'`): `useAuditLog` caches PAGES
+ * under `auditLogKey`, and the two shapes must never share a cache entry. The `auditLog` root refreshes
+ * on every change, so mount it only while it is on screen (`enabled`).
+ */
+export const auditEntriesKey = (tenantId: string, filter: AuditLogFilter) => queryKey(tenantId, 'auditLog', 'all', filter);
+
+export function useAuditEntries(filter: AuditLogFilter, options: { enabled?: boolean } = {}) {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: auditEntriesKey(tenantId, filter),
+    queryFn: async () => {
+      const items: AuditLog[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await getDataGateway().system.listAuditLog(tenantId, filter, { limit: 500, cursor });
+        items.push(...page.items);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      return items;
+    },
+    enabled: options.enabled ?? true,
+  });
 }

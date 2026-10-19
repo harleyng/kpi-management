@@ -92,13 +92,13 @@ who holds every permission and sees all five groups.
 | Route | Page | Menu group · permission (default holders; ADMIN holds all) | WBS / phase |
 |---|---|---|---|
 | `/` | → redirects to `/my/kpi` | — | — |
-| `/my/kpi` | KPI của tôi | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
+| `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/tasks` | Việc cần xử lý | Của tôi · — (all) | 4.5.5 (T5) |
 | `/my/results` | Kết quả của tôi | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
-| `/team/kpi` | KPI đội nhóm | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
+| `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
 | `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
-| `/admin/cycles` | Chu kỳ | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
+| `/admin/cycles` | Chu kỳ — **built (T3)**: cycles, periods, the cycle's plans with lock / unlock / history, `?cycle=&plan=` | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
 | `/admin/library` | Thư viện KPI — tabs `?tab=` chi-tieu · danh-muc · phuong-phap; filters `q`, `vc`, `tt` in the URL | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 export (T2, built) |
 | `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
 | `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
@@ -112,9 +112,14 @@ who holds every permission and sees all five groups.
 | `*` | Không tìm thấy trang | — | — |
 
 The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step. A route still on its
-placeholder must show "Chưa xây dựng"; a track that builds its screen gives the route a third field —
-the accessible name of a table the page shows once loaded (T7: "Mẫu thông báo theo sự kiện", "Nhật ký
-thay đổi").
+placeholder must show "Chưa xây dựng". A built route either names a landmark (third field: a table
+or list the page shows once loaded — T2, T7) or sits in the `BUILT` set (it must no longer show the
+placeholder — T1, T3).
+
+**Detail views are search params, not routes** (T3): a plan opens on its list's page with `?plan=<id>`, a
+goal panel with `?goal=<id|new>&mode=view|edit|split|link` — no route-guard or menu change, and a reload or a
+shared link reopens the same view. A detail view still checks its own record (the workspace's rules) and
+answers ERR-KPI-02 for an unknown id.
 
 ---
 
@@ -246,6 +251,12 @@ permission check of every write (above).
   No method, signature or fixture changed: the frozen surface and seed hash are untouched, and
   `fixtures/orgGuards.test.ts` pins that every seeded row stays editable. `integrity.assertReferencesResolve`
   is the commit check's reference half, exported.
+- **T3 (after Gate 1)** — `assertPlanEditable` now calls `planAccessRules.planEditability` and
+  `entitlementCtx` calls `workflowRules.entitlementContextOf`: the screens build the same decision from what
+  they read (`planEditabilityFrom`), pinned by a parity test over every seeded plan
+  (`mock/goals.test.ts`). `saveGoal` gained the allocation guard (`goalAllocationIssues`, ERR-KPI-11 / 06)
+  — behaviour only, contract and seed unchanged. The cascade is two writes (child goal + alignment) with a
+  compensating delete in `useCascadeGoal`; Phase 5 should make it one `cascadeGoal` transaction.
 - **Naming** — gateway methods use the short domain noun (`listPositions` for `JobPosition`,
   `listWorkflows` for `WorkflowTemplate`); the types keep the ERD names.
 

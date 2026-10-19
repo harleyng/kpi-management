@@ -377,3 +377,13 @@ describe('validateTargetLevels (ERR-KPI-13)', () => {
     expect(details('TEXT', levels)).toContain('LEVEL_TEXT_DUPLICATE');
   });
 });
+
+describe('levelsMissingIssue — LEVELS needs at least two levels', () => {
+  it('only for a LEVELS method under two levels', async () => {
+    const { levelsMissingIssue } = await import('./calcRules');
+    expect(levelsMissingIssue('LEVELS', 1, 'g1')).toEqual({ code: 'ERR-KPI-13', ref: 'g1', detail: 'LEVELS_MISSING', data: null });
+    expect(levelsMissingIssue('LEVELS', 2, 'g1')).toBeNull();
+    expect(levelsMissingIssue('RATIO_UP', 0, 'g1')).toBeNull();
+    expect(levelsMissingIssue(undefined, 0, null)).toBeNull();
+  });
+});
