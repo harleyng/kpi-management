@@ -119,6 +119,37 @@ the one named). Change a fixture, run it.
 
 ---
 
+## 2026-10-19 — `getGoalPlan` checks only the tenant: a typed plan id opens anyone's plan
+
+The gateway's plan reads take no actor (until Phase 5's RLS). While a plan only opened from a list the
+list's own filter was the protection; once plans have routes (`/my/kpi/plans/:planId`,
+`/team/kpi/members/:planId`) the route guard passes any id under a permitted prefix.
+
+**Rule.** Every page that mounts a Goal Plan checks `planRouteAllows` (`planAccessRules.ts`):
+`goalplan.view` over the plan's owner AND the route's kind (mine → I own it; members → an employee's
+plan; unit → a unit / company plan; cycles → the plan is in that cycle). Refused → ERR-KPI-02.
+
+---
+
+## 2026-10-19 — `<main>` is the scroll container, not the window
+
+The shell scrolls `<main className="overflow-y-auto">`, so `window.scrollTo` and React Router's
+`<ScrollRestoration>` do nothing: a new page opened scrolled as far down as the last one. The AppShell
+resets `main.scrollTop` and focuses the page's `h1` (`data-page-title`, from `PageHeader`) on every
+pathname change. Do not add a second scroll container around a page.
+
+---
+
+## 2026-10-19 — `useBlocker` throws outside a data router
+
+The app runs on `createBrowserRouter` (`main.tsx`) so an editor page can ask before its unsaved edits
+are left. A component test under `<MemoryRouter>` is NOT a data router: `useBlocker` there throws.
+
+**Rule.** Never call `useBlocker` directly — render `<UnsavedChangesGuard when={dirty} />`, which uses it
+only inside a data router (and adds the `beforeunload` prompt either way).
+
+---
+
 ## 2026-10-19 — React Router v6 hands out a NEW `navigate` after every navigation
 
 `useNavigate()` (outside a data router) returns a function that depends on the current location, so a

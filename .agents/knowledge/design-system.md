@@ -166,8 +166,23 @@ of several statuses.
   never collapsed by a route.
 - **The sidebar is a three-part column**: product mark, scrolling nav (5 groups by role, group captions
   `text-xs font-medium text-muted-foreground` in sentence case), account block on the bottom edge.
+- **Areas with sub-pages** (sidebar): a parent is a disclosure button (icon, title, chevron that turns
+  90°) over its sub-items — indented, no icon, `h-8`. Accordion: one area unfolded by hand at a time,
+  and the area holding the current page always open (its button inert). The filled highlight is on the
+  sub-item you are on (`aria-current="page"`, also on its detail pages); the area is marked by weight
+  only. On the icon rail the area's icon opens a menu of its sub-items, headed by the area's title.
+- **No tabs for pages.** A screen that would need top-level tabs is an area with sub-pages, each its own
+  route. Tabs are only for FACETS of one record on its detail page (a cycle's periods / plans; a goal's
+  information / split / links), with the tab in the URL (`?tab=`).
 - **Page heading**: `<PageHeader title description actions>` on every route-level screen. The title is
-  the same string as the menu item.
+  the same string as the menu item; on a sub-page the area shows above it as a breadcrumb
+  (`<nav aria-label="Đường dẫn">`, plain text — not an eyebrow). It also sets the browser title.
+- **Detail pages**: a list never shows a record's detail below, beside or in place of itself — the
+  record opens on its own route. One header order everywhere: breadcrumb with explicit links back
+  (`Chu kỳ › KPI 2027`) → title = the record's name with its status badge (`status`) → description =
+  context → actions on the right (Sửa…). Not found / not allowed: `ErrorStateCard` ERR-KPI-02 under the
+  header, never a blank page. Small create/edit forms are a Sheet or Dialog; a big editor is its own
+  page with `<UnsavedChangesGuard when={dirty} />`.
 - **Unbuilt blocks**: `<PlaceholderPanel spec items>` naming the WBS work package and track.
 - **Tables** (most screens): use `<DataTable>` — it already wraps in `<Card><CardContent className="p-0">`, takes
   the `useQuery` result, and settles error → first load → empty (first-use vs "Không có dòng nào khớp bộ lọc.")
@@ -175,6 +190,11 @@ of several statuses.
   text-muted-foreground` in sentence case; rows `hover:bg-surface-alt`. **Numeric columns right-aligned,
   `tabular`, unit in the header.** Editable cells look editable; values computed by the rules (score,
   "chưa giao", weight total) look computed (muted background, no input border).
+- **List toolbar**: search and filters (`toolbar`) on the left and the list's primary action (`actions`)
+  on the right, in one row ABOVE the table's card, on the page canvas — never inside the card. Both stay
+  in every state (loading, empty, error). With `actions`, the empty state shows only its sentence, not a
+  second copy of the button. Page-level actions (export, a cycle / period picker) stay in the
+  `PageHeader`.
 - **Totals and blockers** sit where the decision is made: the weight total and the computed score at the
   bottom of a Goal Plan or form, with the reason a Submit is disabled spelled out next to it.
 - **Empty states**: `<EmptyStateCard>` with a sentence naming the next step — never just "Không có dữ liệu".

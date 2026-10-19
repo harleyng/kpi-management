@@ -47,7 +47,7 @@ src/
 ├── components/
 │   ├── ui/                 # shadcn primitives — NEVER edited directly; wrap or compose instead
 │   ├── layout/             # AppShell, AppSidebar, TopBar (+ "Dữ liệu giả lập" banner), SidebarAccount,
-│   │                       #   RouteErrorBoundary, navConfig (5 groups by role)
+│   │                       #   RouteErrorBoundary, navConfig (5 groups by role, parents with sub-pages)
 │   ├── org/                # T1 "Tổ chức": OrgStructureTab, EmployeesTab (+ EmployeeSheet, AssignmentDialog,
 │   │                       #   ResignDialog, ImportActions), PositionsTab, TenantTab, UnitSheet
 │   ├── access/             # T1 "Người dùng & quyền": AccountsTab, AccountSheet, RoleAssignments,
@@ -80,47 +80,64 @@ in `components/shared/`.
 
 ## Route table
 
-Every route lives in `src/App.tsx` under a single `<AppShell>`, each page its own `React.lazy` chunk.
-Navigation is defined in `src/components/layout/navConfig.ts` — **5 groups, 17 items** (plan §7.1).
-Each item names the **permission** that shows it and opens its route (`null` = every signed-in user). The
-sidebar shows `visibleNavGroups(NAV_GROUPS, access)` and the AppShell **route guard** renders ERR-KPI-05 for a
-path `canOpenPath` refuses — both in `src/lib/permissionRules.ts` (Phase 1.3). `navConfig.test.ts` fails if a
-route of `App.tsx` is neither a menu item nor in `PUBLIC_PATHS` (`/`, `*`). A detail page still checks its own
-record with `useSession().can(code, resource)`. Under the default matrix the menu is plan §7.1, except ADMIN,
-who holds every permission and sees all five groups.
+Every route lives in `src/App.tsx` under a single `<AppShell>`, inside the data router
+(`createBrowserRouter`, `main.tsx` — needed for `useBlocker`). Each AREA is one `React.lazy` chunk: its
+sub-pages share the module and pick their `section` by prop. Every `path` is absolute and the route's
+first attribute (`navConfig.test.ts` parses them).
 
-| Route | Page | Menu group · permission (default holders; ADMIN holds all) | WBS / phase |
+Navigation is defined in `src/components/layout/navConfig.ts` — the **5 groups of plan §7.1**. An item
+is a destination (`NavLeaf`) or a **parent** (`NavParent`) whose sub-items are one area's sub-pages
+(product owner, 2026-10-19: every former tab is its own sub-page). A destination names the
+**permission** that shows it and opens its route (`null` = every signed-in user); a parent has none —
+it shows, and its url opens, when any child does. Sub-items inherit their area's permission, except
+"Quy trình duyệt" (`cycle.manage`). The sidebar shows `visibleNavGroups(NAV_GROUPS, access)`; the AppShell
+**route guard** renders ERR-KPI-05 for a path `canOpenPath` refuses (longest destination prefix decides,
+so a detail route has its list's permission) — both in `src/lib/permissionRules.ts`. AFTER the guard,
+the shell replaces an old link — a parent's own url, a pre-split `?tab=`, or a record param that is now
+a route segment — with `legacyRedirect` (`src/lib/navRules.ts`). `navConfig.test.ts` fails if a route
+is neither a destination, under one, nor in `PUBLIC_PATHS` (`/`, `*`, `/forms/:formId`), if a
+destination url nests inside another, or if a destination has no route. Under the default matrix the
+menu is plan §7.1, except ADMIN, who holds every permission and sees all five groups.
+
+**A list never shows a record's detail below, beside or in place of itself** (product owner,
+2026-10-19). A record opens on its own route under its list's url; small create/edit forms are a
+Sheet or Dialog; big editors are their own page and guard unsaved edits (`UnsavedChangesGuard`). A
+detail page checks its record — unknown id, other tenant, or not allowed → ERR-KPI-02 — and a Goal
+Plan page also checks the route kind with `planRouteAllows` (the gateway's `getGoalPlan` checks only
+the tenant).
+
+| Route | Page | Menu · permission (default holders; ADMIN holds all) | WBS / phase |
 |---|---|---|---|
 | `/` | → redirects to `/my/kpi` | — | — |
-| `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
-| `/my/tasks` | Việc cần xử lý — tabs Cần xử lý · Phiếu của tôi · Ủy quyền (`?tab=`) | Của tôi · — (all) | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-82); "KPI của tôi" on top (Phase 3) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
-| `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
-| `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
-| `/dashboard` | Dashboard — **built (Phase 3)**: tabs `?tab=` tong-quan · van-hanh; `?cycle=&period=&unit=` (drill-down, Back returns up) | Điều hành · `dashboard.view` (BOD, MANAGER, HR; scope-sensitive) | 4.7.1–4.7.4 (Phase 3) |
-| `/admin/cycles` | Chu kỳ — **built (T3)**: cycles, periods, the cycle's plans with lock / unlock / history, `?cycle=&plan=` | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
-| `/admin/library` | Thư viện KPI — tabs `?tab=` chi-tieu · danh-muc · phuong-phap; filters `q`, `vc`, `tt` in the URL | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 export (T2, built) |
-| `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
-| `/admin/launches` | Khởi chạy phiếu — tabs Đợt khởi chạy · Lịch tự khởi chạy · Phiếu · Quy trình (the last only with `cycle.manage`); `?tab=` and `?launch=` in the URL | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
-| `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
-| `/admin/results` | Kết quả & lương — **built (T6)**: tabs Kết quả kỳ · Xếp loại & quy đổi · Xuất file lương (`?tab=&cycle=&period=`); export needs `result.export` (CNB) | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
-| `/system/org` | Tổ chức | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
-| `/system/users` | Người dùng & quyền | Hệ thống · `user.manage` | 4.1.5–4.1.6 (T1) |
-| `/system/data-sources` | Nguồn dữ liệu | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
+| `/my/kpi` | KPI của tôi — the own plan in `?cycle=`; goals open on the plan's goal pages | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
+| `/my/kpi/plans/:planId` · `…/goals/:goalId` (`new`; `?tab=info\|split\|link`) | One own Goal Plan · one goal | under KPI của tôi · record: owner is me | T3 |
+| `/my/tasks/inbox` · `/forms` · `/delegations` | Việc cần xử lý › Chờ tôi xử lý · Phiếu của tôi · Ủy quyền | Của tôi · — (all) | 4.5.5 (T5) |
+| `/my/results` | Kết quả của tôi — own results by cycle (BR-KPI-82) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 |
+| `/team/kpi/members` (+ `/:planId`, `/:planId/goals/:goalId`) | KPI đội nhóm › KPI nhân viên — reports' plans | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
+| `/team/kpi/unit` (+ `/:planId`, `/:planId/goals/:goalId`) | KPI đội nhóm › KPI bộ phận — the headed unit's plan, cascade | Đội nhóm · `team.view` | 4.3.4 (T3) |
+| `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` | 4.5.2–4.5.4 (T5) |
+| `/dashboard/overview` · `/operations` | Dashboard › Tổng quan · Vận hành; `?cycle=&period=&unit=` | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 |
+| `/admin/cycles` · `/:cycleId` (`?tab=periods\|plans`) · `/:cycleId/plans/:planId` (+ goals) | Chu kỳ — list · one cycle · one plan | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
+| `/admin/library/definitions` · `/perspectives` · `/units` · `/calc-methods` | Thư viện KPI › Chỉ tiêu mẫu · Viễn cảnh BSC · Đơn vị đo · Phương pháp tính | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 (T2) |
+| `/admin/templates` · `/:templateId` (`new`) | Bộ mẫu — list (`q`, `ad`) · editor page | Quản trị KPI · `library.manage` | 4.2.4 (T2) |
+| `/admin/launches/runs` (+ `/new`) · `/rules` · `/forms` (`?launch=`) · `/workflows` (+ `/:workflowId`) | Khởi chạy phiếu › Đợt khởi chạy · Lịch tự động · Phiếu đã tạo · Quy trình duyệt | Quản trị KPI · `form.launch` (HR, CNB); Quy trình duyệt `cycle.manage` | D5, 4.5.1 (T5) |
+| `/admin/actuals/entry` · `/import` (+ `/:batchId`) · `/sync` (+ `/:connectionId`) | Số liệu & import › Nhập tay · Nhập từ Excel · Đồng bộ API; `?cycle=&period=` | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4) |
+| `/admin/results/period` · `/rating` · `/payroll` | Kết quả & lương › Kết quả theo kỳ · Xếp loại & quy đổi · Xuất file lương; `?cycle=&period=`; export needs `result.export` | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
+| `/system/org/structure` (+ `/:unitId`) · `/employees` (`?emp=`) · `/positions` · `/company` | Tổ chức › Cơ cấu · Nhân sự · Chức danh · Công ty | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
+| `/system/users/accounts` · `/roles` | Người dùng & quyền › Tài khoản · Vai trò & quyền | Hệ thống · `user.manage` | 4.1.5–4.1.6 (T1) |
+| `/system/data-sources/catalogue` · `/connections` (+ `/:connectionId`) | Nguồn dữ liệu › Danh mục nguồn · Kết nối API | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
 | `/system/notification-templates` | Mẫu thông báo | Hệ thống · `notification.manage` | 4.8.1–4.8.3 (T7) |
 | `/system/audit-log` | Nhật ký | Hệ thống · `audit.view` | 4.8.4 (T7) |
-| `/forms/:formId` | Phiếu (one form: registration, adjustment, evaluation) | not a menu item — `PUBLIC_PATHS`; the page checks the record (`useFormDetail.mayView`), the gateway decides every action | 4.5.2–4.5.4 (T5) |
+| `/forms/:formId` | Phiếu (one form) | not a menu item — `PUBLIC_PATHS`; the page checks the record (`useFormDetail.mayView`) | 4.5.2–4.5.4 (T5) |
 | `*` | Không tìm thấy trang | — | — |
 
-The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step. A route still on its
-placeholder must show "Chưa xây dựng". A built route either names a landmark (third field: a table
-or list the page shows once loaded — T2, T7) or sits in the `BUILT` set (it must no longer show the
-placeholder — T1, T3).
+The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step.
 
-**Detail views are search params, not routes** (T3): a plan opens on its list's page with `?plan=<id>`, a
-goal panel with `?goal=<id|new>&mode=view|edit|split|link` — no route-guard or menu change, and a reload or a
-shared link reopens the same view. A detail view still checks its own record (the workspace's rules) and
-answers ERR-KPI-02 for an unknown id.
+**Page chrome.** `PageHeader` sets the browser title. A sub-page's title is its menu title and its
+area shows as the breadcrumb automatically; a detail page passes an explicit `breadcrumb` (explicit
+`to`, never history-back), `title` = the record's name and `status` = its badge. `<main>` is the scroll
+container: the shell resets its scroll and focuses the new page's `h1` on every route change.
+Sibling sub-pages carry their parent's `carryParams` (`?cycle=&period=`) through the sidebar.
 
 ---
 

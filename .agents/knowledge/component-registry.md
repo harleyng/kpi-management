@@ -34,11 +34,12 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 
 | Component | Purpose |
 |---|---|
-| `PageHeader` | Title, description, actions — every route-level screen |
+| `PageHeader` | Title, description, actions, `status` badge, `breadcrumb` (a sub-page shows its area automatically; a detail page passes an explicit trail) — every route-level screen; sets the browser title, its `h1` takes focus on navigation |
+| `UnsavedChangesGuard` | `when={dirty}` on an editor page: asks before leaving to another path (`useBlocker`, data router only) and on reload |
 | `PlaceholderPanel` | "Chưa xây dựng", then "Phần việc: WP x.y.z, Track Tn" + the list of remaining work |
 | `EmptyState` / `EmptyStateCard` | "There is nothing here" for a panel / a whole page, with an optional next action |
 | `ErrorStateCard` / `ErrorState` | A failed read for a page / inside a panel or popover; takes a catalogue `spec` (`errorSpecOf(error)`), `role="alert"` |
-| `DataTable` | The management table: columns (`numeric`, `sortValue`), the `useQuery` result, first-use vs filtered empty, `—` for missing cells, client paging or `serverPage` for `Page<T>` lists, `toolbar`, totals `footer` |
+| `DataTable` | The management table: columns (`numeric`, `sortValue`), the `useQuery` result, first-use vs filtered empty, `—` for missing cells, client paging or `serverPage` for `Page<T>` lists, `toolbar` (search/filters) and `actions` (primary CTA) in a row ABOVE the card, totals `footer` |
 | `MissingValue` | `—` with sr-only "chưa có" (exported from `DataTable.tsx`) |
 | `FormField` / `RequiredLegend` | Label + control (render prop with id/ARIA) + hint + announced error; "* Bắt buộc" legend |
 | `EntityCombobox` | Searchable single/multiple picker (Popover + cmdk, `matchesSearch`); never misreports a selected value (loading / failed / no longer in list) |
@@ -60,7 +61,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 
 | Component | Purpose |
 |---|---|
-| `OrgStructureTab` | Tree (`OrgUnitTreeView`, `?unit=`, "Hiện đơn vị ngừng dùng" `?inactive=1`) beside the unit's detail: head, dates, staff today, Sửa / Thêm đơn vị trực thuộc / Ngừng dùng (blocked reasons from `unitEndIssues`) |
+| `OrgStructureTab` · `OrgUnitDetailPage` | Cơ cấu: the tree (`OrgUnitTreeView`, "Hiện đơn vị ngừng dùng" `?inactive=1`) — a unit opens on `/system/org/structure/:unitId`: ancestors as breadcrumb, head, dates, staff today, sub-units, Sửa / Thêm đơn vị trực thuộc / Ngừng dùng (blocked reasons from `unitEndIssues`) |
 | `UnitSheet` | Add / edit a unit — parent options exclude its own subtree; head picker limited to the unit's people |
 | `EmployeesTab` / `EmployeeSheet` | People with today's primary line; the wide sheet (`?emp=`, `new`) = "Hồ sơ" + "Phân công" |
 | `AssignmentDialog` | `first` · `transfer` · `concurrent` · `end`; preview from `transferPlan`, outside-unit warning from `managerOutsideUnit` |
@@ -79,9 +80,9 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | Component | Purpose |
 |---|---|
 | `KpiDefinitionsPanel` / `KpiDefinitionSheet` | "Chỉ tiêu mẫu" table (filters in the URL, goal-usage count) and its side-sheet editor: live `libraryRules` reasons (blocked status, missing source), server issues mapped to fields, closes only on success, discard guard, focus back to the row |
-| `CataloguesPanel` | Perspectives (rename / reorder) and measure units (inline edit, code locked while in use) |
+| `PerspectivesSection` · `UnitsSection` (`CataloguesSections.tsx`) | Viễn cảnh BSC (rename / reorder) and Đơn vị đo (code locked while in use) — each record edits in a dialog |
 | `CalcMethodsPanel` / `CalcMethodSheet` | Methods with "Đang dùng" counts; editor with the tier editor and the in-use lock (BR-KPI-80), live `validateCalcMethod` per tier |
-| `TemplateList` / `TemplateEditor` | `/admin/templates` master list ("Cần xem lại" in words) and editor with the sticky weight-total / item-count footer (warnings, Q26) and `KpiPicker` to add items |
+| `KpiTemplatesPage` / `TemplateDetailPage` + `TemplateEditor` | `/admin/templates` list ("Cần xem lại" in words) and `/admin/templates/:id` editor page with the sticky weight-total / item-count footer (warnings, Q26), `KpiPicker` to add items, `UnsavedChangesGuard` |
 | `LibraryExportButton` / `LibraryActions` / `exportLibrary.ts` | "Xuất Excel" (exceljs loaded on click) + the disabled "Nhập từ Excel — sắp có" |
 | `DiscardChangesDialog` | "Bỏ thay đổi chưa lưu?" on top of `ConfirmDialog` |
 | `libraryCopy.ts` | `issueMessage(issue)` (inline copy per rule `detail`), `fieldErrors`, `methodLockedMessage`, `weightGapMessage`, `parseNumberInput` ("12,5" → 12.5; garbage → NaN, never 0), `numberText` |
@@ -118,14 +119,15 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 
 | Component | Purpose |
 |---|---|
-| `GoalPlanWorkspace` | One Goal Plan end to end: `PlanHeader` (+ readiness strip and "Gửi"), `KgiSection`, `GoalTable`, the inline panels by `?goal=&mode=`, `CascadeDialog`; loading / error / not-found states; every decision from `usePlanWorkspace` |
+| `GoalPlanWorkspace` | One Goal Plan end to end: `PlanHeader` (+ readiness strip and "Gửi"), `KgiSection` (KGI in `KgiDialog`), `GoalTable` (rows open the goal page under `basePath`), `CascadeDialog`; loading / error / not-found states; every decision from `usePlanWorkspace` |
+| `PlanPage` · `GoalPage` (`GoalPlanPages.tsx`) | A plan / one goal on its own route for each `kind` (my, members, unit, cycles), checked by `planRouteAllows` (BR-KPI-90); the goal page's facets Thông tin / Phân bổ theo kỳ / Liên kết (`useFacetTab`, `?tab=`) reuse `GoalEditorPanel` / `PeriodSplitPanel` / `LinkGoalPanel`; `goalNav.ts` builds the urls |
 | `PlanHeader` | Owner, status, registration step, weight / goal / KGI counts, the read-only reason, "Cần xử lý trước khi gửi" / "Lưu ý" (each item jumps to its row), "Gửi" / "Chuyển cho nhân viên" with confirm |
 | `GoalTable` | Goals ordered by perspective (Changed / Cancelled muted, struck), weight-total footer, optional D3 bucket columns, a row menu whose disabled items carry their reason |
 | `GoalEditorPanel` | §5.1 fields inline; a library pick fills only untouched fields; levels section (ASSUMPTION Q1 hint); partial-save handling |
 | `PeriodSplitPanel` / `LinkGoalPanel` | Split by month / quarter with "Chia đều" and live warnings; link up to the manager's / unit's / company's goals (visible ones only) |
 | `CascadeDialog` | "Phân giao": reports with a disabled reason, share, weight (remaining to 100%), method when the parent's is not share-safe, bucket preview, ERR-KPI-11 inline |
 | `PlanLockActions` | HR's lock (confirm), unlock (reason + new due date when a form is open), lock history from the audit log |
-| `CycleDetail` / `CycleFormDialog` | The selected cycle: next-status action, periods (generate → preview → apply, lock switches), the cycle's plans table (filters, create Company / OrgUnit plan) |
+| `CycleDetailPage` + `CycleDetail.tsx` (`CycleActions`, `PeriodsPanel`, `CyclePlansPanel`, `CycleFormDialog`) | `/admin/cycles/:cycleId`: next-status action, facets Kỳ đánh giá (generate in a dialog → preview → apply, lock switches) / Goal Plan (filters, create Company / OrgUnit plan; rows open the plan page) |
 | `CyclePicker` + `useSelectedCycle` | `?cycle=` with `cycleRules.defaultCycleId` |
 | `goalCopy.ts` | `EDIT_REASON_COPY`, `issueText` (catalogue title + the detail's words), `formatTarget`, `formatWeight`, `planOwnerName` |
 
@@ -139,7 +141,8 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `EvidencePanel` | Evidence of a goal for a month: list (file / link, who, when), add a link or a file, remove. T5's evaluation form reuses it |
 | `ActualValue` / `SourceTypeTag` | A value (`—` when none, never 0) / where it came from (icon + label, muted — a category, not a status) |
 | `CycleSelect` / `MonthSelect` | The shared pickers (default: the Active cycle; the latest month ended) |
-| `ActualEntryTab` · `ActualImportTab` · `SyncTab` (+ `ScheduleText`) · `useCycleGoalData` | The three tabs of `/admin/actuals` and the composite read of a cycle's goals with one combined state |
+| `ActualEntryTab` · `ActualImportTab` · `SyncTab` (+ `ScheduleText`, `RunSyncDialog`) · `useCycleGoalData` · `useCyclePeriodParams` | The three sub-pages of Số liệu & import (`?cycle=&period=`), and the composite read of a cycle's goals with one combined state |
+| `ImportBatchPage` · `SyncConnectionPage` (`ActualsDetailPages.tsx`) · `BatchPreview` | One import batch (`/admin/actuals/import/:batchId`) and one connection's runs (`/admin/actuals/sync/:connectionId`) |
 | `EvidenceAttach` (T5) | "N bằng chứng" popover for one goal in one period: list (file → `getFileUrl`, link), and attach a file or a link when `canAdd`; T4's evidence management (4.4.6) reuses it and adds removal |
 | `toastError` (T5) | `toastError(error)` — a failed write as a toast with the catalogue copy (`errorSpecOf`); the dev toolbar re-exports it |
 | `StatusBadge` additions (T5) | `DelegationStateBadge` (derived state), `PlanAdjustingBadge` ("Đang điều chỉnh") |
@@ -164,7 +167,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `LaunchesTab` + `LaunchPanel` | Launch list (open forms / cancel a Scheduled one) and the inline "Tạo đợt khởi chạy" panel (`validateLaunch`, `launchTimingIssues`, `cycleAllowsLaunch`) |
 | `LaunchRulesTab` | Recurring rules (inline on/off, edit dialog, `validateLaunchRule`) |
 | `AdminFormsTab` | Every form, keyset-paged by the gateway (Trang trước / Trang sau), filters incl. `?launch=` |
-| `WorkflowsTab` | Step settings per workflow with `validateWorkflow` inline and `workflowEditWarnings` |
+| `WorkflowsTab` · `WorkflowDetailPage` + `WorkflowStepEditor` | Quy trình duyệt: the workflows table; one workflow's step settings on its own page with `validateWorkflow` inline, `workflowEditWarnings` and `UnsavedChangesGuard` · `NewLaunchPage` hosts `LaunchPanel` |
 | `RecipientFilterFields` · `recipients.ts` | "Người nhận" ALL / FILTER fields · `EMPTY_RECIPIENT_FILTER`, `recipientSummary` |
 
 ## `src/components/results/` (T6)

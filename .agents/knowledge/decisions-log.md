@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-10-19 — Sub-pages instead of tabs; a record's detail is its own route; the list toolbar above the card
+
+**Decision.** (product owner) Every page that bundled views as tabs is an AREA in the menu with one
+sub-page per former tab, each its own route (11 areas: Việc cần xử lý, KPI đội nhóm, Dashboard, Thư
+viện KPI — Danh mục split into Viễn cảnh BSC and Đơn vị đo —, Khởi chạy phiếu, Số liệu & import, Kết
+quả & lương, Tổ chức, Người dùng & quyền, Nguồn dữ liệu). A list never shows a record's detail below,
+beside or in place of itself: cycles, Goal Plans, goals (the workspace's inline `?goal=&mode=` panels),
+templates, workflows, import batches, API connections and org units open on their own routes; KGI,
+period generation and catalogue rows edit in dialogs. A list's search/filters and primary action sit in
+a row above the table card. Renamed sub-items that repeated their area: Chờ tôi xử lý, KPI nhân viên,
+Lịch tự động, Phiếu đã tạo, Quy trình duyệt, Kết quả theo kỳ. "Quy trình duyệt" needs `cycle.manage`
+(was a tab only cycle managers saw; a custom role with `form.launch` alone no longer sees it). Old
+links (`?tab=`, `?plan=`, `?batch=`, `?bo=`, `?cycle=`, `?unit=`, a parent url) redirect after the route
+guard (`navRules.legacyRedirect`). The app moved to the data router for `useBlocker`.
+
+**Why.** Tabs hid destinations from the menu and stacked a second navigation inside the page; a detail
+under or beside its list mixed two scopes on one screen and could not be linked cleanly. Plan routes
+exposed that `getGoalPlan` checks only the tenant, so plan pages check `planRouteAllows`.
+
+**Updated alongside.** `architecture.md` (route table, page chrome), `design-system.md` (sidebar areas,
+no tabs for pages, detail pages, list toolbar), `common-pitfalls.md`, `/new-page` skill, `navConfig.ts`.
+
+---
+
 ## 2026-10-19 — Phase 3: one scoped drill-down, stored figures only, an assistant that only phrases a snapshot
 
 **Decision.** (product owner: tracks merged first; Q40–Q43 defaults; a thin deterministic assistant)

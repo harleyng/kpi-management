@@ -761,6 +761,13 @@ or `ASSUMPTION Q12`, except the six roles and four scopes themselves (ERD `ROLE`
 - **BR-KPI-63** — **The company plan is readable by the whole tenant** (`goalplan.view` on the Company owner
   needs no scope): every cascade starts from it. Editing it needs a Tenant scope or an OrgUnit scope on the
   root unit. *ASSUMPTION Q12.*
+- **BR-KPI-90** — **A Goal Plan opened by its address is checked against the place it opens in**
+  (`planRouteAllows`, `planAccessRules.ts`): the viewer needs `goalplan.view` over the plan's owner AND the
+  route must fit the plan — under "KPI của tôi" only the viewer's own employee plan; under "KPI nhân viên" an
+  employee plan; under "KPI bộ phận" a unit or company plan; under a cycle a plan of that cycle. Otherwise
+  ERR-KPI-02, the same answer as an unknown id (the page never reveals whose plan it was). Its goals are
+  those of `visibleGoals` (BR-KPI-08) whose plan is that plan. *Source: product owner, 2026-10-19 (plans
+  and goals open on their own pages); the gateway's plan read checks only the tenant until Phase 5.*
 - **BR-KPI-64** — **Scopes resolve on "today" in the tenant's zone** (the gateway clock), over every
   assignment effective that day (both ends inclusive; a concurrent assignment counts too):
   Self = the account's own employee · DirectReports = people whose effective assignment names me as manager,
