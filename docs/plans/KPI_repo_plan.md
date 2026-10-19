@@ -203,8 +203,8 @@ Các track **chạy song song được vì cùng dựa trên seed fixtures**, kh
 `src/data/fixtures/*.ts`, nạp bằng `resetSeed()`:
 
 - **2 tenant**: "Syntra" (dữ liệu đầy đủ) và "Demo Co" (ít dữ liệu, chỉ để test cô lập).
-- **Tổ chức Syntra**: 3 khối, khoảng 8 phòng (theo các sheet DATX: Marketing, CSKH, Mua hàng, Vận hành, Công nghệ, HCNS, Kế toán, Kế hoạch), khoảng 40 nhân viên có quan hệ quản lý trực tiếp; đủ 6 vai trò.
-- **Thư viện**: chỉ tiêu và bộ mẫu lấy từ sheet "2. KPIs phòng ban" (khoảng 14 bộ, 60–80 chỉ tiêu), đã sửa lỗi phát hiện ở Q4/Q5.
+- **Tổ chức Syntra**: 3 khối, 9 phòng (8 sheet DATX: Marketing, CSKH, Mua hàng, Vận hành, Công nghệ, HCNS, Kế toán, Kế hoạch, cộng phòng Kinh doanh ứng với bộ "Tư vấn" — quyết định D-c, Phase 1.2), 42 nhân viên có quan hệ quản lý trực tiếp; đủ 6 vai trò.
+- **Thư viện**: chỉ tiêu và bộ mẫu lấy từ sheet "2. KPIs phòng ban" (15 bộ = công ty + 14 đơn vị, 87 dòng → 54 chỉ tiêu sau khi gộp trùng), đã sửa lỗi phát hiện ở Q4/Q5 và làm sạch theo Q14 (Phase 1.2).
 - **Chu kỳ 2027**, 12 kỳ tháng và 4 kỳ quý.
 - **Goal Plan ở đủ mọi trạng thái** (Nháp, Đã gửi, Bị trả lại, Đã duyệt, Đã khóa), để track nào cũng có dữ liệu cho mọi trạng thái.
 - **Số thực tế 3 tháng**, trong đó có dòng thủ công, dòng import và dòng "API".

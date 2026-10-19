@@ -218,10 +218,11 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   **A+ / A / B / C / D** (`ASSUMPTION Q2` — the DATX "TH KQ" sheet is broken with `#REF!`, so no real
   scale is available yet). Each level holds `[minScore, maxScore)`; the top level also takes anything
   above its max; levels must start at 0 and be contiguous (`ratingRules`). The rating reads the
-  **rounded, adjusted** score, so it matches the number on screen. Sample for the seed: A+ ≥ 110 ·
-  A [100, 110) · B [90, 100) · C [70, 90) · D [0, 70); payout 120 / 100 / 80 / 50 / 0%.
+  **rounded, adjusted** score, so it matches the number on screen. The seed's sample: A+ [110, 120] (and
+  above) · A [100, 110) · B [90, 100) · C [70, 90) · D [0, 70).
 - **BR-KPI-42** — A **payout rule** maps a rating level to a % of the KPI salary component, optionally
-  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`). The most
+  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`): A+ 120% ·
+  A 100% · B 80% · C 50% · D 0% for everyone, and an OrgUnit rule paying Kinh doanh 130% for A+. The most
   specific rule in force wins: **Position**, then the **nearest org unit** up the employee's unit chain,
   then All; among equals the latest `effectiveFrom`. A rule naming both a unit and a position is
   invalid. No rule → **no payout figure** ("chưa có quy tắc"), never 0% (`ratingRules.payoutPctFor`).
@@ -337,6 +338,9 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q11 | Does P1 track "tự thực hiện" (what a manager personally achieved on a cascaded goal)? | No — shown as "—" | BR-KPI-07 |
 | Q12 | The permission catalogue, the default role → permission matrix and the default scopes? The sources are silent | §9 as written: union of roles, MANAGER = OrgUnit + children, company plan readable by all, BOD read-only, ADMIN holds everything | BR-KPI-60…64 |
 | Q13 | Is the KPI payout prorated for someone who joins or leaves mid-period? | No — full payout % for any period worked | BR-KPI-24, 42 |
+| Q14 | The DATX library sheet has weights that do not sum to 100%, blank or contradictory calculation methods, mixed rows and garbled targets — how is it read? | Cleaned as listed in `src/data/fixtures/README.md` ("DATX cleaning"): weights normalised, methods filled / corrected by meaning, mixed rows split, BSC perspective mapped by subject. HR to confirm "Tồn kho" / "Xả tồn" direction and the Kế toán opex definition | Seed, BR-KPI-06, 30, 34 |
+| Q15 | KPI frequency and aggregation (absent from DATX)? | Monthly; SUM for money, counts and volumes, AVG for ratios, LAST for headcount and stock | Seed, BR-KPI-11, 36 |
+| Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

@@ -61,7 +61,7 @@ src/
 ├── hooks/
 │   └── queries/            # React Query hooks per domain — the only callers of getDataGateway()
 ├── integrations/
-│   ├── data/               # DataGateway: types.ts (contract), index.ts, mockGateway.ts (stub until 1.2), supabaseGateway.ts (stub)
+│   ├── data/               # DataGateway: types.ts (contract), index.ts, mockGateway.ts + mock/ (Phase 1.2), supabaseGateway.ts (stub)
 │   └── insight/            # InsightGateway: the simulated AI assistant (Phase 3)
 ├── lib/                    # *Rules.ts (pure, tested), *Store.ts (Zustand), errorCatalog, utils, pagination
 ├── pages/                  # one placeholder page per menu item (Phase 0)
@@ -114,7 +114,7 @@ The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step.
 
 ```
 components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway()
-                                                              ├── mockGateway      (Phase 1.2; a stub that rejects until then)
+                                                              ├── mockGateway      (Phase 1.2 — see "Mock adapter" below)
                                                               └── supabaseGateway  (Phase 5 — throws until then)
 ```
 
@@ -148,12 +148,44 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   and a rejected listener is reported, never swallowed.
 - **Imports** — the client parses Excel (exceljs) into typed rows; `actuals.stageImport` validates and
   stores rows + row errors on the `ImportBatch`; `commitImport` applies all rows or none.
-- **Mock adapter** (Phase 1.2) — in-memory + localStorage partitioned per tenant, `dev.resetSeed()`,
-  simulated latency, an error-injection switch. It **reuses** `src/lib/*Rules.ts`.
-- **IDs** — strings (`crypto.randomUUID()` at runtime; literal UUIDs in fixtures). The ERD's `bigint`
-  keys are for the future database.
+- **IDs** — strings (`crypto.randomUUID()` at runtime; deterministic UUID-shaped `seedId(...)` in
+  fixtures; `perm.<code>` for the global permission catalogue). The ERD's `bigint` keys are for the
+  future database.
 - **Errors** — methods reject with `KpiError` (ERR-KPI-01…06 are the contract's generic codes); hooks
-  surface the catalogue copy. React Query retries only `isRetryable` failures (01, 03).
+  surface the catalogue copy. React Query retries only `isRetryable` failures (01, 03) — never a
+  `KpiDeferredError` (a method waiting for its rule).
+- **Query keys** — `[tenantId, root, ...params]` via `queryKey()` in `src/hooks/queries/keys.ts`. Each
+  root of `KEY_ROOTS` names the entities it reads; `useGatewayEventInvalidation` (mounted once by
+  `GatewayEventBridge` inside `SessionProvider`) invalidates every root an `entity.changed` touches,
+  batched per microtask. `dev.resetSeed()` emits nothing — its caller clears the cache.
+
+### Mock adapter (Phase 1.2)
+
+`src/integrations/data/mock/` — `mockGateway.ts` exports `createMockGateway({ storage: localStorage })`.
+
+| File | Responsibility |
+|---|---|
+| `runtime.ts` | The per-call wrapper every method runs through: latency (150 ms; 0 under Vitest) → failure injection (`dev.setFailureMode`, glob on `group.method`; reads 01, writes 03) → copy the input → tenant check (unknown tenant 02) → authorize → transaction → integrity → save → swap in → emit → copy the output. Write bodies are synchronous, so two writes never interleave. The registry: every method's kind, `deferred` (rejects `KpiDeferredError`), `pendingGuards` |
+| `store.ts` | Per-tenant tables (`Map` per collection; `RolePermission` keyed `roleId\|permissionId`; `Tenant` and `Permission` global). Rows are deep-frozen. `Tx` copies a collection on its first write and swaps it in only on commit |
+| `schema.ts` | The table definitions a database would have: writable columns (a payload's other keys are ignored — `tenantId`, status, authors come from the gateway), foreign keys with kind (`owner` immutable · `reference` · `hierarchy` acyclic) and delete policy (`restrict` · `cascade` · `setNull`), nested paths (`recipientFilter.orgUnitIds[]`, `proposed.kpiDefId`), polymorphic ids (`Notification.refId`), unique indexes (per tenant, partial ones), CHECK-like row and collection checks |
+| `integrity.ts` | Enforces the schema at COMMIT: a reference outside the tenant answers ERR-KPI-06 worded exactly like a missing id; owner / immutable column changed → 06; unique / check → 06; removal of a referenced row → 04 (cascades and set-null applied by `removeRow`) |
+| `persistence.ts` | localStorage `kpi.meta` (seed version), `kpi.clock`, `kpi.global.*`, `kpi.t.<tenant>.<Collection>`. A save writes every touched key AND the clock or none of them (previous strings restored; ERR-KPI-03) — nothing after the save can fail. A stored row of another tenant, or a missing key, fails the load (01). A different `SEED_VERSION` reseeds. `MemoryStorage` for tests |
+| `clock.ts` | Starts at `SEED_NOW`, flows with real time while the app runs, strictly increasing; `setNow(null)` → `SEED_NOW`; saved in every commit's batch, so a reload continues from the simulated time (time spent closed does not count); a corrupt saved clock is reported |
+| `bus.ts` | Per-tenant subscribers + system listeners; events only after commit; a listener's throw / rejection goes to `onDiagnostic` (console.error), never fails the write |
+| `authorize.ts` | The ONE authorization hook: the actor is an Active account of the tenant (else 05). Phase 1.3's `can()` plugs in here |
+| `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
+| `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
+
+**Waiting for rules** (Gate 1 requires both lists empty; `runtime.test.ts` holds the skipped Gate 1 test):
+- *Deferred* — the method's result IS a rule's answer, so it rejects `KpiDeferredError` until wired:
+  `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `stageImport`, `commitImport` (T4 4.4.3), `runSync`
+  (T4 4.4.5), `createLaunch`, `cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`,
+  `calculateResults`, `setAdjustment`, `finalizeResults`, `lockResults`, `exportPayroll` (T6), `scheduler.runDue`.
+- *Pending guard* — the method stores what it is given and its rule only REFUSES; it works now and the
+  refusal is wired later: `saveCycle`, `savePeriods`, `saveKgi`, `deleteKgi`, `saveGoal`, `deleteGoal`,
+  `setTargetLevels`, `setPeriodTargets`, `saveAlignment`, `deleteAlignment`, `recordActual`, `rejectImport`,
+  `saveWorkflow`, `saveLaunchRule`, `saveGoalChangeItems`, `saveDelegation`, `revokeDelegation` — plus the
+  permission check of every write (1.3). The exact list is `mockGateway.registry`.
 - **Naming** — gateway methods use the short domain noun (`listPositions` for `JobPosition`,
   `listWorkflows` for `WorkflowTemplate`); the types keep the ERD names.
 
@@ -164,11 +196,14 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 
 ### Fixtures strategy
 
-`src/data/fixtures/` (see its README) — two tenants (Syntra full, Demo Co minimal), Syntra's org from
-the DATX sheets (3 blocks, ~8 departments, ~40 fictional employees, all 6 roles), the library from DATX
-sheet "2. KPIs phòng ban", cycle 2027 (12 months + 4 quarters), Goal Plans and forms in every state,
-three months of actuals (manual, Excel, "API"), a sample rating scale and payout table marked
-`ASSUMPTION Q2`. **After Gate 1 the fixtures are frozen as the contract between tracks.**
+`src/data/fixtures/` (its README tells the whole story, date by date) — two tenants: **Syntra**
+(3 divisions, the 8 DATX departments + Kinh doanh, 42 fictional people, all 6 roles; the library from
+DATX "2. KPIs phòng ban" cleaned per `ASSUMPTION Q14`; cycles 2026 Closed · 2027 Active · 2028 Planning;
+Goal Plans in every status; three months of actuals from all three sources; forms at every step with a
+history that replays; launches, delegations, notifications, audit) and **Demo Co** (small, but a row in
+every collection, reusing Syntra's codes). The seed's "now" is **2027-04-06 09:00 +07**; the scheduler
+last ran 2027-04-01 09:00. Ids come from `seedId`; `SEED_VERSION` is bumped with every change. **After
+Gate 1 the fixtures are frozen as the contract between tracks.**
 
 ---
 
@@ -197,7 +232,7 @@ delta Phase 5 applies when it writes the SQL schema.
 
 ## Phases (plan §6)
 
-Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed · **1.3** session
+Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed (**done 2026-10-19**, rules wired at Gate 1) · **1.3** session
 + permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (parallel) → **Gate 1** (fixtures
 frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.

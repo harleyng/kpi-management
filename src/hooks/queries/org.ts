@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/contexts/useSession';
 import { getDataGateway } from '@/integrations/data';
 import type { EmployeeFilter } from '@/integrations/data/types';
+import { queryKey } from './keys';
 
 /**
  * G1 · Tổ chức — reads the shared pickers need (Phase 1.4). Track T1 adds the writes beside them.
@@ -13,7 +14,7 @@ import type { EmployeeFilter } from '@/integrations/data/types';
 
 const ORG_STALE_MS = 5 * 60 * 1000;
 
-export const orgUnitsKey = (tenantId: string) => [tenantId, 'orgUnits'] as const;
+export const orgUnitsKey = (tenantId: string) => queryKey(tenantId, 'orgUnits');
 
 export function useOrgUnits() {
   const { tenantId } = useSession();
@@ -29,7 +30,7 @@ export function useOrgUnits() {
  * would be a new key and a pending flash — pickers filter the loaded list on the client.
  */
 export const employeesKey = (tenantId: string, filter: EmployeeFilter = {}) =>
-  [tenantId, 'employees', filter] as const;
+  queryKey(tenantId, 'employees', filter);
 
 export function useEmployees(filter: EmployeeFilter = {}) {
   const { tenantId } = useSession();

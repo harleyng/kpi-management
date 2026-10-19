@@ -49,6 +49,86 @@ table → `canSubmit` → move, returning the history row with both people. Erro
 
 ---
 
+## 2026-10-19 — Phase 1.2: the mock is a schema-checked store behind one per-call runtime; rule-dependent methods wait for their rule
+
+**Decision.** `src/integrations/data/mock/`: every method runs through `runtime.ts` (latency, failure
+injection, input/output copies, tenant check, authorize, transaction, integrity, save, events after
+commit). `schema.ts` declares each table's writable columns, foreign keys (kind + delete policy, nested
+and polymorphic paths), unique indexes and checks; `integrity.ts` enforces them at commit. A method whose
+RESULT is a rule's answer is *deferred* (rejects `KpiDeferredError`, never retried); a method whose rule
+only REFUSES is a *pending guard* (works now). Gate 1 requires both lists (`mockGateway.registry`) empty.
+
+**Why.** One generic integrity check is what lets the isolation suite be generated from the schema; a
+hand-written "does this id exist in the tenant" per method is the check that gets forgotten. Copying a
+rule into the mock to make a method work before 1.5 would demonstrate behaviour the real system will
+not have (common-pitfalls); rejecting everything instead would block T3/T4 from saving a draft goal.
+
+**Phase 4 (QA).** The audit entry is written in the write's own transaction, and the clock saved in the
+same batch as the tables — a listener writing audit afterwards lost it on a storage error, and a clock
+save after the commit could report a stored write as failed (the user retries: a duplicate).
+
+**Updated alongside.** `architecture.md` ("Mock adapter (Phase 1.2)"), contract comments in
+`src/integrations/data/types.ts` (unknown tenant → 02, recordAudit tenant check, keyset cursor, listener
+failures, `setNow(null)`), `errorCatalog.ts` (`KpiDeferredError`).
+
+---
+
+## 2026-10-19 — The seed's "now" is 2027-04-06 09:00; the scheduler last ran 2027-04-01 09:00; every form's history replays
+
+**Decision.** The simulated clock starts at `SEED_NOW` and flows with real time; `setNow(null)` returns to
+`SEED_NOW`, not real time (D-b); a reload continues from the saved simulated time. Every seeded overdue
+state is what daily ticks up to `LAST_SCHEDULER_TICK` produce, and exactly one step is overdue and
+unhandled (E029's open adjustment). Evaluation recipients follow 1.5's `resolveRecipients` (Approved /
+Locked plan at launch), so the five AUTO_LOCKed staff are evaluated too.
+
+**Why.** Real time (October 2026) is before the 2027 cycle. The first draft seeded forms 78 days past due
+with nothing handled — the first `runDue` would have locked or forwarded half the company; a test now
+fails if any seeded open step was overdue at the last tick.
+
+**Updated alongside.** `src/data/fixtures/README.md` ("The story"), `timeline.ts`, `seed.test.ts`.
+
+---
+
+## 2026-10-19 — D-c: a 9th department "Kinh doanh"; D-e: deterministic seed ids
+
+**Decision.** DATX's "Tư vấn" set becomes "Phòng Kinh doanh" (head E006 = the §8.2 "TP Sale"); the five
+DATX sets with no unit are templates with `orgUnitId = null`. Seed ids come from `seedId(...parts)` —
+UUID-shaped (version nibble 8), stable across builds — instead of pasted literals.
+
+**Why.** The E2E scenario names a Sales manager the 8 DATX departments do not have. 2 000 pasted UUIDs
+would be unreviewable and impossible to reference from a test.
+
+**Updated alongside.** `src/data/fixtures/README.md` (conventions), plan §6.4 wording, `architecture.md`.
+
+---
+
+## 2026-10-19 — DATX cleaning, frequency/aggregation and data sources are ASSUMPTIONS Q14–Q16
+
+**Decision.** The library is the DATX sheet cleaned item by item (weights normalised, methods corrected by
+meaning, mixed rows split, BSC mapped by subject — Q14); every KPI monthly with SUM / AVG / LAST by kind
+(Q15); four data sources as named in the workbook, five invented (Q16). Q12 is 1.3's and Q13 is 1.5's.
+
+**Why.** Taken literally the sheet scores lead time and response time higher-is-better, ships three sets
+whose weights cannot be submitted, and has no frequency at all.
+
+**Updated alongside.** `business-rules.md` §4 (sample scale) and §8 (Q14–Q16), fixtures README ("DATX
+cleaning"), `docs/source-map.md`.
+
+---
+
+## 2026-10-19 — Query keys are tenant-first and invalidated from the gateway's events
+
+**Decision.** `src/hooks/queries/keys.ts`: `queryKey(tenantId, root, ...params)`; each root of `KEY_ROOTS`
+names the entities it reads; `useGatewayEventInvalidation` (one `GatewayEventBridge` in `main.tsx`)
+invalidates every root an `entity.changed` touches, once per microtask.
+
+**Why.** `forms.act` changes a form, a plan and other people's inboxes; a mutation that had to list every
+other track's keys would miss one, and the screen would show yesterday's state with nothing looking broken.
+
+**Updated alongside.** `src/hooks/queries/README.md`, `architecture.md` (Data layer).
+
+---
+
 ## 2026-10-19 — Phase 1.3: permissions are data, a person's access is the union of their roles, and approving is never a permission
 
 **Decision.** `src/lib/permissionRules.ts` declares 28 `module.action` codes (ids `perm.<code>`, the same in

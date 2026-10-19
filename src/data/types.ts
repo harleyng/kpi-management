@@ -378,6 +378,8 @@ export interface KpiTemplateItem extends TenantScoped {
 
 export const CYCLE_STATUSES = ['Planning', 'Active', 'Evaluating', 'Closed'] as const;
 export type CycleStatus = (typeof CYCLE_STATUSES)[number];
+/** A new cycle starts here; later moves are `cycleRules`'. */
+export const CYCLE_INITIAL_STATUS: CycleStatus = 'Planning';
 export const CYCLE_STATUS_LABEL: Readonly<Record<CycleStatus, string>> = {
   Planning: 'Đang lập kế hoạch',
   Active: 'Đang thực hiện',
@@ -440,6 +442,8 @@ export const OWNER_TYPE_LABEL: Readonly<Record<OwnerType, string>> = {
  */
 export const GOAL_PLAN_STATUSES = ['Draft', 'Submitted', 'Returned', 'Approved', 'Locked'] as const;
 export type GoalPlanStatus = (typeof GOAL_PLAN_STATUSES)[number];
+/** `createGoalPlan` and a registration launch create plans here (BR-KPI-12). */
+export const GOAL_PLAN_INITIAL_STATUS: GoalPlanStatus = 'Draft';
 export const GOAL_PLAN_STATUS_LABEL: Readonly<Record<GoalPlanStatus, string>> = {
   Draft: 'Nháp',
   Submitted: 'Đã gửi',
@@ -481,6 +485,8 @@ export interface Kgi extends TenantScoped {
 
 export const GOAL_STATUSES = ['Active', 'Changed', 'Cancelled'] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
+/** A goal added to a plan starts here; Changed / Cancelled come only from an approved GOAL_CHANGE. */
+export const GOAL_INITIAL_STATUS: GoalStatus = 'Active';
 export const GOAL_STATUS_LABEL: Readonly<Record<GoalStatus, string>> = {
   Active: 'Đang áp dụng',
   Changed: 'Đã thay đổi',
