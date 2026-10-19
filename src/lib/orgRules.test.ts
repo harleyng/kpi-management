@@ -6,6 +6,7 @@ import {
   isEmployedDuring,
   isEffectiveOn,
   isEmployedOn,
+  isStillEmployedOn,
   managerOf,
   primaryAssignmentOn,
   scopeCoversEmployee,
@@ -100,13 +101,20 @@ describe('employment', () => {
     expect(isEmployedDuring(joiner, '2026-12-01', '2026-12-31')).toBe(false);
   });
 
+  it('isStillEmployedOn ignores the hire date — in scope until they leave', () => {
+    expect(isStillEmployedOn(joiner, '2027-01-01')).toBe(true); // not hired yet, but not gone
+    expect(isStillEmployedOn(leaver, '2027-01-15')).toBe(true);
+    expect(isStillEmployedOn(leaver, '2027-01-16')).toBe(false);
+    expect(isStillEmployedOn(employee({ employmentStatus: 'Resigned', leftOn: null }), '2027-01-01')).toBe(false);
+  });
+
   it('treats "Resigned" with no last day as gone', () => {
     const gone = employee({ employmentStatus: 'Resigned', leftOn: null });
     expect(isEmployedOn(gone, '2027-01-10')).toBe(false);
     expect(isEmployedDuring(gone, '2027-01-01', '2027-01-31')).toBe(false);
   });
 
-  it('measures the employed share of a period (ASSUMPTION Q12 — not applied to pay in P1)', () => {
+  it('measures the employed share of a period (ASSUMPTION Q13 — not applied to pay in P1)', () => {
     expect(employedFraction(leaver, '2027-01-01', '2027-01-31')).toBeCloseTo(15 / 31);
     expect(employedFraction(joiner, '2027-01-01', '2027-01-31')).toBeCloseTo(11 / 31);
     expect(employedFraction(employee(), '2027-01-01', '2027-01-31')).toBe(1);

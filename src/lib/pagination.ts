@@ -66,3 +66,20 @@ export function paginate<T>(
     total,
   };
 }
+
+/**
+ * The footer range for a list the GATEWAY pages (`Page<T>`): the rows on screen are already one
+ * page, so only the range is computed. `shown` is the number of rows that page actually holds.
+ */
+export function serverPageSlice(
+  page: number,
+  pageSize: number,
+  total: number,
+  shown: number,
+): Omit<PageSlice<never>, 'items'> {
+  const size = Math.max(1, Math.floor(pageSize) || 1);
+  const pageCount = Math.max(1, Math.ceil(total / size));
+  const safe = Math.min(Math.max(Math.floor(page) || 1, 1), pageCount);
+  const from = shown === 0 ? 0 : (safe - 1) * size + 1;
+  return { page: safe, pageCount, from, to: shown === 0 ? 0 : from + shown - 1, total };
+}

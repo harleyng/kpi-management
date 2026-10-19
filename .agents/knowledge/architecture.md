@@ -25,7 +25,7 @@ scaffold (tooling, agent panel, workflow) on 2026-10-19; no OmniX business code 
 | Framework | React 18 + TypeScript (`strict: true`) + Vite 5 (`@vitejs/plugin-react-swc`) |
 | UI | shadcn-ui + Tailwind CSS + Radix. White background, primary `#863EEA` (`--primary: 265 80% 58%`) |
 | Server state | **React Query v5** over the `DataGateway`, in `src/hooks/queries/*` |
-| Client state | **Zustand** (`src/lib/*Store.ts`) + `SessionContext` (simulated tenant, user, role) |
+| Client state | **Zustand** (`src/lib/*Store.ts`) + `SessionContext` (simulated tenant and person; access = the union of their roles) |
 | Forms | React Hook Form + Zod |
 | Charts | Recharts (dashboard, Phase 3) |
 | Excel | **exceljs** for every import/export (not the npm `xlsx` package — outdated) |
@@ -48,11 +48,13 @@ src/
 │   ├── ui/                 # shadcn primitives — NEVER edited directly; wrap or compose instead
 │   ├── layout/             # AppShell, AppSidebar, TopBar (+ "Dữ liệu giả lập" banner), SidebarAccount,
 │   │                       #   RouteErrorBoundary, navConfig (5 groups by role)
-│   └── shared/             # PageHeader, PlaceholderPanel, EmptyState, ErrorStateCard, ConfirmDialog,
-│                           #   StatusBadge, Pagination, SearchInput, SectionTitle, CopyButton
+│   └── shared/             # PageHeader, PlaceholderPanel, EmptyState, ErrorState(Card), ConfirmDialog,
+│                           #   StatusBadge (+ per-set badges, statusTones), DataTable, FormField,
+│                           #   EntityCombobox, KpiPicker, EmployeePicker, OrgUnitTree, Pagination,
+│                           #   SearchInput, SectionTitle, CopyButton
 ├── contexts/
 │   ├── useSession.ts       # session contract + hook (a file with NO JSX)
-│   └── SessionContext.tsx  # the provider (Phase 0 placeholder; real switcher in 1.3)
+│   └── SessionContext.tsx  # the provider: tenants → directory → person → access profile (Phase 1.3)
 ├── data/
 │   ├── types.ts            # domain types (47 P1 tables + D1–D8) + FIXED STATE SETS with label maps
 │   └── fixtures/           # seed data — the CONTRACT between tracks (Phase 1.2)
@@ -75,28 +77,33 @@ in `components/shared/`.
 
 Every route lives in `src/App.tsx` under a single `<AppShell>`, each page its own `React.lazy` chunk.
 Navigation is defined in `src/components/layout/navConfig.ts` — **5 groups, 17 items** (plan §7.1).
-Menu filtering by role arrives in Phase 1.3 (`permissionRules`); in Phase 0 every group is shown.
+Each item names the **permission** that shows it and opens its route (`null` = every signed-in user). The
+sidebar shows `visibleNavGroups(NAV_GROUPS, access)` and the AppShell **route guard** renders ERR-KPI-05 for a
+path `canOpenPath` refuses — both in `src/lib/permissionRules.ts` (Phase 1.3). `navConfig.test.ts` fails if a
+route of `App.tsx` is neither a menu item nor in `PUBLIC_PATHS` (`/`, `*`). A detail page still checks its own
+record with `useSession().can(code, resource)`. Under the default matrix the menu is plan §7.1, except ADMIN,
+who holds every permission and sees all five groups.
 
-| Route | Page | Menu group · roles | WBS / phase |
+| Route | Page | Menu group · permission (default holders; ADMIN holds all) | WBS / phase |
 |---|---|---|---|
 | `/` | → redirects to `/my/kpi` | — | — |
-| `/my/kpi` | KPI của tôi | Của tôi · all | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
-| `/my/tasks` | Việc cần xử lý | Của tôi · all | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi | Của tôi · all | 4.6.4 (T6), 4.7.2 (Phase 3) |
-| `/team/kpi` | KPI đội nhóm | Đội nhóm · MANAGER | 4.3.4 (T3) |
-| `/team/reviews` | Duyệt & đánh giá | Đội nhóm · MANAGER | 4.5.2–4.5.4 (T5) |
-| `/dashboard` | Dashboard | Điều hành · BOD, MANAGER, HR | 4.7.1–4.7.4 (Phase 3) |
-| `/admin/cycles` | Chu kỳ | Quản trị KPI · HR, CNB | 4.3.1, 4.3.6 (T3) |
-| `/admin/library` | Thư viện KPI | Quản trị KPI · HR, CNB | 4.2.1–4.2.3, 4.2.5 (T2) |
-| `/admin/templates` | Bộ mẫu | Quản trị KPI · HR, CNB | 4.2.4 (T2) |
-| `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · HR, CNB | D5, 4.5.1 (T5) |
-| `/admin/actuals` | Số liệu & import | Quản trị KPI · HR, CNB | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
-| `/admin/results` | Kết quả & lương | Quản trị KPI · HR, CNB | 4.6.1–4.6.4 (T6) |
-| `/system/org` | Tổ chức | Hệ thống · ADMIN | 4.1.1–4.1.4, 4.1.7 (T1) |
-| `/system/users` | Người dùng & quyền | Hệ thống · ADMIN | 4.1.5–4.1.6 (T1) |
-| `/system/data-sources` | Nguồn dữ liệu | Hệ thống · ADMIN | 4.4.1, 4.4.4–4.4.5 (T4) |
-| `/system/notification-templates` | Mẫu thông báo | Hệ thống · ADMIN | 4.8.1–4.8.3 (T7) |
-| `/system/audit-log` | Nhật ký | Hệ thống · ADMIN | 4.8.4 (T7) |
+| `/my/kpi` | KPI của tôi | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
+| `/my/tasks` | Việc cần xử lý | Của tôi · — (all) | 4.5.5 (T5) |
+| `/my/results` | Kết quả của tôi | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
+| `/team/kpi` | KPI đội nhóm | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
+| `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
+| `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
+| `/admin/cycles` | Chu kỳ | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
+| `/admin/library` | Thư viện KPI | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 (T2) |
+| `/admin/templates` | Bộ mẫu | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2) |
+| `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
+| `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
+| `/admin/results` | Kết quả & lương | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
+| `/system/org` | Tổ chức | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
+| `/system/users` | Người dùng & quyền | Hệ thống · `user.manage` | 4.1.5–4.1.6 (T1) |
+| `/system/data-sources` | Nguồn dữ liệu | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
+| `/system/notification-templates` | Mẫu thông báo | Hệ thống · `notification.manage` | 4.8.1–4.8.3 (T7) |
+| `/system/audit-log` | Nhật ký | Hệ thống · `audit.view` | 4.8.4 (T7) |
 | `*` | Không tìm thấy trang | — | — |
 
 The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step.
@@ -191,7 +198,7 @@ delta Phase 5 applies when it writes the SQL schema.
 ## Phases (plan §6)
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed · **1.3** session
-+ permissions · **1.4** app shell + UI kit · **1.5** rule engines (parallel) → **Gate 1** (fixtures
++ permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (parallel) → **Gate 1** (fixtures
 frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 

@@ -9,6 +9,37 @@
 
 ---
 
+## 2026-10-19 — React Router v6 hands out a NEW `navigate` after every navigation
+
+`useNavigate()` (outside a data router) returns a function that depends on the current location, so a
+`useCallback(…, [navigate])` is re-created on every route change — and a context value memoised on it
+re-renders EVERY consumer on every navigation. Caught by the SessionProvider stability test.
+
+**Rule.** In a provider or any long-lived handler, keep `navigate` in a ref (`latest.current.navigate`)
+and give the callback no dependency on it.
+
+---
+
+## 2026-10-19 — Node ≥ 22's global `localStorage` shadows jsdom's in Vitest
+
+Node ships an experimental `localStorage` accessor that is `undefined` without `--localstorage-file`, and it
+wins over jsdom's: `localStorage.clear()` in a test throws "Cannot read properties of undefined". Reading it
+also prints an ExperimentalWarning per worker.
+
+**Rule.** `src/test/setup.ts` re-points `localStorage` / `sessionStorage` at `globalThis.jsdom.window` when
+the global is Node's accessor (checked through the property descriptor, never by reading it). Do not remove it.
+
+---
+
+## 2026-10-19 — The session hooks are the ONE place a hook takes `tenantId` explicitly
+
+`useTenants` / `useSessionDirectory(tenantId)` (`src/hooks/queries/session.ts`) run inside the
+`SessionProvider`, before `useSession()` exists. Every other hook reads the tenant from `useSession()`;
+do not copy the explicit-tenant shape elsewhere. A disabled `useSessionDirectory(null)` is `isPending`
+for ever — the provider checks for a tenant first.
+
+---
+
 ## 2026-10-15 — `NavLink` overwrites the `aria-current` you pass it
 
 A link meant to be "current" on pages outside its own url LOOKED current (its class came from our own

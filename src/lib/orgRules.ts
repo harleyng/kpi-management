@@ -70,6 +70,14 @@ export function wouldCreateUnitCycle(units: readonly OrgUnit[], unitId: Id, newP
 /** A `Resigned` employee with no recorded last day is treated as gone. */
 const leftWithoutDate = (e: Employee) => e.employmentStatus === 'Resigned' && e.leftOn === null;
 
+/**
+ * Not yet gone on `date`: `leftOn` (the last working day) is not before it, and not "Resigned" without
+ * a last day. Ignores the hire date — what a scope needs (a person is in scope until they leave).
+ */
+export function isStillEmployedOn(employee: Employee, date: IsoDate): boolean {
+  return !leftWithoutDate(employee) && (employee.leftOn === null || employee.leftOn >= date);
+}
+
 /** Employed on `date`: hired by then and `leftOn` (the last working day) not before it. */
 export function isEmployedOn(employee: Employee, date: IsoDate): boolean {
   return !leftWithoutDate(employee) && isWithin(date, employee.hireDate, employee.leftOn);
@@ -82,7 +90,7 @@ export function isEmployedDuring(employee: Employee, start: IsoDate, end: IsoDat
 }
 
 /**
- * The share of `[start, end]` the employee was employed, 0–1. Exposed for `ASSUMPTION Q12`: P1 does
+ * The share of `[start, end]` the employee was employed, 0–1. Exposed for `ASSUMPTION Q13`: P1 does
  * NOT prorate the payout for a mid-period joiner or leaver; this is what a proration would use.
  */
 export function employedFraction(employee: Employee, start: IsoDate, end: IsoDate): number {
@@ -111,7 +119,7 @@ export function scopeSubjectOn(employee: Employee, assignments: readonly Employe
     employeeId: employee.id,
     orgUnitIds: [...new Set(current.map((a) => a.orgUnitId))],
     managerEmployeeIds: [...new Set(current.map((a) => a.managerEmployeeId).filter((m): m is Id => m !== null))],
-    inScope: !leftWithoutDate(employee) && (employee.leftOn === null || employee.leftOn >= date),
+    inScope: isStillEmployedOn(employee, date),
   };
 }
 

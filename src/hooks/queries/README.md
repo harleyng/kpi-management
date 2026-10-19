@@ -23,6 +23,8 @@ components/pages → src/hooks/queries/<domain>.ts → getDataGateway() → mock
   }
   ```
   `tenantId` in the key means switching tenant can never serve another tenant's cached rows.
+  **The one exception:** `session.ts` (`useTenants`, `useSessionDirectory(tenantId)`) runs inside the
+  `SessionProvider`, before a session exists, so it takes the tenant explicitly. Nothing else does.
 - **Reads** use `useQuery`; `staleTime` matches how fast the data really changes.
 - **Writes** use `useMutation` that calls `queryClient.invalidateQueries` on success for every key
   it changed, plus a `sonner` toast. On error, show the catalogue copy (`errorSpecOf(error)` from

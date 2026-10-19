@@ -88,6 +88,25 @@ sequenceDiagram
   từ lúc mở khóa.
 - Thao tác thay (HR làm thay) và ủy quyền đều ghi nhận **cả hai người**.
 
+## 4A. Ai thấy gì, ai làm gì (Phase 1.3)
+
+- **Quyền khác với lượt xử lý.** Quyền (`business-rules.md` §9) quyết định một người được *mở* màn hình nào và
+  *xem* dữ liệu của ai. Còn ai được gửi, duyệt hay trả lại một phiếu thì do **người xử lý của bước** quyết định
+  (BR-KPI-20), không phải do quyền. Vì vậy không có quyền "duyệt KPI".
+- **Mỗi người nhận đủ quyền của mọi vai trò mình có.** Ai có hồ sơ nhân viên đều có vai trò Nhân viên, nên
+  ai cũng có mục "Của tôi". Quản lý có thêm "Đội nhóm" và "Điều hành", HR và C&B có "Quản trị KPI", Quản trị
+  hệ thống thấy tất cả.
+- **Phạm vi dữ liệu:**
+  - Nhân viên: của bản thân.
+  - Quản lý: đơn vị mình phụ trách và các đơn vị con.
+  - HR, C&B, Ban điều hành, Quản trị hệ thống: toàn công ty.
+  - KPI công ty: mọi người đều xem được, vì cascade bắt đầu từ đó.
+- **Nhập URL trực tiếp không vượt quyền được.** Trang ngoài quyền hiện thông báo "Bạn không có quyền thực
+  hiện thao tác này" và nút về trang chủ.
+- **Chạy thử nhiều vai trò không cần đăng nhập lại.** Thanh trên cùng có ô chọn **công ty** và ô chọn **người
+  dùng** (nhóm theo vai trò, tìm theo tên, đơn vị, vai trò). Đổi công ty thì không còn thấy dữ liệu của công
+  ty kia.
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -112,10 +131,19 @@ trực tiếp đến quy trình:
 | Q10 | "Kế hoạch công việc tháng" (PMGM.08) có thuộc P1 không? | Không | Product owner |
 | — | Goal Plan có trạng thái "Bị trả lại" riêng không? (Plan có, ERD chưa có) | Có — chốt ở Phase 1.1 | System architect + HR |
 | — | Bước nào khóa khi quá hạn, bước nào tự chuyển? | Đăng ký: khóa; đánh giá: tự chuyển | HR |
+| Q12 | Danh mục quyền, quyền mặc định của từng vai trò và phạm vi dữ liệu? (Các tài liệu nguồn không nêu) | Như `business-rules.md` §9 | Product owner + HR |
+| Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 
 ## 7. Quyết định đã chốt
 
 *(Ghi ngày, quyết định và lý do khi từng điểm trên được chốt.)*
+
+- **19/10/2026 — Chọn người dùng, không chọn vai trò.** Quyền của một người là tổng quyền mọi vai trò người đó
+  có (BR-KPI-60). Bộ chuyển trên thanh trên chỉ đổi công ty và người dùng. *Lý do: một khái niệm ít hơn để giải
+  thích khi demo, và giống hệ thống thật.*
+- **19/10/2026 — Quản lý xem theo đơn vị phụ trách và các đơn vị con.** Phạm vi "cấp dưới trực tiếp" vẫn dùng
+  được cho trưởng nhóm không phụ trách đơn vị.
+- **19/10/2026 — Quản trị hệ thống có toàn bộ quyền** và thấy cả 5 nhóm menu. Đây là điểm khác plan §7.1.
 
 **19/10/2026 — Phase 1.5, các quy tắc tính và quy trình (product owner duyệt).** Chi tiết: `business-rules.md`.
 
@@ -126,6 +154,6 @@ trực tiếp đến quy trình:
   cao nhất; chưa đạt L1 thì 0%.
 - **Xếp loại** đọc điểm đã làm tròn 2 chữ số (89,995 → 90,00 → loại B).
 - **Người nghỉ việc giữa kỳ** vẫn được đánh giá cho kỳ có làm việc; phần chỉ tiêu đã giao cho họ quay
-  về "chưa giao"; % lương KPI không chia theo số ngày làm việc (giả định Q12).
+  về "chưa giao"; % lương KPI không chia theo số ngày làm việc (giả định Q13).
 - **Khóa khi quá hạn** chỉ dùng cho phiếu đăng ký. Không ai được duyệt phiếu của chính mình. HR được làm
   thay ở bước không có người xử lý, để phiếu không bị kẹt.

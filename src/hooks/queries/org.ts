@@ -1,0 +1,41 @@
+import { useQuery } from '@tanstack/react-query';
+import { useSession } from '@/contexts/useSession';
+import { getDataGateway } from '@/integrations/data';
+import type { EmployeeFilter } from '@/integrations/data/types';
+
+/**
+ * G1 · Tổ chức — reads the shared pickers need (Phase 1.4). Track T1 adds the writes beside them.
+ *
+ * Keys are `[tenantId, root, ...params]` (CLAUDE.md rule 7), so switching tenant can never serve
+ * another tenant's cached rows and `[tenantId, root]` invalidates every variant of a list.
+ * The org changes rarely during a session, hence the long `staleTime`.
+ */
+
+const ORG_STALE_MS = 5 * 60 * 1000;
+
+export const orgUnitsKey = (tenantId: string) => [tenantId, 'orgUnits'] as const;
+
+export function useOrgUnits() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: orgUnitsKey(tenantId),
+    queryFn: () => getDataGateway().org.listOrgUnits(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}
+
+/**
+ * `filter` goes into the key as-is. Do not pass a picker's live search text here: every keystroke
+ * would be a new key and a pending flash — pickers filter the loaded list on the client.
+ */
+export const employeesKey = (tenantId: string, filter: EmployeeFilter = {}) =>
+  [tenantId, 'employees', filter] as const;
+
+export function useEmployees(filter: EmployeeFilter = {}) {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: employeesKey(tenantId, filter),
+    queryFn: () => getDataGateway().org.listEmployees(tenantId, filter),
+    staleTime: ORG_STALE_MS,
+  });
+}

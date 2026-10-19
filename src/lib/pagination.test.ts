@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, paginate } from './pagination';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, paginate, serverPageSlice } from './pagination';
 
 const rows = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
 
@@ -57,5 +57,19 @@ describe('PAGE_SIZE_OPTIONS', () => {
 
   it('is ascending — a size list that jumps around reads as a bug', () => {
     expect([...PAGE_SIZE_OPTIONS]).toEqual([...PAGE_SIZE_OPTIONS].sort((a, b) => a - b));
+  });
+});
+
+describe('serverPageSlice', () => {
+  it('reports the range of the page the gateway returned', () => {
+    expect(serverPageSlice(3, 20, 45, 5)).toEqual({ page: 3, pageCount: 3, from: 41, to: 45, total: 45 });
+  });
+
+  it('reads an empty page as an empty range', () => {
+    expect(serverPageSlice(1, 20, 0, 0)).toEqual({ page: 1, pageCount: 1, from: 0, to: 0, total: 0 });
+  });
+
+  it('clamps a page past the end', () => {
+    expect(serverPageSlice(9, 20, 45, 5).page).toBe(3);
   });
 });
