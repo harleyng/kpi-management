@@ -244,6 +244,35 @@ form once its editor route exists; T4 reuses `EvidenceAttach`; T7 links notifica
 
 **Updated alongside.** `architecture.md` (route table), `business-rules.md` §5 (derived flags),
 `component-registry.md`, `common-pitfalls.md`.
+## 2026-10-19 — T6: payroll export takes Final or Locked Employee results, blank % never blocks, status never changes
+
+**Decision.** `results.exportPayroll` is wired (T6, BR-KPI-45): the period's Employee results that are
+Final OR Locked (`ASSUMPTION Q38`) go into an `.xlsx` (exceljs, dynamically imported by
+`mock/payrollWorkbook.ts` only), every number copied from the stored result; a null payout is a blank cell
+with its reason (`ASSUMPTION Q39`); exporting changes no status, works in a Closed cycle and is repeatable.
+Async work in a mock write goes through the new `Runtime.preparedWrite` (authorize → prepare → await
+render → re-authorize and re-check → commit; `CHANGED_DURING_WRITE`). The rating scale is read-only until
+Q2 is answered; payout rules are editable. An employee sees a result's figures only once it is Final or
+Locked (BR-KPI-46). `primaryAssignmentOn` breaks same-day ties by id. The seed is untouched: no export is
+seeded, freeze hash unchanged, so no other track is affected.
+
+**Why.** Requiring Locked would make C&B wait on a second HR act although a Final result is already
+frozen; making export lock would turn a read into a lifecycle change. Blocking a blank % would block the
+period forever — a Final result is never recomputed, so adding a rule afterwards cannot fill it — and
+writing 0 would tell payroll to pay nothing. CSV breaks in Vietnamese-locale Excel (`;`, decimal comma).
+Rendering in a read then writing would build data for a refused actor and race a lock in between. Showing
+an employee a Draft promises a figure HR may still adjust. A same-day tie decided by row order could put a
+person in a different unit in the file than the one their payout % was read for.
+
+**Consequence.** HR finalises and locks; only C&B (and ADMIN) exports. Mock files live in memory: after a
+reload the record stays and the file is exported again. The sources are silent on all of this — a Syntra
+decision (`source-map.md`, "Where the sources are silent").
+
+**Updated alongside.** `business-rules.md` (§0 glossary, BR-KPI-43, 45, 46, §8 Q38, Q39); `docs/flows/new-flow.md`
+§4B, §5, §6, §7; `architecture.md` (routes, `preparedWrite`, deferrals); `component-registry.md`;
+`common-pitfalls.md`; `docs/source-map.md`; `src/data/fixtures/README.md`.
+
+---
 
 ## 2026-10-19 — Gate 1 passed: rules wired, permissions enforced, fixtures frozen
 

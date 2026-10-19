@@ -6,6 +6,7 @@ import {
   isEmployedDuring,
   isEffectiveOn,
   isEmployedOn,
+  latestFirst,
   isStillEmployedOn,
   managerOf,
   primaryAssignmentOn,
@@ -193,5 +194,15 @@ describe('wouldCreateReportingCycle', () => {
   it('stops on a loop already in the data', () => {
     const loop = [assignment({ id: 'p', employeeId: 'p', managerEmployeeId: 'q' }), assignment({ id: 'q', employeeId: 'q', managerEmployeeId: 'p' })];
     expect(wouldCreateReportingCycle(loop, 'z', 'p', '2027-04-06')).toBe(false);
+  });
+});
+
+describe('latestFirst — a deterministic order for assignments', () => {
+  it('latest start first; the same start ordered by id, whatever the input order', () => {
+    const a = assignment({ id: 'as-a', effectiveFrom: '2027-01-01' });
+    const b = assignment({ id: 'as-b', effectiveFrom: '2027-01-01' });
+    const old = assignment({ id: 'as-0', effectiveFrom: '2020-01-01' });
+    expect([old, b, a].sort(latestFirst).map((x) => x.id)).toEqual(['as-a', 'as-b', 'as-0']);
+    expect(primaryAssignmentOn('e1', [b, a], '2027-02-01')?.id).toBe(primaryAssignmentOn('e1', [a, b], '2027-02-01')?.id);
   });
 });

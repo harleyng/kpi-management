@@ -18,8 +18,8 @@ freeze test means a fixture or the `DataGateway` contract changed — a **Large*
 5. `/log-decision`.
 
 What the seed still leaves to the tracks (`seed.test.ts`): the states T1 `Tenant:Suspended`, T3
-`Cycle:Evaluating`, T4 `Sync run:Running` (`STATE_EXEMPTIONS`), and the empty `PayrollExport` (T6,
-`EMPTY_UNTIL_WIRED`).
+`Cycle:Evaluating`, T4 `Sync run:Running` (`STATE_EXEMPTIONS`), and the empty `PayrollExport` (T6
+wired `exportPayroll` without seeding one — a demo starts with no export; `EMPTY_UNTIL_WIRED`).
 
 ## Layout
 
@@ -50,8 +50,8 @@ What the seed still leaves to the tracks (`seed.test.ts`): the states T1 `Tenant
 - **No real personal data.** Names are fictional; nothing is copied from the DATX "TH KQ" sheet.
 - **No derived value is stored by hand** (total weight, "chưa giao", scores). `PeriodResult` /
   `ResultDetail` are PRODUCED by `ResultScript` (`results.ts`) running the same `resultRules`
-  orchestrators the mock's `results.*` methods call; `PayrollExport` stays empty until T6 wires
-  `exportPayroll` (`seed.test.ts` `EMPTY_UNTIL_WIRED`).
+  orchestrators the mock's `results.*` methods call; `PayrollExport` stays empty: T6 wired
+  `exportPayroll` and kept the seed frozen (`seed.test.ts` `EMPTY_UNTIL_WIRED`).
 - Every state of every status set appears (plan §6.4); the few that cannot are listed with a reason in
   `seed.test.ts` (`STATE_EXEMPTIONS`).
 - Values that depend on an open question are marked `// ASSUMPTION Qn`.

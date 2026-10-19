@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { CycleStatus, FormType } from '@/data/types';
+import type { CycleStatus, FormType, PerformanceCycle } from '@/data/types';
 import { months2027, period } from '@/test/builders';
 import {
-  CYCLE_NEXT,
   canEditCycle,
   canLockPeriod,
+  CYCLE_NEXT,
   cycleAllowsLaunch,
   cycleIssues,
   defaultCycleId,
+  defaultResultCycle,
+  defaultResultPeriod,
   generatePeriods,
   mergeGeneratedPeriods,
   nextCycleStatus,
@@ -242,5 +244,35 @@ describe('defaultCycleId — the cycle a screen opens on', () => {
     expect(defaultCycleId([c('a', 'Planning', '2028-01-01'), c('b', 'Evaluating', '2027-01-01')])).toBe('b');
     expect(defaultCycleId([c('a', 'Closed', '2025-01-01'), c('b', 'Closed', '2026-01-01')])).toBe('b');
     expect(defaultCycleId([])).toBeNull();
+  });
+});
+
+describe('defaultResultPeriod / defaultResultCycle (T6 screens)', () => {
+  const months = months2027();
+  const q1 = period({ id: 'Q1', periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31' });
+
+  it('opens on the latest month already over', () => {
+    expect(defaultResultPeriod([q1, ...months], '2027-04-06')?.id).toBe('T03');
+    expect(defaultResultPeriod(months, '2027-04-01')?.id).toBe('T03');
+    expect(defaultResultPeriod(months, '2027-03-31')?.id).toBe('T02');
+  });
+
+  it('falls back to the first month, then the first period, then null', () => {
+    expect(defaultResultPeriod([...months].reverse(), '2026-12-01')?.id).toBe('T01');
+    expect(defaultResultPeriod([q1], '2027-06-01')?.id).toBe('Q1');
+    expect(defaultResultPeriod([], '2027-06-01')).toBeNull();
+  });
+
+  const c = (id: string, status: CycleStatus, startDate: string): PerformanceCycle => ({
+    id, tenantId: 't1', name: id, startDate, endDate: `${startDate.slice(0, 4)}-12-31`, ratingScaleId: null, status,
+  });
+
+  it('prefers the Active cycle, then Evaluating, then the latest started', () => {
+    const cycles = [c('2026', 'Closed', '2026-01-01'), c('2027', 'Active', '2027-01-01'), c('2028', 'Planning', '2028-01-01')];
+    expect(defaultResultCycle(cycles, '2027-04-06')?.id).toBe('2027');
+    expect(defaultResultCycle([c('2026', 'Evaluating', '2026-01-01'), c('2028', 'Planning', '2028-01-01')], '2027-04-06')?.id).toBe('2026');
+    expect(defaultResultCycle([c('2026', 'Closed', '2026-01-01'), c('2028', 'Planning', '2028-01-01')], '2027-04-06')?.id).toBe('2026');
+    expect(defaultResultCycle([c('2028', 'Planning', '2028-01-01')], '2027-04-06')?.id).toBe('2028');
+    expect(defaultResultCycle([], '2027-04-06')).toBeNull();
   });
 });

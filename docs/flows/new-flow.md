@@ -169,8 +169,15 @@ Sau khi phiếu đánh giá hoàn thành:
 3. **Chốt kết quả (C&B/HR).** Chốt một số hoặc toàn bộ bản nháp của kỳ. Điểm được làm tròn 2 chữ số
    một lần. Chỉ cần MỘT kết quả còn vướng (tổng trọng số ≠ 100%, chỉ tiêu chưa có điểm hoặc không tính
    được) thì không kết quả nào được chốt, và màn hình liệt kê mọi chỗ vướng.
-4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa để chuyển lương; bản nháp giữ nguyên.
-5. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
+4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa, không sửa được nữa; bản nháp giữ nguyên. Khóa
+   kết quả không khóa kỳ nhập số liệu.
+5. **Xuất file lương (C&B).** C&B xuất file Excel gồm kết quả cá nhân **đã chốt hoặc đã khóa** của kỳ
+   (giả định Q38): mã NV, họ tên, đơn vị, chức danh, điểm KPI (đã gồm điều chỉnh), điều chỉnh điểm, xếp
+   loại, % hưởng lương KPI. Bản tạm tính và kết quả phòng ban/công ty không có trong file. Kết quả chưa có
+   % hưởng lương KPI vẫn có trong file, cột % để trống kèm ghi chú (giả định Q39). Xuất file không đổi
+   trạng thái kết quả; xuất lại bao nhiêu lần cũng được, mỗi lần một file trong lịch sử xuất file.
+6. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
+7. **Nhân viên xem "Kết quả của tôi"** sau khi HR chốt. Bản tạm tính hiện "Đang tổng hợp", không có số.
 
 ## 4C. Tổ chức và nhân sự (Track T1)
 
@@ -257,7 +264,7 @@ flowchart LR
 | 3 | "Khóa sau hạn" chỉ là lời nhắc | Khóa thật, hoặc tự chuyển bước, theo cấu hình | Quy tắc có hiệu lực | BR-KPI-13, 14 |
 | 4 | Không thấy phần chưa giao | Hệ thống tính "chưa giao" cho từng KPI cascade | Quản lý giao đủ, không giao vượt | BR-KPI-07 |
 | 5 | Số liệu không nguồn, không bằng chứng | Mỗi KPI có nguồn; mỗi số ghi rõ tay / Excel / API; bằng chứng đính kèm | Kiểm chứng được khi chấm | BR-KPI-05, 52 |
-| 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % lương tính tự động; dashboard sống | Ban điều hành thấy ngay | BR-KPI-35, 40–44 |
+| 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % hưởng lương KPI tính tự động; file lương xuất từ kết quả đã chốt; dashboard sống | Ban điều hành thấy ngay; C&B không chép số tay | BR-KPI-35, 40–46 |
 | 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch (ngày 1 hằng tháng) | Không quên kỳ nào | BR-KPI-19 (D5) |
 | 8 | Mỗi phòng tự gõ bộ KPI trong sheet riêng, tổng trọng số có bộ không đủ 100% | Thư viện chỉ tiêu mẫu và bộ mẫu dùng chung; trọng số lệch được cảnh báo | Cùng tên, cùng cách tính giữa các phòng | BR-KPI-74…76 |
 
@@ -291,6 +298,8 @@ trực tiếp đến quy trình:
 | Q35 | Có nhập số cho chỉ tiêu khi Goal Plan chưa duyệt/khóa không? | Không | Product owner + HR |
 | Q36 | Quý, nửa năm, năm có số thực tế riêng không? | Không: chỉ nhập theo tháng, kỳ dài hơn tự cộng | HR |
 | Q37 | Đồng bộ API có ghi đè số người đã nhập (tay, Excel) không? | Không: bỏ qua và ghi nhật ký | HR |
+| Q38 | Kết quả nào được xuất sang lương, và xuất có khóa kết quả không? | Kết quả cá nhân đã chốt hoặc đã khóa; xuất không đổi trạng thái | Product owner + C&B |
+| Q39 | Kết quả đã chốt nhưng chưa có % hưởng lương KPI (chưa có quy tắc, chưa xếp loại): chặn xuất hay vẫn xuất? | Vẫn xuất, cột % để trống kèm ghi chú | C&B |
 
 ## 7. Quyết định đã chốt
 
@@ -370,3 +379,11 @@ trực tiếp đến quy trình:
 - Chỉ nhập số cho chỉ tiêu của Goal Plan đã duyệt hoặc đã khóa (Q35); chỉ nhập theo tháng (Q36).
 - Đồng bộ API không ghi đè số do người nhập (Q37); import Excel thì ghi đè, có cảnh báo trước khi ghi nhận.
 - Import Excel ghi cả lô hoặc không ghi gì; tệp sửa lại được tải lên thành lô mới.
+**19/10/2026 — Track T6, kết quả và file lương (product owner duyệt).**
+
+- File lương lấy kết quả cá nhân đã chốt hoặc đã khóa; xuất file không khóa kết quả (giả định Q38).
+- Kết quả chưa có % hưởng lương KPI vẫn có trong file, để trống kèm ghi chú (giả định Q39).
+- Chỉ C&B (và quản trị hệ thống) xuất file lương; HR tính, điều chỉnh, chốt và khóa.
+- Thang xếp loại mẫu chỉ xem, chưa sửa trên màn hình cho tới khi có câu trả lời Q2; quy tắc quy đổi thì
+  sửa được để thử.
+- Nhân viên chỉ thấy số của kết quả đã chốt.

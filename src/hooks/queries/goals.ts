@@ -155,9 +155,10 @@ export function useKgis(goalPlanId: Id | null) {
 const normalizeGoalFilter = (filter: GoalFilter): GoalFilter => (filter.goalPlanIds ? { ...filter, goalPlanIds: sortedIds(filter.goalPlanIds) } : filter);
 
 /**
- * EVERY goal row matching `filter`, unfiltered by visibility — for aggregates (totals, buckets), and for a
- * FORM's own plan, whose actors are already entitled to the whole plan (its weighted total needs every
- * goal; T5). Anywhere else, never render its names — use `useGoals`.
+ * EVERY goal row matching `filter`, unfiltered by visibility — for aggregates (totals, buckets), and for
+ * the plan behind one FORM or one RESULT, whose viewer is already entitled to that whole plan (its weighted
+ * total needs every goal; T5 forms, T6 result detail and finalise check). Anywhere else, never render its
+ * names — use `useGoals`.
  */
 export function useGoalRows(filter: GoalFilter = {}, options: { enabled?: boolean } = {}) {
   const { tenantId } = useSession();

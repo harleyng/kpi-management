@@ -104,3 +104,9 @@ and positions, accounts, role guard rails) or tenant management. Every rule in `
 (BR-KPI-65…73) is a **Syntra decision**, tagged `ASSUMPTION Q19`–`Q24`. The ERD gives only the tables
 (`ORG_UNIT`, `JOB_POSITION`, `EMPLOYEE`, `EMPLOYEE_ASSIGNMENT`, `USER_ACCOUNT`, `ROLE`, `USER_ROLE`).
 
+## Where the sources are silent
+
+| Topic | What exists | Rule |
+|---|---|---|
+| The payroll hand-off (T6) — the file's columns, who exports, when (before or after lock) | Only ERD `PAYROLL_EXPORT` (the export log: period, file, who, when). DATX "TH KQ" lists result columns but no hand-off; CMC, SF4C, the email template and the minutes say nothing | BR-KPI-45 — a Syntra decision; `ASSUMPTION Q38`, `Q39` |
+| What an employee sees of a result before HR finalises it | Nothing | BR-KPI-46 — a Syntra decision |

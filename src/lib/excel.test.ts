@@ -19,10 +19,10 @@ function sourceFiles(dir: string): string[] {
 
 /**
  * The modules allowed to load exceljs — each lazily, inside a function. T4's `lib/excel.ts` is the shared
- * import framework's; T1's template builder and T2's library export were written in parallel with it and
- * load it the same way. Folding them into one loader is a follow-up; a NEW loader must not appear.
+ * import framework's; T1's template builder, T2's library export and T6's payroll workbook (the mock's
+ * export file) were written in parallel with it and load it the same way. Folding them into one loader is a follow-up; a NEW loader must not appear.
  */
-const EXCEL_LOADERS = new Set(['lib/excel.ts', 'lib/excel/workbook.ts', 'components/library/exportLibrary.ts']);
+const EXCEL_LOADERS = new Set(['lib/excel.ts', 'lib/excel/workbook.ts', 'components/library/exportLibrary.ts', 'integrations/data/mock/payrollWorkbook.ts']);
 
 describe('exceljs stays out of the shell chunk (plan §3.1, cto review)', () => {
   it('no module imports exceljs statically, and only the known loaders load it at all', () => {

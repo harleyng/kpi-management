@@ -5,6 +5,7 @@ import type { AuditLog, Id, NotificationTemplate } from '@/data/types';
 import { getDataGateway } from '@/integrations/data';
 import type { AuditLogFilter, Upsert, UploadFileInput } from '@/integrations/data/types';
 import { isInAppNotification } from '@/lib/notificationRules';
+import { downloadUrl } from '@/lib/utils';
 import { queryKey } from './keys';
 
 /**
@@ -217,4 +218,22 @@ export function useAuditEntries(filter: AuditLogFilter, options: { enabled?: boo
     },
     enabled: options.enabled ?? true,
   });
+}
+
+// ─── Downloads (T6, payroll files) ────────────────────────────────────────────────────────────
+
+/** Opens a stored file as a download. Resolves with the file name; rejects with the gateway's error. */
+export async function downloadFile(tenantId: Id, fileId: Id): Promise<string> {
+  const gateway = getDataGateway();
+  const file = await gateway.system.getFile(tenantId, fileId);
+  // Mock files live in memory only: after a reload this rejects ERR-KPI-02 (export again).
+  const url = await gateway.system.getFileUrl(tenantId, fileId);
+  downloadUrl(url, file.fileName);
+  return file.fileName;
+}
+
+/** A download as a mutation, so a screen can show its pending and failed state per row. */
+export function useDownloadFile() {
+  const { tenantId } = useSession();
+  return useMutation({ mutationFn: (fileId: Id) => downloadFile(tenantId, fileId) });
 }

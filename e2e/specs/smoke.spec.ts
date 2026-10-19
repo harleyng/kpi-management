@@ -42,6 +42,7 @@ const BUILT: ReadonlySet<string> = new Set([
   '/my/kpi', '/team/kpi', '/admin/cycles', // T3
   '/admin/actuals', '/system/data-sources', // T4
   '/my/tasks', '/team/reviews', '/admin/launches', // T5
+  '/my/results', '/admin/results', // T6
 ]);
 
 /**
@@ -99,7 +100,8 @@ test.describe('@smoke app shell', () => {
         .getByRole('link', { name: title, exact: true })
         .click();
 
-      await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
+      // A built screen may keep its selection in the query string (`?cycle=&period=`).
+      await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}(\\?.*)?$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
       if (built) {
         await expect(page.getByRole(built[0], { name: built[1] })).toBeVisible();

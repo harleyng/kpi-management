@@ -131,8 +131,9 @@ export const STATE_EXEMPTIONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Collections the seed leaves empty until a Phase 2 track's own deferred method fills them:
- * `PayrollExport` waits for T6's `exportPayroll` (WBS 4.6.4) — the export file is that track's work.
+ * Collections the seed leaves empty on purpose, each filled by a Phase 2 track's own method:
+ * `PayrollExport` — T6 wired `exportPayroll` (WBS 4.6.4) without seeding an export, so the fixtures
+ * stayed frozen and a demo starts with none; a test that needs one exports first.
  */
 export const EMPTY_UNTIL_WIRED: ReadonlySet<CollectionName> = new Set<CollectionName>(['PayrollExport']);
 

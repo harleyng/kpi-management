@@ -94,7 +94,7 @@ who holds every permission and sees all five groups.
 | `/` | → redirects to `/my/kpi` | — | — |
 | `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/tasks` | Việc cần xử lý — tabs Cần xử lý · Phiếu của tôi · Ủy quyền (`?tab=`) | Của tôi · — (all) | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
+| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-46) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
 | `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
 | `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
@@ -103,7 +103,7 @@ who holds every permission and sees all five groups.
 | `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
 | `/admin/launches` | Khởi chạy phiếu — tabs Đợt khởi chạy · Lịch tự khởi chạy · Phiếu · Quy trình (the last only with `cycle.manage`); `?tab=` and `?launch=` in the URL | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
 | `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
-| `/admin/results` | Kết quả & lương | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
+| `/admin/results` | Kết quả & lương — **built (T6)**: tabs Kết quả kỳ · Xếp loại & quy đổi · Xuất file lương (`?tab=&cycle=&period=`); export needs `result.export` (CNB) | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
 | `/system/org` | Tổ chức | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
 | `/system/users` | Người dùng & quyền | Hệ thống · `user.manage` | 4.1.5–4.1.6 (T1) |
 | `/system/data-sources` | Nguồn dữ liệu | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
@@ -231,6 +231,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `imports.ts` (T4) | The batch-import framework's per-type handlers (`validate` at stage, `apply` at commit) and `actualImportContext(tx, cycleId)` — a lookup table, the decisions are `src/lib` rules |
 | `actualWrites.ts` (T4) | `writeActualSnapshot` — THE way an actual is written (manual, Excel, API: new current snapshot, previous one retired) — and `writeImportEvidence` |
 | `erpSaleSimulator.ts` (T4) | `simulatedErpReading` — the simulated ERP Sale's answer for (goal, month): deterministic data, not a calculation (BR-KPI-56) |
+| `payrollWorkbook.ts` (T6) | Renders `payrollRules.buildPayrollSheet` as the `.xlsx` payroll file (sheets "Lương KPI", "Thông tin") — the ONLY importer of exceljs, dynamically, so it is an async chunk of its own |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
 `groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
@@ -241,13 +242,23 @@ guards: `saveCalcMethod` (`validateCalcMethod`), `saveRatingScale` (`validateRat
 `savePayoutRule` (`validatePayoutRule` + level in scale) — a reference that does not resolve is left to
 the integrity check, so a foreign id still answers like a missing one.
 
+`results.exportPayroll` (T6, BR-KPI-45) is the one method built on **`Runtime.preparedWrite`** — a user
+write with async work between reading and committing: authorize → `prepare` on an uncommitted
+transaction (`buildPayrollSheet`) → `await produce` outside any transaction (render the workbook) → a
+fresh transaction that authorizes again and re-runs `prepare`; if the answer changed meanwhile (ignoring
+its clock reading) → ERR-KPI-04 `CHANGED_DURING_WRITE`, else `apply` (FileObject + PayrollExport +
+`payroll.exported`) and commit; `afterCommit` keeps the bytes in `rt.blobs` (memory only). Latency and
+failure injection run once; the registration, `auth` and events are `write`'s.
+
 **Track-owned deferrals (after Gate 1).** Every Phase 1 rule is wired: no method is deferred and no guard
 is pending, bar a Phase 2 track's own work package (`registry.trackOwned`, pinned by the Gate 1 test in
 `src/integrations/data/mock/runtime.test.ts`; adding to it is a Large change):
 - *Deferred* (rejects `KpiDeferredError` until the track wires it; its `auth` is already declared) —
-  T6: `results.exportPayroll` (4.6.4). (T4 wired `actuals.stageImport`, `commitImport` and `runSync` on
-  2026-10-19; the import TYPES of T1/T2/T3 are deferred inside `stageImport`, not as methods.)
-- *Pending guard* — none.
+  none — T4 wired `actuals.stageImport`, `commitImport` (4.4.3) and `runSync` (4.4.5), T6 wired
+  `results.exportPayroll` (4.6.4), 2026-10-19. The import TYPES of T1/T2/T3 are deferred inside
+  `stageImport`, not as methods.
+- *Pending guard* — none. (`actuals.rejectImport` was wired at Gate 1 QA: only a Validating batch,
+  `actualRules.canRejectImport`; T4's import framework builds the rest of the batch lifecycle.)
 
 Wired at Gate 1 — workflow lane: `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `createLaunch`,
 `cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`, `scheduler.runDue` (now
@@ -291,7 +302,8 @@ the seed hash, the gateway surface (`group.method:kind[:permission]`) and the en
 `SEED_VERSION` is `2027-04-06.G1`. A failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4
-`Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (T6, `EMPTY_UNTIL_WIRED`).
+`Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (`EMPTY_UNTIL_WIRED`: T6 wired the
+export without seeding one).
 
 ---
 

@@ -26,7 +26,9 @@ describe('mock runtime — the contract surface', () => {
 
   it('lists each deferred method with what it waits for; each rejects KpiDeferredError and is never retried', async () => {
     const { gateway } = newGateway();
-    expect(gateway.registry.deferred.size).toBeGreaterThan(0);
+    // Every Phase 2 track has merged and wired its methods (2026-10-19): nothing is deferred any more.
+    // A deferral added later must still name its owner and reject as below.
+    expect([...gateway.registry.deferred.keys()]).toEqual([]);
     for (const [name, owner] of gateway.registry.deferred) {
       const [group, method] = name.split('.');
       const fn = (gateway as unknown as Record<string, Record<string, (...a: unknown[]) => Promise<unknown>>>)[group][method];
@@ -76,7 +78,6 @@ describe('mock runtime — the contract surface', () => {
     // T4 wired stageImport / commitImport (4.4.3) and runSync (4.4.5); the import TYPES other tracks
     // own (GoalPlan, OrgData, Library) are deferred inside stageImport, not as methods (mock/imports.ts).
     expect(Object.fromEntries([...trackOwned].sort(([a], [b]) => (a < b ? -1 : 1)))).toEqual({
-      'results.exportPayroll': 'T6', // WBS 4.6.4
     });
     // Every user write declares its authorization (authorize.ts), deferred ones included.
     for (const [name, kind] of methods) if (kind === 'write') expect(auth.has(name), name).toBe(true);
