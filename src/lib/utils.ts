@@ -79,6 +79,15 @@ export function formatPercent(value: number | null | undefined): string {
   ).format(value / 100);
 }
 
+/** A file size for people — "850 B", "12,4 KB", "3,1 MB" (1 KB = 1024 B). */
+export function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${formatNumber(kb, 1)} KB`;
+  return `${formatNumber(kb / 1024, 1)} MB`;
+}
+
 /**
  * Strip Vietnamese tone marks so "doanh thu" finds "Doanh thu" and "nguyen" finds "Nguyễn".
  *

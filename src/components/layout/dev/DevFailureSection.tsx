@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { useSetFailureMode } from '@/hooks/queries/dev';
 import { useDevStore } from '@/lib/devStore';
-import { toastError } from './toastError';
+import { toastError } from '@/components/shared/toastError';
 
 /** Radix Select refuses an empty value, so "every call" is a sentinel that maps to no pattern. */
 const ALL = 'all';

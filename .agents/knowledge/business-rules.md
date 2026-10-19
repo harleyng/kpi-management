@@ -18,6 +18,8 @@
 > import).
 > **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-74…76), enforced by
 > `src/lib/libraryRules.ts` in every `library.save*` of the mock.
+> **Track T7 (2026-10-19)** added §4b — notifications, files and the audit log — in
+> `src/lib/notificationRules.ts`, `src/lib/fileRules.ts` and `src/lib/auditRules.ts`.
 
 ---
 
@@ -52,6 +54,10 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 | **Phân công chính / Kiêm nhiệm** | An employee's primary assignment (unit + position + direct manager, exactly one on any date) / a concurrent one (`isPrimary = false`) |
 | **Quản lý trực tiếp** | The `managerEmployeeId` of a primary assignment — the line the workflow follows. Not the MANAGER role ("Quản lý") |
 | **Điều chuyển** | A transfer: a new primary assignment from a date, which ends the running one the day before (BR-KPI-65) |
+| **Thông báo** | An in-app notice to one person (the bell in the top bar); "Đánh dấu đã đọc" marks it read (§4b) |
+| **Mẫu thông báo** | The tenant's text for one event × channel, with **biến** (`{{variable}}`) filled when it is sent |
+| **Lịch nhắc hạn** | Per workflow step: "Nhắc trước … ngày" its deadline, and what happens when it runs over (BR-KPI-13) |
+| **Nhật ký** | The audit log — who changed what, when, for whom ("A thay cho B") and why |
 
 ---
 
@@ -122,7 +128,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   launches → recurring rule firings → overdue steps (on the forms as the tick found them) → reminders.
   **Reminders are not deduplicated by the scheduler**: every tick inside the window re-emits
   `form.dueSoon` with the same `reminderKey`; the notification listener (T7) writes one notification
-  per (reminderKey, recipient). AUTO_LOCK audits the plan's lock as `LOCK` with reason `AUTO_LOCK` and
+  per (reminderKey, recipient) — BR-KPI-46. AUTO_LOCK audits the plan's lock as `LOCK` with reason `AUTO_LOCK` and
   no user. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
 - **BR-KPI-14** — HR can **lock and unlock** a Goal Plan; every lock/unlock is kept in its history. A
   locked plan cannot be edited except through the adjustment process. Lock and unlock are audited as
@@ -380,6 +386,60 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   targets; a goal flagged `rollUpFromChildren` sums its CASCADE children (`ASSUMPTION Q8`); NO_ACTUAL
   and NOT_COMPUTABLE stay null, never 0.
 
+## 4b. Notifications, files and the audit log (Track T7)
+
+- **BR-KPI-45** — **Who is notified, of what** (in-app only in P1; `notificationListener.ts`, rules in
+  `notificationRules.ts`):
+  - a launch → **FORM_LAUNCHED** to each form's subject (employed on the launch day, Active account);
+    and **STEP_ASSIGNED** to the step-1 assignees other than the subject (registration step 1 is the
+    direct manager) — none when the form is frozen at once (its registration plan already locked);
+  - a form started by hand, or a form that **re-enters its step** because HR unlocked its plan with a
+    new due date (BR-KPI-14) → **STEP_ASSIGNED** to the step's assignees;
+  - SUBMIT / APPROVE / AUTO_FORWARD to a next step → **STEP_ASSIGNED** to the new assignees
+    ("Hệ thống" names the actor of an auto-forward);
+  - RETURN → **RETURNED** to whoever it went back to, naming who returned it (and for whom) and the
+    comment of that return;
+  - a step nearing its deadline → **DEADLINE_REMIND** (BR-KPI-46), whose `{{consequence}}` warns what
+    the scheduler WILL do (`workflowRules.effectiveOverdueBehaviour`: lock the plan, hand the form on, or
+    nothing when the configured behaviour cannot apply).
+  Assignees are the step's actors plus their valid delegates (`assigneesOf`): **a delegator and their
+  delegate are both told** — except the form's subject on a review step of their own form, who is never
+  told to act there (BR-KPI-21) even when they are also the reviewer's delegate (`assigneesOf` lists such
+  a delegate; the inbox has the same gap — flagged to the workflow lane). **Nobody is told about their own action** — neither the person who acted
+  nor the person they acted for (proxy / delegation). **No notice** for a completed or cancelled form,
+  an AUTO_LOCK, or a step going overdue (`ASSUMPTION Q29`). An event with no in-app Vietnamese template
+  **notifies nobody** — the template screen flags the missing one. The rendered subject and body are
+  stored (re-rendering from an edited template would rewrite what was said). Delivery is best effort
+  in the prototype: a failed notice is reported to the diagnostics, never undoes the action that caused
+  it. *Source: email template "Email khởi chạy" / "Email nhắc Deadline" (both sent to each step owner);
+  STEP_ASSIGNED and RETURNED are Syntra's (D7); Phase 2 T7 review (workflow-expert).*
+- **BR-KPI-46** — **One reminder per person per step entry.** The notice's idempotency key is the
+  scheduler's `reminderKey` (form, step, entry time): ticks inside the window write it once per
+  recipient; re-entering the step (a return, an unlock) is a new key, so a new reminder; a delegate who
+  becomes valid mid-window gets their own. The lead time is the step's `remindDaysBefore` — not a fixed
+  day. *Source: BR-KPI-13; product owner, Gate 1.*
+- **BR-KPI-47** — **Template variables.** Each event supplies a fixed list (`VARIABLES_BY_EVENT`):
+  every event `recipientName`, `subjectName`, `formType`, `period`, `stepName`; FORM_LAUNCHED and
+  STEP_ASSIGNED add `stepNo`, `stepCount`, `dueDate` (+ `launchName` / `actorName`); DEADLINE_REMIND
+  adds `dueDate` (the STEP deadline) and `consequence`; RETURNED adds `actorName`, `reason`. Saving a
+  template that names any other variable, leaves a brace open, or has an empty subject / body (subject
+  ≤ 200, body ≤ 2000 characters) is refused (`templateIssues`, ERR-KPI-06). Rendering never shows a
+  raw `{{…}}`: a variable with no value is left empty and the spaces tidied. `{{period}}` reads
+  "tháng 03/2027", "quý 1/2027", "năm 2027", or the cycle name for a form with no period; dates are
+  dd/MM/yyyy. *Source: seeded templates (`catalog.ts`); Phase 2 T7 design.*
+- **BR-KPI-48** — **Attachments**: at most **10 MB**, formats PDF, images (PNG, JPG, GIF, WebP), Word,
+  Excel, CSV and text, decided by the file's extension (a MIME type the browser reports must agree);
+  an empty file is refused (`fileRules.fileIssues`, ERR-KPI-06; checked by the upload button and again
+  by `system.uploadFile`). `ASSUMPTION Q30`. In the mock a file's content lives in memory: after a page
+  reload the row remains but opening it answers ERR-KPI-02. *Source: none — product owner default.*
+- **BR-KPI-49** — **The audit log is append-only** and written by the gateway in the SAME transaction as
+  the change it records (never by a screen): who (and for whom), the entity, the action, the row
+  before / after and the reason. Notifications are not audited. The screen shows only the changed
+  fields, statuses in words, and filters by entity, person and days in the tenant's zone (a backwards
+  range is refused before any query). It is read with `audit.view` — **ADMIN only** under the default
+  matrix; whether HR should read it too is open (product owner to confirm; changing the matrix is a
+  Large change). *Source: ERD `AUDIT_LOG`; BR-KPI-14, 21.*
+
 ## 5. State sets (declared in `src/data/types.ts`, Phase 1.1)
 
 Every status in the app comes from one of these sets; each has a Vietnamese `*_LABEL` map beside it
@@ -434,6 +494,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Notification channel | InApp · Email (P1 sends in-app only) | ERD |
 | Notification | Queued · Sent · Read · Failed | ERD |
 | Audit action | CREATE · UPDATE · DELETE · LOCK · UNLOCK | ERD |
+| Entity name | the 49 P1 entities, each labelled for the audit log (`ENTITY_NAME_LABEL`) | ERD + D1/D5/D7 |
 
 ## 6. Error catalogue
 
@@ -517,6 +578,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q26 | Must a template's weights total 100% and hold 5–8 items? | No — both are warnings; the plan made from it is gated | BR-KPI-77 |
 | Q27 | What does archiving a library item do? | Hides it from new picks only; refused while an Active template holds it; goals keep working | BR-KPI-78 |
 | Q28 | May a tenant edit a standard (seeded) library item? | Yes, except its code | BR-KPI-79 |
+| Q29 | Is a person notified when their step goes overdue (and the form is auto-forwarded or the plan locked)? The event set has no overdue code | No — the deadline reminder already says what will happen; an auto-forward tells the next person (STEP_ASSIGNED). A `STEP_OVERDUE` event is a P2 candidate | BR-KPI-45 |
+| Q30 | Size and format limits of attachments? No source states them | 10 MB; PDF, images, Word, Excel, CSV, text | BR-KPI-48 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

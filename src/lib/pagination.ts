@@ -83,3 +83,20 @@ export function serverPageSlice(
   const from = shown === 0 ? 0 : (safe - 1) * size + 1;
   return { page: safe, pageCount, from, to: shown === 0 ? 0 : from + shown - 1, total };
 }
+
+/**
+ * The rows of every page a keyset list has loaded (`Page<T>` from `listNotifications`,
+ * `listAuditLog`), each once: a refetch while new rows arrive can shift a row onto two pages.
+ */
+export function flattenPages<T extends { id: string }>(pages: readonly { items: readonly T[] }[] | undefined): T[] {
+  const seen = new Set<string>();
+  const rows: T[] = [];
+  for (const page of pages ?? []) {
+    for (const row of page.items) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+  }
+  return rows;
+}

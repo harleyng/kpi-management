@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, paginate, serverPageSlice } from './pagination';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, flattenPages, paginate, serverPageSlice } from './pagination';
 
 const rows = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
 
@@ -71,5 +71,13 @@ describe('serverPageSlice', () => {
 
   it('clamps a page past the end', () => {
     expect(serverPageSlice(9, 20, 45, 5).page).toBe(3);
+  });
+});
+
+describe('flattenPages', () => {
+  it('joins the loaded pages in order, each row once', () => {
+    const r = (id: string) => ({ id });
+    expect(flattenPages([{ items: [r('c'), r('b')] }, { items: [r('b'), r('a')] }])).toEqual([r('c'), r('b'), r('a')]);
+    expect(flattenPages(undefined)).toEqual([]);
   });
 });

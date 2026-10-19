@@ -6,7 +6,7 @@ import type { SchedulerReport } from '@/integrations/data/types';
 import { useRunScheduler } from '@/hooks/queries/dev';
 import { useDevStore } from '@/lib/devStore';
 import { PendingButton } from './PendingButton';
-import { toastError } from './toastError';
+import { toastError } from '@/components/shared/toastError';
 
 /** What one tick did, in Vietnamese — only the kinds of work that happened. */
 function summarise(report: SchedulerReport): string {

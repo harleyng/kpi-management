@@ -33,6 +33,7 @@ import {
   delegationIssues,
   editRefusal,
   editStanding,
+  effectiveOverdueBehaviour,
   launchTimingIssues,
   markHandled,
   validateLaunchRule,
@@ -490,6 +491,16 @@ describe('time — deadline, overdue, reminders (BR-KPI-13)', () => {
     const lockedEval = evaluationSteps().map((s) => (s.stepNo === 1 ? { ...s, onOverdue: 'LOCK' as const } : s));
     expect(overdueActions([form()], lockedEval, late)[0]).toMatchObject({ behaviour: 'REMIND', action: null });
     expect(transition(last, steps, 'AUTO_FORWARD', { clock: late, comment: null })).toMatchObject({ ok: false, detail: 'AUTO_FORWARD_ON_LAST_STEP' });
+  });
+
+  it('effectiveOverdueBehaviour — what the scheduler will do, which the reminder (T7) warns about', () => {
+    const steps = evaluationSteps();
+    const [first, , last] = steps;
+    expect(effectiveOverdueBehaviour(form(), { ...first, onOverdue: 'AUTO_FORWARD' }, steps)).toBe('AUTO_FORWARD');
+    expect(effectiveOverdueBehaviour(form(), { ...last, onOverdue: 'AUTO_FORWARD' }, steps)).toBe('REMIND');
+    expect(effectiveOverdueBehaviour(form(), { ...first, onOverdue: 'LOCK' }, steps)).toBe('REMIND');
+    expect(effectiveOverdueBehaviour(form({ formType: 'GOAL_SETTING' }), { ...first, onOverdue: 'LOCK' }, steps)).toBe('LOCK');
+    expect(effectiveOverdueBehaviour(form(), { ...first, onOverdue: null }, steps)).toBeNull();
   });
 
   it('locks a registration plan when its step runs over, freezing the form', () => {

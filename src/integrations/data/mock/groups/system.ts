@@ -1,10 +1,13 @@
 import { seedId } from '@/data/fixtures/ids';
 import type { AuditLog, FileObject, Id, KpiNotification } from '@/data/types';
 import { KpiError } from '@/lib/errorCatalog';
+import { fileIssues } from '@/lib/fileRules';
+import { templateIssues } from '@/lib/notificationRules';
 import type { AuditLogFilter, EntityChangedEvent, NewNotificationInput, PageRequest, SystemGateway, UploadFileInput } from '../../types';
 import { eqOpt, newId, upsert } from '../rows';
 import type { Runtime } from '../runtime';
 import { auditRowOf } from '../audit';
+import { throwIssues } from '../workflowContext';
 import { paginate } from './page';
 
 /**
@@ -24,6 +27,8 @@ export function systemGroup(rt: Runtime): SystemGateway {
   return {
     uploadFile: rt.write('system.uploadFile', { permission: 'evidence.upload' }, (tx, input: UploadFileInput) => {
       if (!(input.data instanceof Blob)) throw new KpiError('ERR-KPI-06', 'file data must be a Blob');
+      // Size and format (BR-KPI-48, ASSUMPTION Q30) — the upload button checked too; this is the authority.
+      throwIssues(fileIssues({ fileName: String(input.fileName ?? ''), mimeType: String(input.mimeType ?? ''), sizeBytes: input.data.size }));
       const id = newId();
       const row: FileObject = {
         id,
@@ -53,9 +58,13 @@ export function systemGroup(rt: Runtime): SystemGateway {
     }),
 
     listNotificationTemplates: rt.read('system.listNotificationTemplates', (tx) => tx.all('NotificationTemplate')),
-    saveNotificationTemplate: rt.write('system.saveNotificationTemplate', { permission: 'notification.manage' }, (tx, input: Parameters<SystemGateway['saveNotificationTemplate']>[2]) =>
-      upsert(tx, 'NotificationTemplate', input, { create: () => ({}) }),
-    ),
+    saveNotificationTemplate: rt.write('system.saveNotificationTemplate', { permission: 'notification.manage' }, (tx, input: Parameters<SystemGateway['saveNotificationTemplate']>[2]) => {
+      const saved = upsert(tx, 'NotificationTemplate', input, { create: () => ({}) });
+      // Checked on the row as saved (an update merges into the stored one): no unknown variable, no
+      // open brace, no empty text (BR-KPI-47). Throwing here rolls the transaction back.
+      throwIssues(templateIssues(saved));
+      return saved;
+    }),
 
     listNotifications: rt.read(
       'system.listNotifications',

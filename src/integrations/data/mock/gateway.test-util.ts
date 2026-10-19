@@ -8,10 +8,14 @@ import { MemoryStorage } from './persistence';
 let cached: Seed | null = null;
 export const testSeed = (): Seed => (cached ??= buildSeed());
 
-/** A fresh mock with its own in-memory storage, no latency, and the shared seed. */
+/**
+ * A fresh mock with its own in-memory storage, no latency, and the shared seed. The notification
+ * listener is OFF unless the test passes `notifications: true` (its writes arrive asynchronously);
+ * such a test awaits `gateway.notificationsSettled()` before it reads.
+ */
 export function newGateway(options: MockGatewayOptions = {}) {
   const storage = options.storage === undefined ? new MemoryStorage() : options.storage;
-  return { gateway: createMockGateway({ latencyMs: 0, seed: testSeed, ...options, storage }), storage };
+  return { gateway: createMockGateway({ latencyMs: 0, seed: testSeed, notifications: false, ...options, storage }), storage };
 }
 
 /** The rejection of `promise` as a KpiError (fails the test if it resolves or throws something else). */

@@ -128,8 +128,9 @@ sequenceDiagram
   *Đang đánh giá* (tháng 12). HR cũng có thể khởi chạy *ngay* hoặc *hẹn ngày*; đợt hẹn ngày chỉ hủy
   được khi chưa chạy.
 - Số thực tế trên phiếu là **ảnh chụp lúc khởi chạy**, không sửa trên phiếu.
-- Nhắc hạn gửi trước hạn bước 1 ngày; hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ
-  nhận **một** thông báo cho mỗi lần vào bước.
+- Nhắc hạn gửi trước hạn bước **theo cấu hình của bước** ("Nhắc trước … ngày", mẫu hiện tại: 1 ngày);
+  hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ nhận **một** thông báo cho mỗi lần vào bước.
+  Ai nhận thông báo gì: mục 4D.
 
 ## 4A. Ai thấy gì, ai làm gì (Phase 1.3)
 
@@ -195,6 +196,31 @@ Quản trị hệ thống làm phần này một lần trước khi giao KPI, r�
 - **Nhập từ Excel (WBS 4.1.7).** Đã có file mẫu (sheet Nhân sự + mã đơn vị + mã chức danh) và quy tắc
   kiểm tra từng dòng. Nút "Nhập từ file" mở khi khung nhập dữ liệu dùng chung (T4) hoàn tất.
 
+## 4D. Thông báo và nhật ký (Track T7)
+
+Thông báo hiện trên **chuông** ở thanh trên cùng; bấm vào một thông báo thì mở màn hình liên quan và
+thông báo được đánh dấu đã đọc. Giai đoạn này **chỉ gửi trong ứng dụng**, chưa gửi email.
+
+| Khi nào | Ai nhận | Thông báo |
+|---|---|---|
+| Một đợt khởi chạy tạo phiếu | Người được đánh giá | Khởi chạy phiếu (quy trình mấy bước, đang ở bước nào, hạn) |
+| Như trên, khi bước 1 không phải của người được đánh giá (đăng ký: bước 1 là quản lý) | Người xử lý bước 1 | Có phiếu cần xử lý |
+| Phiếu chuyển sang bước tiếp theo (gửi, duyệt, hoặc tự chuyển do quá hạn) | Người xử lý bước mới | Có phiếu cần xử lý |
+| Phiếu bị trả lại | Người nhận lại phiếu | Phiếu bị trả lại (ai trả, lý do) |
+| HR mở khóa Goal Plan và đặt hạn mới | Người đang giữ phiếu | Có phiếu cần xử lý (hạn mới) |
+| Trước hạn bước, theo lịch nhắc của bước | Người đang giữ phiếu | Nhắc hạn (và điều xảy ra khi quá hạn: khóa Goal Plan / tự chuyển bước) |
+
+- Người được ủy quyền nhận thông báo **cùng** người ủy quyền.
+- **Không ai nhận thông báo về thao tác của chính mình**, kể cả khi HR làm thay hay người được ủy quyền
+  làm thay.
+- Không có thông báo khi phiếu hoàn thành, bị hủy, hoặc khi bước đã quá hạn (giả định Q29): lời nhắc
+  trước hạn đã nói điều gì sẽ xảy ra.
+- Nội dung lấy từ **Mẫu thông báo** (Hệ thống → Mẫu thông báo); sự kiện nào thiếu mẫu thì không gửi.
+- **Nhật ký** (Hệ thống → Nhật ký) ghi mọi thay đổi dữ liệu: ai làm, làm thay ai, lúc nào, trước/sau và
+  lý do (khóa, mở khóa, hủy phiếu). Hiện chỉ Quản trị hệ thống xem được.
+- Tệp đính kèm (bằng chứng, file import) tối đa 10 MB, chỉ nhận PDF, ảnh, Word, Excel, CSV, văn bản
+  (giả định Q30).
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -229,6 +255,9 @@ trực tiếp đến quy trình:
 | Q26 | Bộ mẫu có bắt buộc đủ 100% và 5–8 chỉ tiêu không? | Không — chỉ cảnh báo | HR |
 | Q27 | Lưu trữ chỉ tiêu mẫu nghĩa là gì? | Ẩn khỏi danh sách chọn; không được khi còn trong bộ mẫu đang áp dụng | HR |
 | Q28 | Công ty có sửa được chỉ tiêu chuẩn không? | Có, trừ mã | Product owner |
+| Q29 | Có báo cho người giữ phiếu khi bước đã quá hạn (phiếu tự chuyển hoặc Goal Plan bị khóa) không? | Không — lời nhắc trước hạn đã nói trước | Product owner + HR |
+| Q30 | Giới hạn dung lượng và định dạng tệp đính kèm? | 10 MB; PDF, ảnh, Word, Excel, CSV, văn bản | Product owner + HR |
+| — | HR có được xem Nhật ký không? (Hiện chỉ Quản trị hệ thống) | Chưa — chỉ Quản trị hệ thống | Product owner |
 
 ## 7. Quyết định đã chốt
 
@@ -280,3 +309,9 @@ trực tiếp đến quy trình:
 - **Bộ mẫu chỉ cảnh báo** khi tổng trọng số khác 100% hoặc số chỉ tiêu ngoài 5–8; chỉ chặn việc thêm chỉ
   tiêu Nháp/Lưu trữ vào bộ mẫu.
 - **Phương pháp tính đã dùng cho mục tiêu thì khóa cách tính**; tên, mô tả, mã vẫn sửa được.
+**19/10/2026 — Track T7, thông báo và nhật ký (product owner duyệt theo khuyến nghị).**
+
+- Không gửi thông báo khi bước đã quá hạn (giả định Q29); lời nhắc trước hạn nói rõ điều sẽ xảy ra.
+- Tệp đính kèm tối đa 10 MB, chỉ các định dạng văn phòng, ảnh và văn bản (giả định Q30).
+- Nhật ký giữ quyền xem như hiện tại (Quản trị hệ thống); việc mở cho HR chờ product owner chốt.
+- Người được ủy quyền nhận thông báo cùng người ủy quyền.

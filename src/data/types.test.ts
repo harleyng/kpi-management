@@ -54,10 +54,12 @@ const LABELLED_SETS: [string, readonly string[], Record<string, string>][] = [
   ['NOTIFICATION_STATUSES', domain.NOTIFICATION_STATUSES, domain.NOTIFICATION_STATUS_LABEL],
   ['AUDIT_ACTIONS', domain.AUDIT_ACTIONS, domain.AUDIT_ACTION_LABEL],
   ['GOAL_CHANGE_TYPES', domain.GOAL_CHANGE_TYPES, domain.GOAL_CHANGE_TYPE_LABEL],
+  // Not a status, but the audit log (T7) shows every entity by name.
+  ['ENTITY_NAMES', domain.ENTITY_NAMES, domain.ENTITY_NAME_LABEL],
 ];
 
 /** Sets that are never shown as a status on their own — a subset, or developer-facing names. */
-const UNLABELLED_SETS = ['ALLOWED_STEP_ACTIONS', 'PERSON_FORM_ACTIONS', 'NOTIFICATION_LANGUAGES', 'NOTIFICATION_REF_TYPES', 'ENTITY_NAMES'];
+const UNLABELLED_SETS = ['ALLOWED_STEP_ACTIONS', 'PERSON_FORM_ACTIONS', 'NOTIFICATION_LANGUAGES', 'NOTIFICATION_REF_TYPES'];
 
 describe('state sets', () => {
   it('pairs every exported set with a label map, or lists it as deliberately unlabelled', () => {

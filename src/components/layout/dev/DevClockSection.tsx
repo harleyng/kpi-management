@@ -10,7 +10,7 @@ import { useSetSimulatedNow, useSimulatedNow, type SimulatedNowChange } from '@/
 import { errorSpecOf } from '@/lib/errorCatalog';
 import { fromZonedLocalInput, toZonedLocalInput, zoneOffsetLabel } from '@/lib/isoDate';
 import { PendingButton } from './PendingButton';
-import { toastError } from './toastError';
+import { toastError } from '@/components/shared/toastError';
 
 /** "06/04/2027 09:00 (GMT+7)" — the instant's wall clock in the tenant's zone. */
 function formatNow(instant: IsoDateTime, timeZone: string): string {

@@ -32,8 +32,8 @@ const ROUTES: [path: string, title: string, built?: Landmark][] = [
   ['/system/org', 'Tổ chức'],
   ['/system/users', 'Người dùng & quyền'],
   ['/system/data-sources', 'Nguồn dữ liệu'],
-  ['/system/notification-templates', 'Mẫu thông báo'],
-  ['/system/audit-log', 'Nhật ký'],
+  ['/system/notification-templates', 'Mẫu thông báo', ['table', 'Mẫu thông báo theo sự kiện']],
+  ['/system/audit-log', 'Nhật ký', ['table', 'Nhật ký thay đổi']],
 ];
 
 /** Routes whose page is built (no "Chưa xây dựng" placeholder any more) — add a track's routes as it lands. */
