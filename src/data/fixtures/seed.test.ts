@@ -125,9 +125,9 @@ const STATE_SETS: { name: string; values: readonly string[]; seen: (t: TenantSee
 
 /** Temporary exemptions — each says why, and what removes it. */
 export const STATE_EXEMPTIONS: Readonly<Record<string, string>> = {
-  'Tenant:Suspended': 'A suspended tenant cannot be shown without a third tenant; tenant management (T1) suspends one with platform.saveTenant.',
-  'Cycle:Evaluating': 'A 2027 cycle in Evaluating contradicts SEED_NOW (April); T3 reaches it with setCycleStatus once cycleRules is wired.',
-  'Sync run:Running': 'A run frozen in Running would stay so for ever; T4 shows it live while its simulated connector (runSync) runs.',
+  'Tenant:Suspended': 'T1: a suspended tenant cannot be shown without a third tenant; tenant management suspends one with platform.saveTenant.',
+  'Cycle:Evaluating': 'T3: a 2027 cycle in Evaluating contradicts SEED_NOW (April); the cycle screen reaches it with goals.setCycleStatus.',
+  'Sync run:Running': 'T4: a run frozen in Running would stay so for ever; T4 shows it live while its simulated connector (runSync) runs.',
 };
 
 /**
@@ -135,6 +135,14 @@ export const STATE_EXEMPTIONS: Readonly<Record<string, string>> = {
  * `PayrollExport` waits for T6's `exportPayroll` (WBS 4.6.4) — the export file is that track's work.
  */
 export const EMPTY_UNTIL_WIRED: ReadonlySet<CollectionName> = new Set<CollectionName>(['PayrollExport']);
+
+describe('seed — Gate 1: what the seed still leaves to the tracks', () => {
+  it('exempts exactly three states and one collection, each a Phase 2 track\'s own', () => {
+    expect(Object.keys(STATE_EXEMPTIONS).sort()).toEqual(['Cycle:Evaluating', 'Sync run:Running', 'Tenant:Suspended']);
+    expect(Object.values(STATE_EXEMPTIONS).every((why) => /^T[1-7]: /.test(why))).toBe(true);
+    expect([...EMPTY_UNTIL_WIRED]).toEqual(['PayrollExport']);
+  });
+});
 
 describe('seed — plan §6.4 coverage', () => {
   it.each(STATE_SETS.map((s) => [s.name, s] as const))('shows every %s state (bar the listed exemptions)', (_, set) => {

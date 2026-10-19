@@ -65,11 +65,23 @@ describe('mock runtime — the contract surface', () => {
     expect(gateway.registry.methods.get('scheduler.runDue')).toBe('system');
   });
 
-  // Gate 1 (plan §6.2): every rule wired. Un-skip in the wiring change; it must pass before Phase 2.
-  it.skip('Gate 1: nothing is deferred and no guard is pending', () => {
+  // Gate 1 (plan §6.2): every Phase 1 rule is wired. What stays deferred or unguarded is a Phase 2
+  // track's own work package, named here — adding to this list is a Large change (fixtures README).
+  it('Gate 1: nothing is deferred and no guard is pending, bar the tracks\' own work packages', () => {
     const { gateway } = newGateway();
-    expect([...gateway.registry.deferred.keys()]).toEqual([]);
-    expect([...gateway.registry.pendingGuards.keys()]).toEqual([]);
+    const { deferred, pendingGuards, trackOwned, auth, methods } = gateway.registry;
+    const open = (names: Iterable<string>) => [...names].filter((n) => !trackOwned.has(n));
+    expect(open(deferred.keys())).toEqual([]);
+    expect(open(pendingGuards.keys())).toEqual([]);
+    expect(Object.fromEntries([...trackOwned].sort(([a], [b]) => (a < b ? -1 : 1)))).toEqual({
+      'actuals.commitImport': 'T4', // WBS 4.4.3 importRules
+      'actuals.rejectImport': 'T4', // WBS 4.4.3
+      'actuals.runSync': 'T4', // WBS 4.4.5 the simulated ERP Sale connector
+      'actuals.stageImport': 'T4', // WBS 4.4.3
+      'results.exportPayroll': 'T6', // WBS 4.6.4
+    });
+    // Every user write declares its authorization (authorize.ts), deferred ones included.
+    for (const [name, kind] of methods) if (kind === 'write') expect(auth.has(name), name).toBe(true);
   });
 });
 
