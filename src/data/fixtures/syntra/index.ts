@@ -7,6 +7,7 @@ import { buildActuals } from './actuals';
 import { buildForms } from './forms';
 import { buildGoals } from './goals';
 import { buildOrg } from './org';
+import { buildResults } from './results';
 import { buildSystem } from './system';
 
 /** Syntra — the full tenant (plan §6.4). Its story is in `src/data/fixtures/README.md`. */
@@ -52,6 +53,8 @@ export function buildSyntra(): TenantSeed {
   const forms = buildForms(s, id, org, goals, actuals, wf);
   const templateOf = addNotificationTemplates(s, id);
   buildSystem(s, id, org, goals, forms, templateOf);
+  // Last: results are computed from everything above, through resultRules (never typed in).
+  buildResults(s, id, goals);
 
   return { tenant, rows: s.rows };
 }

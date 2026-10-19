@@ -71,7 +71,7 @@ export const ERROR_CATALOG: Record<ErrorCode, ErrorSpec> = {
   'ERR-KPI-04': {
     code: 'ERR-KPI-04',
     trigger:
-      'A write is not allowed in the record\'s current state (e.g. editing a locked Goal Plan, acting on a step that has already moved on)',
+      'A write is not allowed in the record\'s current state (e.g. editing a locked Goal Plan, entering an actual into a locked period, changing a Final or Locked result, acting on a step that has already moved on)',
     surface: 'toast',
     title: 'Thao tác không còn hợp lệ',
     message: 'Trạng thái đã thay đổi, có thể do người khác vừa xử lý. Hãy tải lại để xem trạng thái mới nhất.',

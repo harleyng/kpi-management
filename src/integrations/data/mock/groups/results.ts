@@ -1,10 +1,68 @@
 import type { Id, RatingLevel } from '@/data/types';
+import { KpiError, ruleIssue, toKpiError } from '@/lib/errorCatalog';
+import { validatePayoutRule, validateRatingScale } from '@/lib/ratingRules';
+import {
+  applyAdjustment,
+  buildPeriodResults,
+  finalizePeriodResults,
+  lockPeriodResults,
+  type ResultChanges,
+  type ResultData,
+  type ResultIds,
+  type ResultOutcome,
+} from '@/lib/resultRules';
 import type { ChildInput, PeriodResultFilter, ResultsGateway } from '../../types';
 import { removeRow } from '../integrity';
-import { eqOpt, inList, saveChildren, upsert } from '../rows';
+import { eqOpt, inList, newId, saveChildren, upsert } from '../rows';
 import type { Runtime } from '../runtime';
+import type { Tx } from '../store';
 
-const SCORING = 'Phase 1.5 calcRules + scoreRules + ratingRules';
+/** Everything `resultRules` reads, straight from the transaction (the rules filter by period). */
+function resultData(tx: Tx): ResultData {
+  return {
+    PerformanceCycle: tx.all('PerformanceCycle'),
+    CyclePeriod: tx.all('CyclePeriod'),
+    GoalPlan: tx.all('GoalPlan'),
+    Goal: tx.all('Goal'),
+    GoalAlignment: tx.all('GoalAlignment'),
+    GoalPeriodTarget: tx.all('GoalPeriodTarget'),
+    GoalTargetLevel: tx.all('GoalTargetLevel'),
+    GoalActual: tx.all('GoalActual'),
+    FormInstance: tx.all('FormInstance'),
+    EvaluationItem: tx.all('EvaluationItem'),
+    CalcMethod: tx.all('CalcMethod'),
+    CalcTier: tx.all('CalcTier'),
+    KpiDefinition: tx.all('KpiDefinition'),
+    RatingLevel: tx.all('RatingLevel'),
+    PayoutRule: tx.all('PayoutRule'),
+    Employee: tx.all('Employee'),
+    EmployeeAssignment: tx.all('EmployeeAssignment'),
+    OrgUnit: tx.all('OrgUnit'),
+    PeriodResult: tx.all('PeriodResult'),
+    ResultDetail: tx.all('ResultDetail'),
+  };
+}
+
+/** New rows get random ids here; the seed gives the same rows `seedId`s. */
+const RANDOM_IDS: ResultIds = { result: () => newId(), detail: () => newId() };
+
+/** The rule's answer, or its issues thrown (`toKpiError`: the first issue's code, every issue kept). */
+function changesOf(outcome: ResultOutcome): ResultChanges {
+  if (!outcome.ok) throw toKpiError(outcome.issues);
+  return outcome.changes;
+}
+
+/** Writes the rule's changes; `action` overrides the audit action of the updates (LOCK). */
+function apply(tx: Tx, changes: ResultChanges, action?: 'LOCK'): void {
+  for (const id of changes.removedDetailIds) removeRow(tx, 'ResultDetail', id);
+  for (const { row, created } of changes.results) {
+    if (created) tx.insert('PeriodResult', row);
+    else tx.update('PeriodResult', row, action ? { action } : {});
+  }
+  for (const detail of changes.addedDetails) tx.insert('ResultDetail', detail);
+}
+
+const periodResults = (tx: Tx, periodId: Id) => tx.all('PeriodResult').filter((r) => r.periodId === periodId);
 
 export function resultsGroup(rt: Runtime): ResultsGateway {
   return {
@@ -19,16 +77,34 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
       'results.saveRatingScale', { permission: 'rating.config' },
       (tx, input: Parameters<ResultsGateway['saveRatingScale']>[2], levels: readonly ChildInput<RatingLevel, 'ratingScaleId'>[]) => {
         const parent = upsert(tx, 'RatingScale', input, { create: () => ({}) });
-        return { parent, children: saveChildren(tx, 'RatingLevel', 'ratingScaleId', parent.id, levels) };
+        const children = saveChildren(tx, 'RatingLevel', 'ratingScaleId', parent.id, levels);
+        // BR-KPI-41: from 0, contiguous, every level non-empty (ERR-KPI-13).
+        const issues = validateRatingScale(children);
+        if (issues.length > 0) throw toKpiError(issues);
+        return { parent, children };
       },
     ),
 
     listPayoutRules: rt.read('results.listPayoutRules', (tx, ratingScaleId?: Id) =>
       tx.all('PayoutRule').filter((r) => eqOpt(ratingScaleId, r.ratingScaleId)),
     ),
-    savePayoutRule: rt.write('results.savePayoutRule', { permission: 'rating.config' }, (tx, input: Parameters<ResultsGateway['savePayoutRule']>[2]) =>
-      upsert(tx, 'PayoutRule', input, { create: () => ({}) }),
-    ),
+    savePayoutRule: rt.write('results.savePayoutRule', { permission: 'rating.config' }, (tx, input: Parameters<ResultsGateway['savePayoutRule']>[2]) => {
+      const saved = upsert(tx, 'PayoutRule', input, { create: () => ({}) });
+      // A reference that does not resolve in this tenant is the integrity check's answer (ERR-KPI-06,
+      // worded like a missing id); the rules speak only about rows that exist.
+      const level = tx.find('RatingLevel', saved.ratingLevelId);
+      const resolves =
+        level !== undefined &&
+        tx.find('RatingScale', saved.ratingScaleId) !== undefined &&
+        (saved.orgUnitId === null || tx.find('OrgUnit', saved.orgUnitId) !== undefined) &&
+        (saved.positionId === null || tx.find('JobPosition', saved.positionId) !== undefined);
+      if (resolves) {
+        const issues = validatePayoutRule(saved);
+        if (issues.length > 0) throw toKpiError(issues);
+        if (level.ratingScaleId !== saved.ratingScaleId) throw toKpiError([ruleIssue('ERR-KPI-06', saved.id, 'LEVEL_NOT_IN_SCALE')]);
+      }
+      return saved;
+    }),
     deletePayoutRule: rt.write('results.deletePayoutRule', { permission: 'rating.config' }, (tx, payoutRuleId: Id) => {
       removeRow(tx, 'PayoutRule', payoutRuleId);
     }),
@@ -48,10 +124,35 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
       tx.get('PeriodResult', resultId);
       return tx.all('ResultDetail').filter((d) => d.resultId === resultId);
     }),
-    calculateResults: rt.deferred('results.calculateResults', 'write', SCORING),
-    setAdjustment: rt.deferred('results.setAdjustment', 'write', `${SCORING} (re-score with the adjustment)`),
-    finalizeResults: rt.deferred('results.finalizeResults', 'write', `${SCORING} (Draft → Final, rounding once)`),
-    lockResults: rt.deferred('results.lockResults', 'write', `${SCORING} (Final → Locked)`),
+
+    // BR-KPI-40…43 — every number comes from `resultRules` (the seed runs the same functions).
+    calculateResults: rt.write('results.calculateResults', { permission: 'result.finalize' }, (tx, periodId: Id) => {
+      tx.get('CyclePeriod', periodId);
+      apply(tx, changesOf(buildPeriodResults(resultData(tx), periodId, RANDOM_IDS)));
+      return periodResults(tx, periodId);
+    }),
+    setAdjustment: rt.write('results.setAdjustment', { permission: 'result.finalize' }, (tx, resultId: Id, adjustmentPct: number) => {
+      tx.get('PeriodResult', resultId);
+      apply(tx, changesOf(applyAdjustment(resultData(tx), resultId, adjustmentPct)));
+      return tx.get('PeriodResult', resultId);
+    }),
+    finalizeResults: rt.write('results.finalizeResults', { permission: 'result.finalize' }, (tx, periodId: Id, resultIds?: readonly Id[]) => {
+      tx.get('CyclePeriod', periodId);
+      if (resultIds !== undefined && !Array.isArray(resultIds)) throw new KpiError('ERR-KPI-06', 'resultIds must be a list');
+      for (const id of resultIds ?? []) tx.get('PeriodResult', id);
+      // All or none: one result with an issue refuses the whole call, listing every issue.
+      const changes = changesOf(finalizePeriodResults(resultData(tx), periodId, resultIds, tx.now, RANDOM_IDS));
+      apply(tx, changes);
+      const ids = changes.results.map((r) => r.row.id);
+      tx.emit({ type: 'results.finalized', periodId, resultIds: ids });
+      return ids.map((id) => tx.get('PeriodResult', id));
+    }),
+    lockResults: rt.write('results.lockResults', { permission: 'result.finalize' }, (tx, periodId: Id) => {
+      tx.get('CyclePeriod', periodId);
+      const changes = changesOf(lockPeriodResults(resultData(tx), periodId));
+      apply(tx, changes, 'LOCK');
+      return changes.results.map((r) => tx.get('PeriodResult', r.row.id));
+    }),
 
     listPayrollExports: rt.read('results.listPayrollExports', (tx, periodId?: Id) =>
       tx

@@ -21,7 +21,8 @@ fixtures are frozen: a track that needs a fixture or the `DataGateway` contract 
 | `timeline.ts` | **every date of the story** — `SEED_NOW`, `LAST_SCHEDULER_TICK`, step times |
 | `catalog.ts` | library (from DATX), templates, workflows, rating scale, notification texts — as tables |
 | `shared.ts` | builders both tenants use (roles + permissions, library, workflows, rating, `goalFromKpi`) |
-| `syntra/` | `org.ts` · `goals.ts` · `actuals.ts` · `forms.ts` · `system.ts` · `index.ts` |
+| `results.ts` | `ResultScript` — calculate / adjust / finalise / lock through `src/lib/resultRules.ts`, applied to the rows |
+| `syntra/` | `org.ts` · `goals.ts` · `actuals.ts` · `forms.ts` · `system.ts` · `results.ts` (run last) · `index.ts` |
 | `demoCo.ts` | the second tenant |
 | `seed.test.ts` | integrity (through the mock's own check), coverage, identity, business and timeline invariants |
 
@@ -36,9 +37,10 @@ fixtures are frozen: a track that needs a fixture or the `DataGateway` contract 
   `src/lib/permissionRules.ts` (the 1.3 rows are never hand-written) and, once Phase 1.5 lands, the
   rules that PRODUCE rows (results) — never a copy of a rule.
 - **No real personal data.** Names are fictional; nothing is copied from the DATX "TH KQ" sheet.
-- **No derived value is stored** (total weight, "chưa giao", scores). `PeriodResult` / `ResultDetail` /
-  `PayrollExport` stay empty until `calculateResults` is wired, then a pure seed-finalise step fills
-  them through the rules (`seed.test.ts` lists them in `EMPTY_UNTIL_WIRED`; Gate 1: empty list).
+- **No derived value is stored by hand** (total weight, "chưa giao", scores). `PeriodResult` /
+  `ResultDetail` are PRODUCED by `ResultScript` (`results.ts`) running the same `resultRules`
+  orchestrators the mock's `results.*` methods call; `PayrollExport` stays empty until T6 wires
+  `exportPayroll` (`seed.test.ts` `EMPTY_UNTIL_WIRED`).
 - Every state of every status set appears (plan §6.4); the few that cannot are listed with a reason in
   `seed.test.ts` (`STATE_EXEMPTIONS`).
 - Values that depend on an open question are marked `// ASSUMPTION Qn`.
@@ -101,6 +103,16 @@ history produces; `seed.test.ts` checks that only the one named form is overdue 
   (RECURRING), "đợt 2" for Probation staff on 04-15 (Scheduled), "đợt 1" (Cancelled before it fired).
 - **Delegations** (KPI_EVAL): active E007 → E019 (04-01…04-15), expired E008 → E006 (03-01…03-15),
   revoked E011 → E031 (03-01…04-30, revoked 03-20).
+- **Results** (`syntra/results.ts`, run last, through `resultRules` — the gateway recalculating a Draft
+  reproduces its row exactly). An Employee plan has a result only from a COMPLETED evaluation form
+  (FINAL column, `ASSUMPTION Q17`); Company / department plans are scored from the current actuals.
+  **T01** Locked — adjustments E016 −2 and E019 +1 (89.50 C → 90.50 B, payout 50% → 80%); E027 stays
+  Draft (its plan stopped at 3 goals, 75%). **T02** Final — E031 −2 (101.75 A → 99.75 B); Draft: E023
+  (held — its manager step was a delegate's), E027 (75%) and the company plan (an ERP Sale record never
+  arrived); E025, E026, E028, E037, E041 have no completed form, so no result. **T03** calculated only:
+  the ten unit plans Draft (CSKH and Mua hàng incomplete — the CRM batch is still Validating).
+  Finalised on the evaluation deadline at 09:00 (02-13, 03-13). No payroll export yet. Demo Co: T01
+  calculated, D003 Final, its company plan Draft (no actual).
 - **Rating** "Thang mẫu A+/A/B/C/D (giả định Q2)": A+ [110,120] 120% · A [100,110) 100% · B [90,100)
   80% · C [70,90) 50% · D [0,70) 0%; Kinh doanh pays 130% for A+ (an OrgUnit payout rule). The 2026
   scale is Inactive.

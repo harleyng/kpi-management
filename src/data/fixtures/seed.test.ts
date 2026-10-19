@@ -17,6 +17,10 @@ import {
   type WorkflowStep,
 } from '@/data/types';
 import { addDays, toZonedDate } from '@/lib/isoDate';
+import { isWeightComplete } from '@/lib/goalPlanRules';
+import { ratingFor } from '@/lib/ratingRules';
+import { currentLinesOf, finalizeCheck } from '@/lib/resultRules';
+import { ratedScore, roundScore } from '@/lib/scoreRules';
 import { validateTransaction } from '@/integrations/data/mock/integrity';
 import { POLYMORPHIC_ID_COLUMNS, SCHEMA } from '@/integrations/data/mock/schema';
 import { keyOf, TenantData, Tx, type GlobalData } from '@/integrations/data/mock/store';
@@ -124,13 +128,13 @@ export const STATE_EXEMPTIONS: Readonly<Record<string, string>> = {
   'Tenant:Suspended': 'A suspended tenant cannot be shown without a third tenant; tenant management (T1) suspends one with platform.saveTenant.',
   'Cycle:Evaluating': 'A 2027 cycle in Evaluating contradicts SEED_NOW (April); T3 reaches it with setCycleStatus once cycleRules is wired.',
   'Sync run:Running': 'A run frozen in Running would stay so for ever; T4 shows it live while its simulated connector (runSync) runs.',
-  'Period result:Draft': 'PeriodResult rows are built by calculateResults when Phase 1.5 is wired (no hand-computed scores).',
-  'Period result:Final': 'As above — finalizeResults.',
-  'Period result:Locked': 'As above — lockResults.',
 };
 
-/** Collections Syntra may leave empty until a deferred method fills them (Gate 1: none). */
-export const EMPTY_UNTIL_WIRED: ReadonlySet<CollectionName> = new Set<CollectionName>(['PeriodResult', 'ResultDetail', 'PayrollExport']);
+/**
+ * Collections the seed leaves empty until a Phase 2 track's own deferred method fills them:
+ * `PayrollExport` waits for T6's `exportPayroll` (WBS 4.6.4) — the export file is that track's work.
+ */
+export const EMPTY_UNTIL_WIRED: ReadonlySet<CollectionName> = new Set<CollectionName>(['PayrollExport']);
 
 describe('seed — plan §6.4 coverage', () => {
   it.each(STATE_SETS.map((s) => [s.name, s] as const))('shows every %s state (bar the listed exemptions)', (_, set) => {
@@ -348,5 +352,68 @@ describe('seed — workflow consistency as of SEED_NOW', () => {
       expect(items.length, f.id).toBeGreaterThan(0);
       for (const i of items) expect(rows(syntra, 'Goal').find((g) => g.id === i.goalId)?.goalPlanId).toBe(f.goalPlanId);
     }
+  });
+});
+
+describe('seed — period results (produced by resultRules, BR-KPI-40…43)', () => {
+  const results = rows(syntra, 'PeriodResult');
+  const details = rows(syntra, 'ResultDetail');
+  // The 2027 cycle's scale (the 2026 one is Inactive).
+  const levels = rows(syntra, 'RatingLevel').filter((l) => l.ratingScaleId === SYNTRA.id('RatingScale', 'SAMPLE'));
+  const period = (label: string) => SYNTRA.id('CyclePeriod', 2027, label);
+  const plan = (owner: string) => SYNTRA.id('GoalPlan', SYNTRA.id('PerformanceCycle', '2027'), owner);
+  const resultOf = (label: string, owner: string) => results.find((r) => r.periodId === period(label) && r.goalPlanId === plan(owner));
+
+  it('every status appears, in both tenants a result and its details exist', () => {
+    expect(new Set(results.map((r) => r.status))).toEqual(new Set(['Draft', 'Final', 'Locked']));
+    for (const t of seed.tenants) {
+      expect(t.rows.PeriodResult.length, t.tenant.name).toBeGreaterThan(0);
+      expect(t.rows.ResultDetail.length, t.tenant.name).toBeGreaterThan(0);
+    }
+  });
+
+  it.each([['Syntra', 0], ['Demo Co', 1]] as const)('%s: every Final / Locked result passes finalizeCheck on today\'s data', (_, i) => {
+    const t = seed.tenants[i];
+    for (const r of t.rows.PeriodResult.filter((x) => x.status !== 'Draft')) {
+      const lines = currentLinesOf(t.rows, r);
+      expect(lines, r.id).not.toBeNull();
+      expect(finalizeCheck(lines ?? [], r.id), r.id).toEqual([]);
+      expect(r.finalizedAt, r.id).not.toBeNull();
+    }
+  });
+
+  it('a finalised result: details weigh 100 (± 0.01), its score is rounded once and rated as shown', () => {
+    for (const r of results.filter((x) => x.status !== 'Draft')) {
+      const mine = details.filter((d) => d.resultId === r.id);
+      expect(isWeightComplete(mine.reduce((sum, d) => sum + d.weight, 0)), r.id).toBe(true);
+      expect(r.totalScore, r.id).toBe(roundScore(r.totalScore as number));
+      expect(r.ratingLevelId, r.id).toBe(ratingFor(roundScore(r.totalScore as number), levels)?.id ?? null);
+      expect(r.payoutPct === null, r.id).toBe(r.ownerType !== 'Employee');
+    }
+    for (const r of results.filter((x) => x.status === 'Draft' && x.ratingLevelId !== null)) {
+      expect(r.ratingLevelId).toBe(ratingFor(ratedScore(r.totalScore, 0), levels)?.id);
+    }
+  });
+
+  it('tells the story: T01 Locked (E027 Draft at 75%), T02 Final with E023 held Draft, T03 unit plans Draft', () => {
+    const t01 = results.filter((r) => r.periodId === period('T01'));
+    expect(t01.filter((r) => r.status === 'Draft').map((r) => r.goalPlanId)).toEqual([plan('E027')]);
+    expect(resultOf('T02', 'E023')?.status).toBe('Draft');
+    expect(resultOf('T02', 'E026')).toBeUndefined(); // no completed T02 form (ASSUMPTION Q17)
+    expect(resultOf('T02', 'SYN')?.status).toBe('Draft'); // one ERP Sale record never arrived
+    const t03 = results.filter((r) => r.periodId === period('T03'));
+    expect(t03.every((r) => r.status === 'Draft' && r.ownerType !== 'Employee')).toBe(true);
+    expect(results.filter((r) => r.periodId === period('T02') && r.status === 'Final').every((r) => r.finalizedAt === '2027-03-13T02:00:00.000Z')).toBe(true);
+  });
+
+  it('the seeded adjustments: one negative, one that crosses a level boundary (C → B)', () => {
+    const negative = resultOf('T01', 'E016');
+    expect(negative?.adjustmentPct).toBeLessThan(0);
+    const crossing = resultOf('T01', 'E019');
+    const code = (score: number) => ratingFor(roundScore(score), levels)?.code;
+    expect(crossing?.adjustmentPct).toBeGreaterThan(0);
+    expect(code(crossing?.totalScore as number)).toBe('B');
+    expect(code((crossing?.totalScore as number) - (crossing?.adjustmentPct as number))).toBe('C');
+    expect(crossing?.payoutPct).toBe(80);
   });
 });

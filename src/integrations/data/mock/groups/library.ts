@@ -1,4 +1,6 @@
 import type { CalcTier, Id, KpiTemplateItem } from '@/data/types';
+import { validateCalcMethod } from '@/lib/calcRules';
+import { toKpiError } from '@/lib/errorCatalog';
 import { matchesSearch } from '@/lib/search';
 import type { ChildInput, KpiDefinitionFilter, LibraryGateway } from '../../types';
 import { eqOpt, saveChildren, upsert } from '../rows';
@@ -24,7 +26,11 @@ export function libraryGroup(rt: Runtime): LibraryGateway {
       'library.saveCalcMethod', { permission: 'library.manage' },
       (tx, input: Parameters<LibraryGateway['saveCalcMethod']>[2], tiers: readonly ChildInput<CalcTier, 'calcMethodId'>[]) => {
         const parent = upsert(tx, 'CalcMethod', input, { create: () => ({}) });
-        return { parent, children: saveChildren(tx, 'CalcTier', 'calcMethodId', parent.id, tiers) };
+        const children = saveChildren(tx, 'CalcTier', 'calcMethodId', parent.id, tiers);
+        // BR-KPI-31: a ratio / formula needs a cap, floor ≤ cap, tiers without gaps or overlaps (ERR-KPI-13).
+        const issues = validateCalcMethod(parent, children);
+        if (issues.length > 0) throw toKpiError(issues);
+        return { parent, children };
       },
     ),
 
