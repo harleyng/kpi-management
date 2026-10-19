@@ -1,0 +1,722 @@
+---
+title: "ERD — Hệ thống Quản trị KPI (BSC) · P1 + P2 + P3"
+---
+erDiagram
+    %% Quy ước: mọi bảng nghiệp vụ có tenant_id (multi-tenant từ đầu). Để sơ đồ gọn, chỉ vẽ quan hệ TENANT tới các bảng gốc.
+    %% Phase: P1 = MVP quản trị KPI · P2 = Hiệu suất liên tục, Năng lực & 360, Thử việc/HĐLĐ, Calibration · P3 = Thương mại hóa
+    %% @group G1 "P1 · Tổ chức & người dùng" TENANT,ORG_UNIT,JOB_POSITION,EMPLOYEE,EMPLOYEE_ASSIGNMENT,USER_ACCOUNT,ROLE,PERMISSION,ROLE_PERMISSION,USER_ROLE
+    %% @group G2 "P1 · Thư viện KPI" BSC_PERSPECTIVE,MEASURE_UNIT,CALC_METHOD,CALC_TIER,KPI_DEFINITION,KPI_TEMPLATE,KPI_TEMPLATE_ITEM
+    %% @group G3 "P1 · Kế hoạch mục tiêu" PERFORMANCE_CYCLE,CYCLE_PERIOD,GOAL_PLAN,KGI,GOAL,GOAL_ALIGNMENT,GOAL_PERIOD_TARGET
+    %% @group G4 "P1 · Số liệu thực hiện" DATA_SOURCE,INTEGRATION_CONNECTION,DATA_MAPPING,SYNC_RUN,IMPORT_BATCH,GOAL_ACTUAL,EVIDENCE
+    %% @group G5 "P1 · Quy trình phê duyệt & đánh giá" WORKFLOW_TEMPLATE,WORKFLOW_STEP,FORM_INSTANCE,FORM_STEP_ACTION,EVALUATION_ITEM,DELEGATION
+    %% @group G6 "P1 · Kết quả & đãi ngộ" RATING_SCALE,RATING_LEVEL,PAYOUT_RULE,PERIOD_RESULT,RESULT_DETAIL,PAYROLL_EXPORT
+    %% @group G7 "P1 · Hệ thống" FILE_OBJECT,NOTIFICATION_TEMPLATE,NOTIFICATION,AUDIT_LOG
+    %% @group G8 "P2 · Hiệu suất liên tục" ACTIVITY,ACTIVITY_UPDATE,ACHIEVEMENT,FEEDBACK,ONE_ON_ONE_TOPIC
+    %% @group G9 "P2 · Năng lực & đánh giá 360" COMPETENCY_FRAMEWORK,COMPETENCY,COMPETENCY_LEVEL,POSITION_COMPETENCY,REVIEW_360_PARTICIPANT,COMPETENCY_RATING
+    %% @group G10 "P2 · Thử việc & hết hạn HĐLĐ" EMPLOYMENT_CONTRACT,FORM_LAUNCH_RULE
+    %% @group G11 "P2 · Calibration" CALIBRATION_SESSION,CALIBRATION_GUIDELINE,CALIBRATION_MEMBER,CALIBRATION_ADJUSTMENT
+    %% @group G12 "P3 · Thương mại hóa" SUBSCRIPTION_PLAN,PLAN_MODULE,TENANT_SUBSCRIPTION
+    TENANT {
+        bigint tenant_id PK
+        string code UK "Mã công ty thành viên"
+        string name
+        string timezone
+        string status "Active/Suspended"
+        timestamp created_at
+    }
+    ORG_UNIT {
+        bigint org_unit_id PK
+        bigint tenant_id FK
+        bigint parent_id FK "Tự tham chiếu - cây tổ chức"
+        string code UK
+        string name
+        string unit_type "Company/Khoi/PhongBan/Nhom"
+        bigint head_employee_id FK "Trưởng đơn vị"
+        date effective_from
+        date effective_to
+        string status
+    }
+    JOB_POSITION {
+        bigint position_id PK
+        bigint tenant_id FK
+        string code UK
+        string name "VD: NV Digital MKT"
+        string job_level "GĐ/TP/TN/CV/NV/CTV"
+        string status
+    }
+    EMPLOYEE {
+        bigint employee_id PK
+        bigint tenant_id FK
+        string employee_code UK
+        string full_name
+        string email
+        date hire_date
+        string employment_status "Thử việc/Chính thức/Nghỉ việc"
+    }
+    EMPLOYEE_ASSIGNMENT {
+        bigint assignment_id PK
+        bigint tenant_id FK
+        bigint employee_id FK
+        bigint org_unit_id FK
+        bigint position_id FK
+        bigint manager_employee_id FK "Quản lý trực tiếp (direct line)"
+        boolean is_primary "Kiêm nhiệm: false"
+        date effective_from
+        date effective_to
+    }
+    USER_ACCOUNT {
+        bigint user_id PK
+        bigint tenant_id FK
+        bigint employee_id FK "Null với tài khoản hệ thống"
+        string login UK
+        string auth_provider "Local/SSO"
+        string status
+        timestamp last_login_at
+    }
+    ROLE {
+        bigint role_id PK
+        bigint tenant_id FK
+        string code UK "EMPLOYEE/MANAGER/HR/CNB/BOD/ADMIN"
+        string name
+    }
+    PERMISSION {
+        bigint permission_id PK
+        string code UK "VD: goal.approve, result.view_all"
+        string module
+        string description
+    }
+    ROLE_PERMISSION {
+        bigint role_id PK,FK
+        bigint permission_id PK,FK
+    }
+    USER_ROLE {
+        bigint user_role_id PK
+        bigint user_id FK
+        bigint role_id FK
+        string scope_type "Self/DirectReports/OrgUnit/Tenant"
+        bigint scope_org_unit_id FK "Phạm vi xem dữ liệu"
+        boolean include_children "Gồm đơn vị con"
+    }
+    BSC_PERSPECTIVE {
+        bigint perspective_id PK
+        bigint tenant_id FK
+        string code UK "FIN/CUS/PRO/LNG"
+        string name "Tài chính/Khách hàng/Quy trình/Học hỏi"
+        int sort_order
+    }
+    MEASURE_UNIT {
+        bigint unit_id PK
+        bigint tenant_id FK
+        string code UK "PCT/VND/PERSON/COUNT/DAY"
+        string name
+        int decimals
+    }
+    CALC_METHOD {
+        bigint calc_method_id PK
+        bigint tenant_id FK
+        string code UK
+        string method_type "RATIO_UP/RATIO_DOWN/TIERED/BINARY/FORMULA"
+        string formula_expr "Biểu thức khi FORMULA"
+        decimal cap_pct "Trần % hoàn thành, VD 120"
+        decimal floor_pct "Sàn %"
+        string description
+    }
+    CALC_TIER {
+        bigint tier_id PK
+        bigint calc_method_id FK
+        decimal from_value
+        decimal to_value
+        decimal achievement_pct "VD đứt hàng 1 lần = 70%"
+    }
+    KPI_DEFINITION {
+        bigint kpi_def_id PK
+        bigint tenant_id FK
+        string code UK
+        string name
+        bigint perspective_id FK
+        bigint unit_id FK
+        bigint calc_method_id FK
+        bigint default_data_source_id FK
+        text definition "Định nghĩa, cách hiểu"
+        text formula_text "Công thức tính diễn giải"
+        string frequency "Tuần/Tháng/Quý/Năm"
+        string aggregation "SUM/AVG/LAST - cộng dồn kỳ"
+        boolean is_system "Thư viện chuẩn hay tự tạo"
+        string status "Draft/Active/Archived"
+    }
+    KPI_TEMPLATE {
+        bigint template_id PK
+        bigint tenant_id FK
+        string name "VD: Bộ KPI phòng Marketing"
+        bigint org_unit_id FK "Áp cho đơn vị"
+        bigint position_id FK "Hoặc áp cho chức danh"
+        string status
+    }
+    KPI_TEMPLATE_ITEM {
+        bigint template_item_id PK
+        bigint template_id FK
+        bigint kpi_def_id FK
+        decimal default_weight
+        decimal default_target
+    }
+    PERFORMANCE_CYCLE {
+        bigint cycle_id PK
+        bigint tenant_id FK
+        string name "VD: KPI 2027"
+        date start_date
+        date end_date
+        bigint rating_scale_id FK
+        string status "Planning/Active/Evaluating/Closed"
+    }
+    CYCLE_PERIOD {
+        bigint period_id PK
+        bigint cycle_id FK
+        string period_type "Month/Quarter/Half/Year"
+        string label "T01/Q1/H1/Y"
+        date start_date
+        date end_date
+        date input_deadline "Hạn nhập số liệu"
+        date eval_deadline "Hạn đánh giá"
+        boolean is_locked
+    }
+    GOAL_PLAN {
+        bigint goal_plan_id PK
+        bigint tenant_id FK
+        bigint cycle_id FK
+        string plan_type "KPI/Probation(P2)"
+        string owner_type "Company/OrgUnit/Employee"
+        bigint owner_org_unit_id FK
+        bigint owner_employee_id FK
+        string status "Draft/Submitted/Approved/Locked"
+        decimal total_weight "Phải = 100"
+        timestamp locked_at
+    }
+    KGI {
+        bigint kgi_id PK
+        bigint goal_plan_id FK
+        string name "Mục tiêu trọng yếu (3-5)"
+        text description
+        int sort_order
+    }
+    GOAL {
+        bigint goal_id PK
+        bigint goal_plan_id FK
+        bigint kgi_id FK
+        bigint kpi_def_id FK "Null nếu tự tạo ngoài thư viện"
+        string name
+        bigint perspective_id FK
+        bigint unit_id FK
+        bigint calc_method_id FK
+        bigint data_source_id FK "Bắt buộc - nguồn đo lường"
+        decimal weight
+        decimal target_value
+        string target_text "Khi mục tiêu dạng chữ"
+        date start_date
+        date due_date
+        bigint owner_employee_id FK "Người chịu trách nhiệm"
+        string status "Active/Changed/Cancelled"
+    }
+    GOAL_ALIGNMENT {
+        bigint alignment_id PK
+        bigint child_goal_id FK
+        bigint parent_goal_id FK
+        string alignment_type "CASCADE/LINK"
+        decimal contribution_pct "Tỷ lệ đóng góp lên KPI cha"
+    }
+    GOAL_PERIOD_TARGET {
+        bigint period_target_id PK
+        bigint goal_id FK
+        bigint period_id FK
+        decimal target_value "Phân bổ mục tiêu theo tháng/quý"
+    }
+    DATA_SOURCE {
+        bigint data_source_id PK
+        bigint tenant_id FK
+        string code UK
+        string name "ERP Sale/HRIS/Excel/Thủ công"
+        string source_type "MANUAL/EXCEL/API"
+        bigint owner_org_unit_id FK "Đơn vị cung cấp số liệu"
+    }
+    INTEGRATION_CONNECTION {
+        bigint connection_id PK
+        bigint tenant_id FK
+        bigint data_source_id FK
+        string endpoint
+        string auth_type "APIKey/OAuth2/Basic"
+        string secret_ref "Khóa trong vault, không lưu bản rõ"
+        string schedule_cron
+        string status
+    }
+    DATA_MAPPING {
+        bigint mapping_id PK
+        bigint connection_id FK
+        bigint kpi_def_id FK
+        string query_or_path "Truy vấn / JSONPath"
+        string org_dimension "Trường xác định đơn vị/nhân viên"
+        string transform_expr
+    }
+    SYNC_RUN {
+        bigint sync_run_id PK
+        bigint connection_id FK
+        timestamp started_at
+        timestamp finished_at
+        int records_ok
+        int records_error
+        string status
+        text error_log
+    }
+    IMPORT_BATCH {
+        bigint batch_id PK
+        bigint tenant_id FK
+        string import_type "Actual/GoalPlan/OrgData/Library"
+        bigint file_id FK
+        bigint uploaded_by FK
+        int rows_total
+        int rows_error
+        string status "Validating/Committed/Rejected"
+        timestamp created_at
+    }
+    GOAL_ACTUAL {
+        bigint actual_id PK
+        bigint goal_id FK
+        bigint period_id FK
+        decimal actual_value
+        string actual_text
+        string source_type "MANUAL/EXCEL/API"
+        bigint batch_id FK
+        bigint sync_run_id FK
+        bigint entered_by FK
+        timestamp recorded_at "Snapshot theo ngày - số liệu sống"
+        boolean is_current
+    }
+    EVIDENCE {
+        bigint evidence_id PK
+        bigint goal_id FK
+        bigint period_id FK
+        bigint actual_id FK
+        bigint file_id FK
+        string url "Hoặc link ngoài"
+        string note
+        bigint uploaded_by FK
+        timestamp uploaded_at
+    }
+    WORKFLOW_TEMPLATE {
+        bigint workflow_id PK
+        bigint tenant_id FK
+        string form_type "GOAL_SETTING/GOAL_CHANGE/KPI_EVAL/PROBATION_EVAL(P2)/CONTRACT_EVAL(P2)/REVIEW_360(P2)"
+        string name
+        boolean is_default
+    }
+    WORKFLOW_STEP {
+        bigint step_id PK
+        bigint workflow_id FK
+        int step_no
+        string actor_rule "SELF/DIRECT_MANAGER/MANAGER_L2/HR/CNB/ROLE"
+        bigint actor_role_id FK
+        string allowed_actions "SUBMIT/APPROVE/EDIT/RETURN"
+        int sla_days
+        string on_overdue "AUTO_FORWARD/REMIND"
+    }
+    FORM_INSTANCE {
+        bigint form_id PK
+        bigint tenant_id FK
+        bigint workflow_id FK
+        bigint subject_employee_id FK
+        bigint goal_plan_id FK
+        bigint period_id FK
+        bigint current_step_id FK
+        string status "Open/InProgress/Completed/Cancelled"
+        date due_date
+        timestamp launched_at
+    }
+    FORM_STEP_ACTION {
+        bigint action_id PK
+        bigint form_id FK
+        bigint step_id FK
+        bigint actor_user_id FK
+        bigint on_behalf_of_user_id FK "Proxy/ủy quyền"
+        string action "SUBMIT/APPROVE/EDIT/RETURN/AUTO_FORWARD"
+        text comment
+        timestamp acted_at
+    }
+    EVALUATION_ITEM {
+        bigint eval_item_id PK
+        bigint form_id FK
+        bigint goal_id FK
+        decimal actual_snapshot
+        decimal self_achievement_pct
+        text self_comment
+        decimal manager_achievement_pct
+        text manager_comment
+        decimal final_achievement_pct "HR/C&B ghi nhận"
+    }
+    DELEGATION {
+        bigint delegation_id PK
+        bigint tenant_id FK
+        bigint from_user_id FK
+        bigint to_user_id FK
+        string form_type
+        date valid_from
+        date valid_to
+    }
+    RATING_SCALE {
+        bigint rating_scale_id PK
+        bigint tenant_id FK
+        string name "VD: Thang A+/A/B/C/D"
+        string status
+    }
+    RATING_LEVEL {
+        bigint rating_level_id PK
+        bigint rating_scale_id FK
+        string code "A+/A/B/C/D"
+        string label
+        decimal min_score
+        decimal max_score
+        int sort_order
+    }
+    PAYOUT_RULE {
+        bigint payout_rule_id PK
+        bigint tenant_id FK
+        bigint rating_scale_id FK
+        bigint rating_level_id FK
+        string applies_to "Tất cả/Khối/Chức danh"
+        bigint org_unit_id FK
+        bigint position_id FK
+        decimal payout_pct "% hưởng lương KPI"
+        date effective_from
+    }
+    PERIOD_RESULT {
+        bigint result_id PK
+        bigint tenant_id FK
+        bigint period_id FK
+        bigint goal_plan_id FK
+        string owner_type "Company/OrgUnit/Employee"
+        decimal total_score "Tổng % hoàn thành có trọng số"
+        bigint rating_level_id FK
+        decimal payout_pct
+        decimal adjustment_pct "Điều chỉnh vi phạm/chuyên cần"
+        string status "Draft/Final/Locked"
+        timestamp finalized_at
+    }
+    RESULT_DETAIL {
+        bigint result_detail_id PK
+        bigint result_id FK
+        bigint goal_id FK
+        decimal achievement_pct
+        decimal weight
+        decimal weighted_score
+    }
+    PAYROLL_EXPORT {
+        bigint export_id PK
+        bigint tenant_id FK
+        bigint period_id FK
+        bigint file_id FK
+        bigint exported_by FK
+        timestamp exported_at
+    }
+    FILE_OBJECT {
+        bigint file_id PK
+        bigint tenant_id FK
+        string storage_key
+        string file_name
+        string mime_type
+        bigint size_bytes
+        bigint uploaded_by FK
+        timestamp uploaded_at
+    }
+    NOTIFICATION_TEMPLATE {
+        bigint template_id PK
+        bigint tenant_id FK
+        string event_code "FORM_LAUNCHED/DEADLINE_REMIND/RETURNED/KPI_ALERT"
+        string channel "Email/InApp"
+        string language "vi/en"
+        string subject
+        text body
+    }
+    NOTIFICATION {
+        bigint notification_id PK
+        bigint tenant_id FK
+        bigint template_id FK
+        bigint recipient_user_id FK
+        string ref_type "Form/Goal/Result"
+        bigint ref_id
+        string status "Queued/Sent/Read/Failed"
+        timestamp sent_at
+    }
+    AUDIT_LOG {
+        bigint audit_id PK
+        bigint tenant_id FK
+        bigint user_id FK
+        string entity_name
+        bigint entity_id
+        string action "CREATE/UPDATE/DELETE/LOCK/UNLOCK"
+        json before_data
+        json after_data
+        timestamp created_at
+    }
+    ACTIVITY {
+        bigint activity_id PK
+        bigint tenant_id FK
+        bigint employee_id FK
+        bigint goal_id FK "Null nếu mục tiêu phát triển bản thân"
+        string name
+        string status "NotStarted/OnTrack/Behind/Completed"
+        bigint created_by FK
+        timestamp created_at
+    }
+    ACTIVITY_UPDATE {
+        bigint update_id PK
+        bigint activity_id FK
+        text content
+        boolean is_flagged
+        bigint created_by FK
+        timestamp created_at
+    }
+    ACHIEVEMENT {
+        bigint achievement_id PK
+        bigint tenant_id FK
+        bigint employee_id FK
+        bigint goal_id FK
+        bigint activity_id FK "Sinh ra khi hoạt động hoàn thành"
+        string name
+        text description
+        date achieved_on
+    }
+    FEEDBACK {
+        bigint feedback_id PK
+        bigint tenant_id FK
+        bigint about_employee_id FK
+        string ref_type "Activity/Achievement/Employee"
+        bigint ref_id
+        bigint requested_by FK
+        bigint giver_user_id FK
+        text content
+        string status "Requested/Given/Declined"
+        timestamp given_at
+    }
+    ONE_ON_ONE_TOPIC {
+        bigint topic_id PK
+        bigint tenant_id FK
+        bigint employee_id FK
+        bigint manager_employee_id FK
+        string title
+        boolean is_done
+        timestamp snapshot_at "Ghi lại cuộc họp - khóa bản ghi"
+    }
+    COMPETENCY_FRAMEWORK {
+        bigint framework_id PK
+        bigint tenant_id FK
+        string name
+        string status
+    }
+    COMPETENCY {
+        bigint competency_id PK
+        bigint framework_id FK
+        string code UK
+        string name
+        string competency_type "Core/Functional/Leadership"
+        text description
+    }
+    COMPETENCY_LEVEL {
+        bigint competency_level_id PK
+        bigint competency_id FK
+        int level_no "1..5"
+        text behavioral_indicator
+    }
+    POSITION_COMPETENCY {
+        bigint position_competency_id PK
+        bigint position_id FK
+        bigint competency_id FK
+        int required_level
+        decimal weight
+    }
+    REVIEW_360_PARTICIPANT {
+        bigint participant_id PK
+        bigint form_id FK "FORM_INSTANCE loại REVIEW_360"
+        bigint reviewer_user_id FK
+        string relation "Self/Manager/Peer/Subordinate/External"
+        string status "Invited/Submitted/Declined"
+        timestamp submitted_at
+    }
+    COMPETENCY_RATING {
+        bigint competency_rating_id PK
+        bigint form_id FK
+        bigint participant_id FK
+        bigint competency_id FK
+        int rated_level
+        text comment
+    }
+    EMPLOYMENT_CONTRACT {
+        bigint contract_id PK
+        bigint tenant_id FK
+        bigint employee_id FK
+        string contract_type "Thử việc/12T/24T/KXĐTH"
+        date start_date
+        date end_date
+        string status
+    }
+    FORM_LAUNCH_RULE {
+        bigint launch_rule_id PK
+        bigint tenant_id FK
+        bigint workflow_id FK
+        string trigger_event "HIRE_DATE/CONTRACT_END/PERIOD_END/MANUAL"
+        int offset_days "VD: +45 ngày sau ngày vào"
+        string target_filter "Điều kiện nhân sự áp dụng"
+        boolean is_active
+    }
+    CALIBRATION_SESSION {
+        bigint session_id PK
+        bigint tenant_id FK
+        bigint cycle_id FK
+        bigint period_id FK
+        bigint org_unit_id FK
+        string name
+        string status "Draft/InProgress/Closed"
+        timestamp closed_at
+    }
+    CALIBRATION_GUIDELINE {
+        bigint guideline_id PK
+        bigint session_id FK
+        bigint rating_level_id FK
+        decimal target_pct "Tỷ lệ phân phối chuẩn, VD 68%"
+    }
+    CALIBRATION_MEMBER {
+        bigint member_id PK
+        bigint session_id FK
+        bigint user_id FK
+        string member_role "Owner/Facilitator/Participant"
+    }
+    CALIBRATION_ADJUSTMENT {
+        bigint adjustment_id PK
+        bigint session_id FK
+        bigint result_id FK
+        bigint from_rating_level_id FK
+        bigint to_rating_level_id FK
+        text reason
+        bigint adjusted_by FK
+        timestamp adjusted_at
+    }
+    SUBSCRIPTION_PLAN {
+        bigint plan_id PK
+        string code UK
+        string name
+        decimal price_per_user
+        int max_users
+    }
+    PLAN_MODULE {
+        bigint plan_id PK,FK
+        string module_code PK "KPI/CPM/COMPETENCY/CALIBRATION/AI"
+    }
+    TENANT_SUBSCRIPTION {
+        bigint subscription_id PK
+        bigint tenant_id FK
+        bigint plan_id FK
+        date start_date
+        date end_date
+        int licensed_users
+        string status "Trial/Active/Expired"
+    }
+    TENANT ||--o{ ORG_UNIT : "có"
+    TENANT ||--o{ EMPLOYEE : "có"
+    TENANT ||--o{ USER_ACCOUNT : "có"
+    TENANT ||--o{ PERFORMANCE_CYCLE : "có"
+    TENANT ||--o{ KPI_DEFINITION : "sở hữu thư viện"
+    ORG_UNIT ||--o{ ORG_UNIT : "đơn vị con"
+    ORG_UNIT ||--o{ EMPLOYEE_ASSIGNMENT : "chứa"
+    JOB_POSITION ||--o{ EMPLOYEE_ASSIGNMENT : "đảm nhiệm"
+    EMPLOYEE ||--o{ EMPLOYEE_ASSIGNMENT : "được phân công"
+    EMPLOYEE |o--o{ EMPLOYEE_ASSIGNMENT : "là quản lý trực tiếp"
+    EMPLOYEE |o--o| USER_ACCOUNT : "đăng nhập bằng"
+    USER_ACCOUNT ||--o{ USER_ROLE : "được gán"
+    ROLE ||--o{ USER_ROLE : "gán cho"
+    ORG_UNIT |o--o{ USER_ROLE : "phạm vi dữ liệu"
+    ROLE ||--o{ ROLE_PERMISSION : "gồm"
+    PERMISSION ||--o{ ROLE_PERMISSION : "thuộc"
+    BSC_PERSPECTIVE ||--o{ KPI_DEFINITION : "phân loại"
+    MEASURE_UNIT ||--o{ KPI_DEFINITION : "đơn vị đo"
+    CALC_METHOD ||--o{ KPI_DEFINITION : "cách tính"
+    CALC_METHOD ||--o{ CALC_TIER : "bậc thang"
+    DATA_SOURCE |o--o{ KPI_DEFINITION : "nguồn mặc định"
+    KPI_TEMPLATE ||--o{ KPI_TEMPLATE_ITEM : "gồm"
+    KPI_DEFINITION ||--o{ KPI_TEMPLATE_ITEM : "dùng trong"
+    ORG_UNIT |o--o{ KPI_TEMPLATE : "áp dụng cho"
+    JOB_POSITION |o--o{ KPI_TEMPLATE : "áp dụng cho"
+    PERFORMANCE_CYCLE ||--o{ CYCLE_PERIOD : "chia kỳ"
+    PERFORMANCE_CYCLE ||--o{ GOAL_PLAN : "có"
+    ORG_UNIT |o--o{ GOAL_PLAN : "sở hữu (bộ phận)"
+    EMPLOYEE |o--o{ GOAL_PLAN : "sở hữu (cá nhân)"
+    GOAL_PLAN ||--o{ KGI : "có"
+    GOAL_PLAN ||--o{ GOAL : "gồm"
+    KGI |o--o{ GOAL : "triển khai bằng"
+    KPI_DEFINITION |o--o{ GOAL : "khởi tạo từ"
+    BSC_PERSPECTIVE ||--o{ GOAL : "phân loại"
+    CALC_METHOD ||--o{ GOAL : "cách tính"
+    DATA_SOURCE ||--o{ GOAL : "đo bằng"
+    GOAL ||--o{ GOAL_ALIGNMENT : "là con"
+    GOAL ||--o{ GOAL_ALIGNMENT : "là cha"
+    GOAL ||--o{ GOAL_PERIOD_TARGET : "phân bổ"
+    CYCLE_PERIOD ||--o{ GOAL_PERIOD_TARGET : "trong kỳ"
+    DATA_SOURCE ||--o{ INTEGRATION_CONNECTION : "kết nối"
+    INTEGRATION_CONNECTION ||--o{ DATA_MAPPING : "ánh xạ"
+    KPI_DEFINITION ||--o{ DATA_MAPPING : "được ánh xạ"
+    INTEGRATION_CONNECTION ||--o{ SYNC_RUN : "lần đồng bộ"
+    GOAL ||--o{ GOAL_ACTUAL : "có số thực tế"
+    CYCLE_PERIOD ||--o{ GOAL_ACTUAL : "trong kỳ"
+    IMPORT_BATCH |o--o{ GOAL_ACTUAL : "nạp bởi"
+    SYNC_RUN |o--o{ GOAL_ACTUAL : "nạp bởi"
+    GOAL ||--o{ EVIDENCE : "chứng minh"
+    GOAL_ACTUAL |o--o{ EVIDENCE : "đính kèm"
+    FILE_OBJECT |o--o{ EVIDENCE : "tệp"
+    FILE_OBJECT ||--o{ IMPORT_BATCH : "tệp import"
+    WORKFLOW_TEMPLATE ||--o{ WORKFLOW_STEP : "gồm bước"
+    ROLE |o--o{ WORKFLOW_STEP : "người xử lý"
+    WORKFLOW_TEMPLATE ||--o{ FORM_INSTANCE : "khởi chạy"
+    EMPLOYEE ||--o{ FORM_INSTANCE : "là đối tượng"
+    GOAL_PLAN |o--o{ FORM_INSTANCE : "xử lý"
+    CYCLE_PERIOD |o--o{ FORM_INSTANCE : "cho kỳ"
+    WORKFLOW_STEP |o--o{ FORM_INSTANCE : "bước hiện tại"
+    FORM_INSTANCE ||--o{ FORM_STEP_ACTION : "lịch sử xử lý"
+    WORKFLOW_STEP ||--o{ FORM_STEP_ACTION : "tại bước"
+    USER_ACCOUNT ||--o{ FORM_STEP_ACTION : "thực hiện"
+    FORM_INSTANCE ||--o{ EVALUATION_ITEM : "đánh giá"
+    GOAL ||--o{ EVALUATION_ITEM : "được đánh giá"
+    USER_ACCOUNT ||--o{ DELEGATION : "ủy quyền"
+    RATING_SCALE ||--o{ RATING_LEVEL : "gồm bậc"
+    RATING_SCALE ||--o{ PERFORMANCE_CYCLE : "áp dụng"
+    RATING_LEVEL ||--o{ PAYOUT_RULE : "quy đổi"
+    CYCLE_PERIOD ||--o{ PERIOD_RESULT : "kết quả kỳ"
+    GOAL_PLAN ||--o{ PERIOD_RESULT : "kết quả của"
+    RATING_LEVEL |o--o{ PERIOD_RESULT : "xếp loại"
+    PERIOD_RESULT ||--o{ RESULT_DETAIL : "chi tiết"
+    GOAL ||--o{ RESULT_DETAIL : "điểm từng KPI"
+    CYCLE_PERIOD ||--o{ PAYROLL_EXPORT : "xuất lương"
+    FILE_OBJECT ||--o| PAYROLL_EXPORT : "tệp xuất"
+    NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : "sinh ra"
+    USER_ACCOUNT ||--o{ NOTIFICATION : "nhận"
+    USER_ACCOUNT ||--o{ AUDIT_LOG : "thực hiện"
+    EMPLOYEE ||--o{ ACTIVITY : "ghi nhận"
+    GOAL |o--o{ ACTIVITY : "hướng tới"
+    ACTIVITY ||--o{ ACTIVITY_UPDATE : "cập nhật"
+    ACTIVITY |o--o| ACHIEVEMENT : "hoàn thành thành"
+    EMPLOYEE ||--o{ ACHIEVEMENT : "đạt"
+    GOAL |o--o{ ACHIEVEMENT : "đóng góp cho"
+    EMPLOYEE ||--o{ FEEDBACK : "được phản hồi"
+    EMPLOYEE ||--o{ ONE_ON_ONE_TOPIC : "trao đổi 1-1"
+    COMPETENCY_FRAMEWORK ||--o{ COMPETENCY : "gồm"
+    COMPETENCY ||--o{ COMPETENCY_LEVEL : "bậc"
+    JOB_POSITION ||--o{ POSITION_COMPETENCY : "yêu cầu"
+    COMPETENCY ||--o{ POSITION_COMPETENCY : "được yêu cầu"
+    FORM_INSTANCE ||--o{ REVIEW_360_PARTICIPANT : "mời đánh giá"
+    REVIEW_360_PARTICIPANT ||--o{ COMPETENCY_RATING : "chấm"
+    COMPETENCY ||--o{ COMPETENCY_RATING : "được chấm"
+    EMPLOYEE ||--o{ EMPLOYMENT_CONTRACT : "ký"
+    WORKFLOW_TEMPLATE ||--o{ FORM_LAUNCH_RULE : "tự khởi chạy theo"
+    PERFORMANCE_CYCLE ||--o{ CALIBRATION_SESSION : "hiệu chỉnh"
+    CALIBRATION_SESSION ||--o{ CALIBRATION_GUIDELINE : "tỷ lệ chuẩn"
+    RATING_LEVEL ||--o{ CALIBRATION_GUIDELINE : "cho bậc"
+    CALIBRATION_SESSION ||--o{ CALIBRATION_MEMBER : "thành viên"
+    CALIBRATION_SESSION ||--o{ CALIBRATION_ADJUSTMENT : "điều chỉnh"
+    PERIOD_RESULT ||--o{ CALIBRATION_ADJUSTMENT : "bị điều chỉnh"
+    SUBSCRIPTION_PLAN ||--o{ PLAN_MODULE : "gồm module"
+    SUBSCRIPTION_PLAN ||--o{ TENANT_SUBSCRIPTION : "được đăng ký"
+    TENANT ||--o{ TENANT_SUBSCRIPTION : "đăng ký"

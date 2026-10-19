@@ -1,0 +1,50 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Env / secrets — NEVER commit. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+
+# This project standardises on npm — do not commit bun/yarn/pnpm lockfiles
+bun.lockb
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
+# Source documents (CMC user guides, SF4C process, DATX workbook, email template) are internal
+# and heavy. They live OUTSIDE the repo; docs/source-map.md points at them with page numbers.
+Request/
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?
+
+# Claude Code: track the shared hooks (settings.json); ignore per-machine permissions
+.claude/settings.local.json
+.mcp.json
+
+# Vercel CLI artifacts
+.vercel
+
+# Playwright artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

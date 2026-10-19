@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. a new push to a PR branch).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # `npm run build` is `vite build`, which does NOT type-check. Running tsc first means a
+      # type error is caught here rather than at runtime in the browser.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # A GATE on this repo (unlike OmniX Studio): src/lib/*Rules.ts computes scores and pay.
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      # CLAUDE.md is the single source for AGENTS.md and GEMINI.md. This fails if someone
+      # edited the source without regenerating the companions.
+      - name: Guide files in sync
+        run: npm run guides:check

@@ -1,0 +1,203 @@
+# Business rules — Syntra KPI
+
+> Living document — **the authoritative current rules**. Referenced by every agent.
+> Rule codes are `BR-KPI-xx`. Every rule names its source (see `docs/source-map.md` for the files and
+> page numbers). A value that depends on an open question (plan §9) is marked **`ASSUMPTION Qn`** and
+> uses the plan's default until the question is answered.
+>
+> Status on 2026-10-19 (Phase 0): the rules below are **specified, not implemented**. They are
+> implemented in Phase 1.5 (`src/lib/*Rules.ts`) and the state sets in Phase 1.1 (`src/data/types.ts`).
+
+---
+
+## 0. Glossary and source priority
+
+**Source priority.** Syntra's decisions (NoteX minutes, the plan, the product owner) > the plan's
+defaults for open questions > CMC PMGM user guides and SF4C as a reference implementation > DATX as an
+example of today's practice. A CMC feature Syntra has not confirmed is **not in P1**.
+
+| Term | Meaning |
+|---|---|
+| **BSC** | Balanced Scorecard — four perspectives: Tài chính · Khách hàng · Quy trình nội bộ · Học hỏi & phát triển |
+| **KGI** | Key Goal Indicator — one of the 3–5 key goals of a Goal Plan (DATX: "Mục tiêu chung (3-5) - KGI") |
+| **CSF** | Critical success factor — the bridge KGI → CSF → KPI (DATX slides) |
+| **KPI / chỉ tiêu** | One measurable goal in a Goal Plan, with weight, target, calculation method and data source |
+| **KPI definition** | A reusable item in the KPI library, which a goal may be created from |
+| **Goal Plan** | One owner's set of goals for one cycle; owner = company, org unit or employee |
+| **Cascade** | A manager hands part of their own goal down to a report (parent → child, with an allocated value) |
+| **Link** | An employee ties a goal they added to a manager's goal (contribution) |
+| **Định mức L1/L2/L3** | Per-goal target levels, each with a score (D1) |
+| **Chu kỳ / kỳ** | Cycle (e.g. "KPI 2027") / a period inside it (T01…T12, Q1…Q4) |
+| **Phiếu (form)** | One workflow instance (registration, adjustment or evaluation) for one subject and period |
+| **Đợt khởi chạy** | One launch that creates many forms, now, on a date or on a schedule (D5) |
+| **Proxy / ủy quyền** | Acting on someone else's step (HR as proxy) / a dated delegation of one's own step |
+
+---
+
+## 1. Structure — tiers, Goal Plans, goals
+
+- **BR-KPI-01** — Goals exist on **three tiers**: Company → Department (org unit) → Individual. Each
+  Goal Plan has exactly one owner of one tier. *Source: NoteX minutes; ERD `GOAL_PLAN.owner_type`.*
+- **BR-KPI-02** — A Goal Plan holds **3–5 KGI**. A KGI may carry a numeric target but is **not scored**
+  (`ASSUMPTION Q9`). *Source: DATX department sheets; DATX slides pp. 21–22.*
+- **BR-KPI-03** — A Goal Plan holds **5–8 KPIs**. *Source: plan §6.2 (1.5 `goalPlanRules`), NoteX minutes.*
+- **BR-KPI-04** — A Goal Plan can be submitted only when its goals' weights sum to **100%**, compared with
+  a tolerance of ±0.01 (a sum of 99.99% or 100.01% from rounding counts as 100%). *Source: HR guide
+  p. 22; Manager guide p. 26; email template ("if the total weight is less than 100%").*
+- **BR-KPI-05** — **Every KPI has a data source** ("KPI phải đo được"). A goal without one cannot be
+  saved. *Source: NoteX minutes §2.3; ERD `GOAL.data_source_id` (required).*
+- **BR-KPI-06** — Every KPI belongs to exactly one **BSC perspective**. DATX's "Hiệu quả / Khối lượng /
+  Chi phí" classification is a secondary tag only (`ASSUMPTION Q5`). The KRI type (KRItc / KRIpt) is
+  hidden until its meaning is confirmed (`ASSUMPTION Q6`, D4). *Source: HR guide p. 22; DATX sheet
+  "2. KPIs phòng ban".*
+- **BR-KPI-07** — Goals are joined by **cascade** (parent goal allocated down, `allocatedValue`) or
+  **link** (child contributes to a parent, `contributionPct`). A goal can never be its own ancestor (no
+  cycles, A → B → A refused). For a cascaded goal the manager sees **assigned to employees / self-held /
+  not yet assigned / self-performed**; "not yet assigned" = parent target − Σ allocated values, always
+  derived, never stored (D3). Allocating more than the parent target is refused. *Source: HR guide p. 24;
+  email template steps 1–2.*
+- **BR-KPI-08** — A goal is **public or private** (visibility, D2). *Source: HR guide pp. 21–22.*
+- **BR-KPI-09** — A goal may carry **target levels L1/L2/L3**, set per assigned goal (not per method),
+  each with a score (e.g. reaching L1 → 0%, L2 → 100%) and an optional text rule (D1, proposed —
+  confirmed in Phase 1.1). *Source: HR guide pp. 23, 28; import columns P–T p. 63.*
+- **BR-KPI-10** — A goal's target is either **numeric** or **text** (Đạt / Không đạt). *Source: HR guide p. 23.*
+- **BR-KPI-11** — A goal's target may be **allocated by period** (monthly/quarterly targets). *Source: DATX
+  column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
+
+## 2. Processes (P1)
+
+The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjustment), **KPI_EVAL**
+(evaluation). Diagrams: `docs/flows/new-flow.md`.
+
+- **BR-KPI-12** — **Registration runs in four steps**: (1) the direct manager cascades some of their own
+  goals to the employee; (2) the employee adds new goals and links them to the manager's goals, until
+  the weights reach 100%; (3) the direct manager approves, edits or returns the plan to the employee;
+  (4) HR records the final Goal Plan (and locks it). *Source: email template "Email khởi chạy"; SF4C
+  PMGM.03.*
+- **BR-KPI-13** — When a step's deadline passes, the step's **overdue behaviour** applies, and it is
+  configured per step: **lock** the Goal Plan (registration: "the goal plan will be locked and can not be
+  editable after running out of time"), **auto-forward** to the next actor (evaluation: an employee who
+  has not self-assessed in time → the form goes to the direct manager), or **remind**. An auto-forward is
+  recorded as an `AUTO_FORWARD` action. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
+- **BR-KPI-14** — HR can **lock and unlock** a Goal Plan; every lock/unlock is kept in its history. A
+  locked plan cannot be edited except through the adjustment process. *Source: HR guide pp. 47–49;
+  SF4C PMGM.03, PMGM.06.*
+- **BR-KPI-15** — **Adjustment** (GOAL_CHANGE) changes an approved, locked Goal Plan through its own
+  approval chain; the changed goals keep their history (`GOAL.status` Active → Changed / Cancelled).
+  *Source: SF4C PMGM.06–07; Manager guide.*
+- **BR-KPI-16** — **Evaluation runs in three steps**: (1) the employee self-assesses each goal (% and
+  explanation) with evidence; (2) the direct manager scores each goal (% and comment); (3) HR/C&B records
+  the final % per goal. *Source: NoteX minutes §2.3; Manager guide pp. 98–109; SF4C PMGM.12.*
+- **BR-KPI-17** — On the evaluation form the **actual value comes from the actuals data (T4) and is
+  read-only**; the form shows target/levels, actual, self %, manager %, final %, evidence, and the
+  computed total score. *Source: plan §5.5.*
+- **BR-KPI-18** — A form can be **submitted** only when the weights sum to 100% (BR-KPI-04) and every
+  item that requires a score or comment at that step has one (`formRules.canSubmit`, D6). *Source:
+  Manager guide p. 26.*
+- **BR-KPI-19** — Forms are created by a **launch**: form type and workflow template; timing — now, on a
+  date, or recurring (e.g. day 1 of each month); the evaluation period; a due date rule (e.g. 7 days
+  after launch); recipients — everyone, by org unit, or by filter. One launch creates many forms. The
+  recurring launch (`FORM_LAUNCH_RULE`) moves from P2 into P1 because the monthly evaluation must launch
+  itself (D5). *Source: HR guide pp. 89–93.*
+- **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
+  ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
+  is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
+  pp. 150–155.*
+- **BR-KPI-21** — An action taken **as proxy or under delegation** records both the person who acted
+  and the person acted for. A delegation is valid only for its form type and between `validFrom` and
+  `validTo`; it stops granting the right the moment it expires. *Source: ERD `FORM_STEP_ACTION`,
+  `DELEGATION`; plan §8.1.*
+- **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
+  Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
+  **monthly** (`ASSUMPTION Q3`).
+
+## 3. Calculation
+
+All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md, rule 5).
+
+- **BR-KPI-30** — Calculation methods (ERD `CALC_METHOD.method_type` + D1): **RATIO_UP** (higher is
+  better: actual / target), **RATIO_DOWN** (lower is better: target / actual — DATX writes it "% mục
+  tiêu / thực tế"), **TIERED** (value ranges → fixed %, e.g. one stock-out = 70%), **BINARY** (Đạt /
+  Không đạt), **FORMULA** (an expression), **LEVELS** (L1/L2/L3 per goal, BR-KPI-09).
+- **BR-KPI-31** — Each method has a **cap** and a **floor** (e.g. cap 120%). The raw result is computed
+  first, then the floor, then the cap.
+- **BR-KPI-32** — A **missing actual** gives no achievement (`null`) — it is never scored as 0. Division
+  by zero is answered explicitly per method (RATIO_UP with target 0, RATIO_DOWN with actual 0) and the
+  answer is documented here when Phase 1.5 decides it.
+- **BR-KPI-33** — **LEVELS** interpolates linearly between levels and is capped at the highest level's
+  score (`ASSUMPTION Q1`).
+- **BR-KPI-34** — "Tỉ lệ KH cũ" is **higher-is-better** (RATIO_UP) despite the DATX workbook using both
+  directions (`ASSUMPTION Q4`).
+- **BR-KPI-35** — The **weighted score** of a Goal Plan for a period = Σ (achievement% × weight) / Σ
+  weight over its active goals; cancelled goals are excluded. Rounding happens once, at finalisation.
+- **BR-KPI-36** — A parent KPI's actual is **measured independently**; it is summed from its children
+  only when that KPI is explicitly flagged to roll up (`ASSUMPTION Q8`).
+
+## 4. Results and pay
+
+- **BR-KPI-40** — A period result per Goal Plan holds the total score, the rating level, the payout %
+  and an **adjustment %** (rule violations, attendance). *Source: ERD `PERIOD_RESULT`; DATX sheet "TH KQ"
+  columns.*
+- **BR-KPI-41** — The **rating scale** maps a score range to a level. Default sample scale
+  **A+ / A / B / C / D** (`ASSUMPTION Q2` — the DATX "TH KQ" sheet is broken with `#REF!`, so no real
+  scale is available yet).
+- **BR-KPI-42** — A **payout rule** maps a rating level to a % of the KPI salary component, optionally
+  per org unit or position, from an effective date. Sample table only (`ASSUMPTION Q2`).
+- **BR-KPI-43** — Results move **Draft → Final → Locked**; only finalised results are exported to
+  payroll, and the export is recorded. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
+
+## 5. State sets (proposed — declared in `src/data/types.ts` in Phase 1.1)
+
+Every status in the app comes from one of these sets. Labels are Vietnamese.
+
+| Set | Values | Source |
+|---|---|---|
+| Tenant | Active · Suspended | ERD |
+| Role | EMPLOYEE · MANAGER · HR · CNB · BOD · ADMIN — **declared** | ERD `ROLE.code` |
+| Scope | Self · DirectReports · OrgUnit · Tenant — **declared** | ERD `USER_ROLE.scope_type` |
+| Cycle | Planning · Active · Evaluating · Closed | ERD |
+| Period type | Month · Quarter · Half · Year | ERD |
+| Goal Plan | Draft · Submitted · **Returned** · Approved · Locked | ERD + plan §6.4 (*Bị trả lại* is in the plan's seed list but not the ERD — confirm in 1.1) |
+| Goal | Active · Changed · Cancelled | ERD |
+| Alignment | CASCADE · LINK | ERD |
+| Calc method | RATIO_UP · RATIO_DOWN · TIERED · BINARY · FORMULA · LEVELS | ERD + D1 |
+| Actual source | MANUAL · EXCEL · API | ERD |
+| Form type | GOAL_SETTING · GOAL_CHANGE · KPI_EVAL (P2: PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360) | ERD |
+| Form | Open · InProgress · Completed · Cancelled | ERD |
+| Step action | SUBMIT · APPROVE · EDIT · RETURN · AUTO_FORWARD | ERD |
+| Actor rule | SELF · DIRECT_MANAGER · MANAGER_L2 · HR · CNB · ROLE | ERD |
+| Overdue behaviour | AUTO_FORWARD · REMIND (+ LOCK, proposed from the email template) | ERD + BR-KPI-13 |
+| Period result | Draft · Final · Locked | ERD |
+
+## 6. Error catalogue
+
+Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
+
+| Code | Trigger | Surface | Title |
+|---|---|---|---|
+| ERR-KPI-01 | A read through the DataGateway failed | empty-state with retry | Không tải được dữ liệu |
+
+## 7. Tenancy and data
+
+- **BR-KPI-50** — **Tenant isolation.** Every read and write is scoped to one tenant; a user of tenant B
+  never sees, by any path, data of tenant A. *Source: plan §3.2.*
+- **BR-KPI-51** — The prototype holds **no real personnel data**. The "Dữ liệu giả lập" banner is shown
+  on every screen. *Source: plan §10.*
+- **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync) and when it was
+  recorded; actuals are snapshots, and only the current one per goal and period counts. *Source: ERD
+  `GOAL_ACTUAL`.*
+
+## 8. Open assumptions (plan §9)
+
+| # | Question | Default in use | Rules affected |
+|---|---|---|---|
+| Q1 | Does LEVELS interpolate between L1–L2–L3? | Yes, linear, capped at the top level | BR-KPI-33 |
+| Q2 | The rating scale and payout table? | Sample A+/A/B/C/D, marked as an assumption | BR-KPI-41, 42 |
+| Q3 | Main evaluation monthly or quarterly? | Monthly | BR-KPI-22, seed |
+| Q4 | Is "Tỉ lệ KH cũ" higher-is-better? | Yes | BR-KPI-34 |
+| Q5 | BSC or "Hiệu quả / Khối lượng / Chi phí"? | BSC primary, the other a secondary tag | BR-KPI-06 |
+| Q6 | What are KRItc / KRIpt? | Field hidden | BR-KPI-06 |
+| Q7 | "Lấy ý kiến", "Thêm người duyệt", collaboration step in P1? | No (P2) | BR-KPI-22 |
+| Q8 | Parent KPI actual independent or summed? | Independent; summed only when flagged | BR-KPI-36 |
+| Q9 | Does a KGI have a numeric target? | Optional field, not scored | BR-KPI-02 |
+| Q10 | CMC's monthly work plan in P1? | No | BR-KPI-22 |
