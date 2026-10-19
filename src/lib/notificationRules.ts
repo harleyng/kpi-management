@@ -190,7 +190,7 @@ export function notificationRecipients(assignees: readonly Id[], exclude: readon
 /**
  * What a step action tells the people now holding the form: a RETURN → RETURNED; a move to another
  * step (SUBMIT, APPROVE, AUTO_FORWARD) → STEP_ASSIGNED. A completed or cancelled form (no next step)
- * and an AUTO_LOCK (the form stays, frozen) notify nobody in P1 (`ASSUMPTION Q19`).
+ * and an AUTO_LOCK (the form stays, frozen) notify nobody in P1 (`ASSUMPTION Q29`).
  */
 export function stepActedNotification(action: StepAction, nextStepId: Id | null): NotificationEvent | null {
   if (nextStepId === null) return null;

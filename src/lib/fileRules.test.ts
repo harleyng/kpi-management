@@ -6,7 +6,7 @@ const file = (o: Partial<{ fileName: string; mimeType: string; sizeBytes: number
 });
 const details = (o: Parameters<typeof file>[0]) => fileIssues(file(o)).map((i) => i.detail);
 
-describe('fileIssues — what uploadFile refuses (BR-KPI-48, ASSUMPTION Q20)', () => {
+describe('fileIssues — what uploadFile refuses (BR-KPI-48, ASSUMPTION Q30)', () => {
   it('accepts the office, image and text formats, case-insensitively', () => {
     for (const [fileName, mimeType] of [
       ['a.pdf', 'application/pdf'],

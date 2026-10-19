@@ -344,7 +344,7 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   told to act there (BR-KPI-21) even when they are also the reviewer's delegate (`assigneesOf` lists such
   a delegate; the inbox has the same gap — flagged to the workflow lane). **Nobody is told about their own action** — neither the person who acted
   nor the person they acted for (proxy / delegation). **No notice** for a completed or cancelled form,
-  an AUTO_LOCK, or a step going overdue (`ASSUMPTION Q19`). An event with no in-app Vietnamese template
+  an AUTO_LOCK, or a step going overdue (`ASSUMPTION Q29`). An event with no in-app Vietnamese template
   **notifies nobody** — the template screen flags the missing one. The rendered subject and body are
   stored (re-rendering from an edited template would rewrite what was said). Delivery is best effort
   in the prototype: a failed notice is reported to the diagnostics, never undoes the action that caused
@@ -367,7 +367,7 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
 - **BR-KPI-48** — **Attachments**: at most **10 MB**, formats PDF, images (PNG, JPG, GIF, WebP), Word,
   Excel, CSV and text, decided by the file's extension (a MIME type the browser reports must agree);
   an empty file is refused (`fileRules.fileIssues`, ERR-KPI-06; checked by the upload button and again
-  by `system.uploadFile`). `ASSUMPTION Q20`. In the mock a file's content lives in memory: after a page
+  by `system.uploadFile`). `ASSUMPTION Q30`. In the mock a file's content lives in memory: after a page
   reload the row remains but opening it answers ERR-KPI-02. *Source: none — product owner default.*
 - **BR-KPI-49** — **The audit log is append-only** and written by the gateway in the SAME transaction as
   the change it records (never by a screen): who (and for whom), the entity, the action, the row
@@ -499,8 +499,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
-| Q19 | Is a person notified when their step goes overdue (and the form is auto-forwarded or the plan locked)? The event set has no overdue code | No — the deadline reminder already says what will happen; an auto-forward tells the next person (STEP_ASSIGNED). A `STEP_OVERDUE` event is a P2 candidate | BR-KPI-45 |
-| Q20 | Size and format limits of attachments? No source states them | 10 MB; PDF, images, Word, Excel, CSV, text | BR-KPI-48 |
+| Q29 | Is a person notified when their step goes overdue (and the form is auto-forwarded or the plan locked)? The event set has no overdue code | No — the deadline reminder already says what will happen; an auto-forward tells the next person (STEP_ASSIGNED). A `STEP_OVERDUE` event is a P2 candidate | BR-KPI-45 |
+| Q30 | Size and format limits of attachments? No source states them | 10 MB; PDF, images, Word, Excel, CSV, text | BR-KPI-48 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

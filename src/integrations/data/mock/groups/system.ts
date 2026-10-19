@@ -27,7 +27,7 @@ export function systemGroup(rt: Runtime): SystemGateway {
   return {
     uploadFile: rt.write('system.uploadFile', { permission: 'evidence.upload' }, (tx, input: UploadFileInput) => {
       if (!(input.data instanceof Blob)) throw new KpiError('ERR-KPI-06', 'file data must be a Blob');
-      // Size and format (BR-KPI-48, ASSUMPTION Q20) — the upload button checked too; this is the authority.
+      // Size and format (BR-KPI-48, ASSUMPTION Q30) — the upload button checked too; this is the authority.
       throwIssues(fileIssues({ fileName: String(input.fileName ?? ''), mimeType: String(input.mimeType ?? ''), sizeBytes: input.data.size }));
       const id = newId();
       const row: FileObject = {

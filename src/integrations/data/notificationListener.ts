@@ -53,7 +53,7 @@ import type { DataGateway, DomainEvent, DomainEventListener, EntityChangedEvent,
  * | `form.dueSoon` | DEADLINE_REMIND → the assignees, once per step entry (`reminderKey`) |
  *
  * Never told: the person who acted, nor the person they acted for. No overdue notice
- * (`ASSUMPTION Q19`), no notice of completion, no e-mail (P1). An event with no in-app template
+ * (`ASSUMPTION Q29`), no notice of completion, no e-mail (P1). An event with no in-app template
  * notifies nobody. Every other event — including the `Notification` rows this listener writes — is
  * ignored at once, so it can never feed itself.
  *

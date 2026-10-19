@@ -164,13 +164,13 @@ thông báo được đánh dấu đã đọc. Giai đoạn này **chỉ gửi t
 - Người được ủy quyền nhận thông báo **cùng** người ủy quyền.
 - **Không ai nhận thông báo về thao tác của chính mình**, kể cả khi HR làm thay hay người được ủy quyền
   làm thay.
-- Không có thông báo khi phiếu hoàn thành, bị hủy, hoặc khi bước đã quá hạn (giả định Q19): lời nhắc
+- Không có thông báo khi phiếu hoàn thành, bị hủy, hoặc khi bước đã quá hạn (giả định Q29): lời nhắc
   trước hạn đã nói điều gì sẽ xảy ra.
 - Nội dung lấy từ **Mẫu thông báo** (Hệ thống → Mẫu thông báo); sự kiện nào thiếu mẫu thì không gửi.
 - **Nhật ký** (Hệ thống → Nhật ký) ghi mọi thay đổi dữ liệu: ai làm, làm thay ai, lúc nào, trước/sau và
   lý do (khóa, mở khóa, hủy phiếu). Hiện chỉ Quản trị hệ thống xem được.
 - Tệp đính kèm (bằng chứng, file import) tối đa 10 MB, chỉ nhận PDF, ảnh, Word, Excel, CSV, văn bản
-  (giả định Q20).
+  (giả định Q30).
 
 ## 5. Khác biệt so với hiện tại
 
@@ -200,8 +200,8 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
-| Q19 | Có báo cho người giữ phiếu khi bước đã quá hạn (phiếu tự chuyển hoặc Goal Plan bị khóa) không? | Không — lời nhắc trước hạn đã nói trước | Product owner + HR |
-| Q20 | Giới hạn dung lượng và định dạng tệp đính kèm? | 10 MB; PDF, ảnh, Word, Excel, CSV, văn bản | Product owner + HR |
+| Q29 | Có báo cho người giữ phiếu khi bước đã quá hạn (phiếu tự chuyển hoặc Goal Plan bị khóa) không? | Không — lời nhắc trước hạn đã nói trước | Product owner + HR |
+| Q30 | Giới hạn dung lượng và định dạng tệp đính kèm? | 10 MB; PDF, ảnh, Word, Excel, CSV, văn bản | Product owner + HR |
 | — | HR có được xem Nhật ký không? (Hiện chỉ Quản trị hệ thống) | Chưa — chỉ Quản trị hệ thống | Product owner |
 
 ## 7. Quyết định đã chốt
@@ -243,7 +243,7 @@ trực tiếp đến quy trình:
 
 **19/10/2026 — Track T7, thông báo và nhật ký (product owner duyệt theo khuyến nghị).**
 
-- Không gửi thông báo khi bước đã quá hạn (giả định Q19); lời nhắc trước hạn nói rõ điều sẽ xảy ra.
-- Tệp đính kèm tối đa 10 MB, chỉ các định dạng văn phòng, ảnh và văn bản (giả định Q20).
+- Không gửi thông báo khi bước đã quá hạn (giả định Q29); lời nhắc trước hạn nói rõ điều sẽ xảy ra.
+- Tệp đính kèm tối đa 10 MB, chỉ các định dạng văn phòng, ảnh và văn bản (giả định Q30).
 - Nhật ký giữ quyền xem như hiện tại (Quản trị hệ thống); việc mở cho HR chờ product owner chốt.
 - Người được ủy quyền nhận thông báo cùng người ủy quyền.

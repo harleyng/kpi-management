@@ -3,16 +3,16 @@
  * payroll exports all go through it. Pure; the upload button checks first for quick feedback and the
  * gateway checks again, so a file the screen let through can still never be stored.
  *
- * The limits are not in any source document: `ASSUMPTION Q20` — 10 MB, and the formats people
+ * The limits are not in any source document: `ASSUMPTION Q30` — 10 MB, and the formats people
  * attach to a KPI (PDF, images, Word, Excel, CSV, plain text).
  */
 
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 
-/** 10 MB — `ASSUMPTION Q20`. */
+/** 10 MB — `ASSUMPTION Q30`. */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-/** Extension → the MIME types a browser may report for it. `ASSUMPTION Q20`. */
+/** Extension → the MIME types a browser may report for it. `ASSUMPTION Q30`. */
 export const ALLOWED_FILE_TYPES: Readonly<Record<string, readonly string[]>> = {
   pdf: ['application/pdf'],
   png: ['image/png'],

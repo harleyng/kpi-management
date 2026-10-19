@@ -41,10 +41,10 @@ khóa" for a lock that never happens — two copies of one rule drifting apart.
 
 **Updated alongside.** `business-rules.md` BR-KPI-45; `component-registry.md` (workflowRules).
 
-## 2026-10-19 — T7 assumptions: no overdue notice (Q19), 10 MB attachments (Q20), audit log stays ADMIN-only
+## 2026-10-19 — T7 assumptions: no overdue notice (Q29), 10 MB attachments (Q30), audit log stays ADMIN-only
 
-**Decision.** (Q19) No notice when a step goes overdue — `NOTIFICATION_EVENTS` has no such code; the
-deadline reminder already says what will happen and an auto-forward tells the next person. (Q20) An
+**Decision.** (Q29) No notice when a step goes overdue — `NOTIFICATION_EVENTS` has no such code; the
+deadline reminder already says what will happen and an auto-forward tells the next person. (Q30) An
 attachment is ≤ 10 MB and one of PDF, images, Word, Excel, CSV, text — enforced in the upload button
 and in `system.uploadFile`. Templates naming a variable their event does not supply are refused in
 `saveNotificationTemplate` (`templateIssues`). The audit log keeps `audit.view` (ADMIN) — flagged to
@@ -55,7 +55,7 @@ adding a code is a frozen-set + fixture change (Large). An unvalidated template 
 in every notice without anyone noticing. Opening the audit log to HR changes the permission matrix
 (Large) — a product decision, not a track's.
 
-**Updated alongside.** `business-rules.md` §4b BR-KPI-47…49 and §8 Q19, Q20; `new-flow.md` §6, §7.
+**Updated alongside.** `business-rules.md` §4b BR-KPI-47…49 and §8 Q29, Q30; `new-flow.md` §6, §7.
 
 ## 2026-10-19 — T7: keyset lists page with "Tải thêm"; a built route names its table in the smoke spec
 

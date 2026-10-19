@@ -128,7 +128,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
 | `notificationRules.ts` (T7) | `NOTIFICATION_VARIABLES`, `VARIABLES_BY_EVENT`, `templateVariables`, `templateIssues`, `renderTemplate` (never a raw `{{…}}`), `formatViDate`, `periodPhrase`, `deadlineConsequence`, `notificationRecipients`, `stepActedNotification`, `notificationRef`, `notificationSourceKey`, `inAppTemplateFor`, `isInAppNotification` (BR-KPI-45…47) |
 | `auditRules.ts` (T7) | `auditChanges` (field diff; `null` = unreadable), `auditSubjectName` (name column, else the person it is about), `dayRangeToInstants` (BR-KPI-49) |
-| `fileRules.ts` (T7) | `MAX_FILE_BYTES`, `ALLOWED_FILE_TYPES`, `FILE_ACCEPT`, `fileIssues` (BR-KPI-48, `ASSUMPTION Q20`) |
+| `fileRules.ts` (T7) | `MAX_FILE_BYTES`, `ALLOWED_FILE_TYPES`, `FILE_ACCEPT`, `fileIssues` (BR-KPI-48, `ASSUMPTION Q30`) |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).

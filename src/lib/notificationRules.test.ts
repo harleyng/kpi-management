@@ -136,7 +136,7 @@ describe('who is told what (BR-KPI-45)', () => {
     ['AUTO_FORWARD', 's2', 'STEP_ASSIGNED'],
     ['APPROVE', null, null], // completed
     ['CANCEL', null, null],
-    ['AUTO_LOCK', 's2', null], // frozen at its step — ASSUMPTION Q19
+    ['AUTO_LOCK', 's2', null], // frozen at its step — ASSUMPTION Q29
   ] as const)('%s with next step %s → %s', (action, next, expected) => {
     expect(stepActedNotification(action, next)).toBe(expected);
   });
