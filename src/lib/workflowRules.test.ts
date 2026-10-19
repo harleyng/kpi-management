@@ -154,7 +154,7 @@ describe('resolveStepActors — who acts, read at the time of the action', () =>
 describe('entitlement — actor, delegate, proxy (BR-KPI-21)', () => {
   const evalForm = form();
   const ctx = (o: Partial<EntitlementContext> = {}): EntitlementContext => ({
-    stepActors: ['u-m1'], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1', clock: CLOCK, ...o,
+    stepActors: ['u-m1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1', clock: CLOCK, ...o,
   });
   const as = (actorUserId: string, onBehalfOfUserId: string | null = null, delegationId: string | null = null) => ({ actorUserId, onBehalfOfUserId, delegationId });
   const outcome = (r: ReturnType<typeof entitlement>) => (r.ok ? r.mode : r.detail);
@@ -192,26 +192,33 @@ describe('entitlement — actor, delegate, proxy (BR-KPI-21)', () => {
   });
 
   it('lets HR act as proxy for the step actor, recording both people', () => {
-    expect(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1', 'u-m1'), ctx({ actorIsProxyAdmin: true }))).toEqual({
+    expect(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1', 'u-m1'), ctx({ actorMayProxy: true, actorMayCancel: true }))).toEqual({
       ok: true, mode: 'PROXY', actorUserId: 'u-hr1', onBehalfOfUserId: 'u-m1', delegationId: null,
     });
     expect(outcome(entitlement(evalForm, managerStep, 'APPROVE', as('u-m2', 'u-m1'), ctx()))).toBe('PROXY_NOT_ALLOWED');
-    expect(outcome(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1', 'u-l2'), ctx({ actorIsProxyAdmin: true })))).toBe('NOT_STEP_ACTOR');
+    expect(outcome(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1', 'u-l2'), ctx({ actorMayProxy: true, actorMayCancel: true })))).toBe('NOT_STEP_ACTOR');
   });
 
   it('lets HR unstick a step nobody is assigned to', () => {
-    expect(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1'), ctx({ stepActors: [], actorIsProxyAdmin: true }))).toMatchObject({ ok: true, mode: 'PROXY', onBehalfOfUserId: null });
+    expect(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1'), ctx({ stepActors: [], actorMayProxy: true, actorMayCancel: true }))).toMatchObject({ ok: true, mode: 'PROXY', onBehalfOfUserId: null });
     expect(outcome(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1'), ctx({ stepActors: [] })))).toBe('NOT_STEP_ACTOR');
   });
 
   it('refuses self-approval, even for HR', () => {
-    expect(outcome(entitlement(evalForm, hrStep, 'APPROVE', as('u-hr1'), ctx({ stepActors: ['u-hr1'], subjectUserId: 'u-hr1', actorIsProxyAdmin: true })))).toBe('SELF_APPROVAL');
+    expect(outcome(entitlement(evalForm, hrStep, 'APPROVE', as('u-hr1'), ctx({ stepActors: ['u-hr1'], subjectUserId: 'u-hr1', actorMayProxy: true, actorMayCancel: true })))).toBe('SELF_APPROVAL');
     expect(outcome(entitlement(evalForm, selfStep, 'SUBMIT', as('u-e1'), ctx({ stepActors: ['u-e1'] })))).toBe('ACTOR');
   });
 
   it('lets only HR/ADMIN cancel, as themself', () => {
-    expect(outcome(entitlement(evalForm, managerStep, 'CANCEL', as('u-hr1'), ctx({ actorIsProxyAdmin: true })))).toBe('ADMIN');
+    expect(outcome(entitlement(evalForm, managerStep, 'CANCEL', as('u-hr1'), ctx({ actorMayProxy: true, actorMayCancel: true })))).toBe('ADMIN');
     expect(outcome(entitlement(evalForm, managerStep, 'CANCEL', as('u-m1'), ctx()))).toBe('CANCEL_NOT_ALLOWED');
+  });
+
+  it('keeps proxy and cancel as separate rights', () => {
+    const proxyOnly = ctx({ actorMayProxy: true, actorMayCancel: false });
+    const cancelOnly = ctx({ actorMayProxy: false, actorMayCancel: true });
+    expect(outcome(entitlement(evalForm, managerStep, 'CANCEL', as('u-hr1'), proxyOnly))).toBe('CANCEL_NOT_ALLOWED');
+    expect(outcome(entitlement(evalForm, managerStep, 'APPROVE', as('u-hr1', 'u-m1'), cancelOnly))).toBe('PROXY_NOT_ALLOWED');
   });
 
   it('isDelegationValid uses the tenant-zone date', () => {
@@ -247,7 +254,7 @@ function act(
   const result = checkAction({
     form: f, steps, plan: null, action, expectedStepId: f.currentStepId ?? '', comment: action === 'RETURN' || action === 'CANCEL' ? 'Lý do' : null,
     actor: { actorUserId, onBehalfOfUserId: null, delegationId: null },
-    entitlement: { stepActors: [actorUserId], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1' },
+    entitlement: { stepActors: [actorUserId], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1' },
     submitCheck: passingCheck(f, steps),
     clock: CLOCK, ...o,
   });
@@ -267,7 +274,7 @@ describe('the evaluation, self → manager → HR (BR-KPI-16)', () => {
     f = one.form;
     const two = act(f, steps, 'APPROVE', 'u-hr1', {
       actor: { actorUserId: 'u-hr1', onBehalfOfUserId: 'u-m1', delegationId: null },
-      entitlement: { stepActors: ['u-m1'], delegations: [], actorIsProxyAdmin: true, subjectUserId: 'u-e1' },
+      entitlement: { stepActors: ['u-m1'], delegations: [], actorMayProxy: true, actorMayCancel: true, subjectUserId: 'u-e1' },
     });
     expect(two.result.record).toMatchObject({ action: 'APPROVE', stepId: 's2', actorUserId: 'u-hr1', onBehalfOfUserId: 'u-m1', delegationId: null });
     expect(two.result.mode).toBe('PROXY');
@@ -282,7 +289,7 @@ describe('the evaluation, self → manager → HR (BR-KPI-16)', () => {
     const result = checkAction({
       form: form(), steps, plan: null, action: 'SUBMIT', expectedStepId: 's1', comment: null,
       actor: { actorUserId: 'u-e1', onBehalfOfUserId: null, delegationId: null },
-      entitlement: { stepActors: ['u-e1'], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1' },
+      entitlement: { stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1' },
       submitCheck: { formType: 'KPI_EVAL', step: selfStep, items, goals: planGoals }, clock: CLOCK,
     });
     expect(result).toMatchObject({ ok: false, code: 'ERR-KPI-09', detail: 'CONTENT_INCOMPLETE' });
@@ -293,7 +300,7 @@ describe('the evaluation, self → manager → HR (BR-KPI-16)', () => {
     const result = checkAction({
       form: form(), steps, plan: null, action: 'SUBMIT', expectedStepId: 's1', comment: null,
       actor: { actorUserId: 'u-m2', onBehalfOfUserId: null, delegationId: null },
-      entitlement: { stepActors: ['u-e1'], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1' },
+      entitlement: { stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1' },
       submitCheck: okCheck, clock: CLOCK,
     });
     expect(result).toMatchObject({ ok: false, code: 'ERR-KPI-05' });
@@ -323,7 +330,7 @@ describe('the evaluation, self → manager → HR (BR-KPI-16)', () => {
     const result = checkAction({
       form: form(), steps, plan: null, action: 'SUBMIT', expectedStepId: 's1', comment: null,
       actor: { actorUserId: 'u-e1', onBehalfOfUserId: null, delegationId: null },
-      entitlement: { stepActors: ['u-e1'], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1' },
+      entitlement: { stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1' },
       submitCheck: okCheck, clock: CLOCK, ...o,
     });
     expect(result).toMatchObject({ ok: false, code: 'ERR-KPI-04', detail });
@@ -371,7 +378,7 @@ describe('registration moves the Goal Plan with it (BR-KPI-12)', () => {
   });
 
   it('cancelling puts the plan back to Draft; only HR/ADMIN may', () => {
-    const cancelled = act(f0, reg, 'CANCEL', 'u-hr1', { entitlement: { stepActors: ['u-m1'], delegations: [], actorIsProxyAdmin: true, subjectUserId: 'u-e1' } });
+    const cancelled = act(f0, reg, 'CANCEL', 'u-hr1', { entitlement: { stepActors: ['u-m1'], delegations: [], actorMayProxy: true, actorMayCancel: true, subjectUserId: 'u-e1' } });
     expect([cancelled.form.status, cancelled.result.planStatus]).toEqual(['Cancelled', 'Draft']);
   });
 
@@ -398,7 +405,7 @@ describe('frozen forms (overdue LOCK, or HR locked the plan)', () => {
     const base = {
       form: frozen, steps: reg, plan: plan({ status: 'Locked' as const }), expectedStepId: 's2', comment: 'x',
       actor: { actorUserId: 'u-hr1', onBehalfOfUserId: null, delegationId: null },
-      entitlement: { stepActors: ['u-e1'], delegations: [], actorIsProxyAdmin: true, subjectUserId: 'u-e1' },
+      entitlement: { stepActors: ['u-e1'], delegations: [], actorMayProxy: true, actorMayCancel: true, subjectUserId: 'u-e1' },
       submitCheck: null, clock: CLOCK,
     };
     expect(checkAction({ ...base, action: 'SUBMIT' })).toMatchObject({ ok: false, detail: 'FROZEN' });
@@ -411,7 +418,7 @@ describe('frozen forms (overdue LOCK, or HR locked the plan)', () => {
   });
 
   it('mayEditAtCurrentStep needs EDIT on the step, entitlement, and no freeze', () => {
-    const ctx = { stepActors: ['u-e1'], delegations: [], actorIsProxyAdmin: false, subjectUserId: 'u-e1', clock: CLOCK };
+    const ctx = { stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1', clock: CLOCK };
     const editable = { ...frozen, overdueHandledAt: null };
     const me = { actorUserId: 'u-e1', onBehalfOfUserId: null, delegationId: null };
     expect(mayEditAtCurrentStep(editable, reg, plan({ status: 'Draft' }), me, ctx)).toBe(true);

@@ -178,8 +178,10 @@ export interface EntitlementContext {
   /** `resolveStepActors` for the current step. */
   stepActors: readonly Id[];
   delegations: readonly Delegation[];
-  /** HR/ADMIN whose scope covers the subject (`permissionRules`, Phase 1.3). */
-  actorIsProxyAdmin: boolean;
+  /** May act for others on this subject's forms — `can(profile, 'form.proxy', subject)` (Phase 1.3). */
+  actorMayProxy: boolean;
+  /** May cancel this subject's forms — `can(profile, 'form.cancel', subject)`; a separate right from proxy. */
+  actorMayCancel: boolean;
   /** The subject's own account — never an actor of a non-SELF step on their own form. */
   subjectUserId: Id | null;
   clock: Clock;
@@ -192,7 +194,7 @@ export type Entitlement =
 /**
  * Whether `input.actorUserId` may take `action` on the form's current step now. Both people are
  * always kept: a delegate or proxy acts with `onBehalfOfUserId` = the step's actor (BR-KPI-21).
- * - CANCEL — HR/ADMIN only, as themself.
+ * - CANCEL — only with the cancel right (HR/ADMIN by default), as themself.
  * - DELEGATE — a delegation valid now, from a current step actor, to this user, for this form type.
  * - PROXY — HR/ADMIN on behalf of a current step actor; or on behalf of nobody when the step has no
  *   actor at all (a top manager with no manager, an unfilled role), so no form can get stuck.
@@ -208,7 +210,7 @@ export function entitlement(
   const granted = (mode: 'ACTOR' | 'DELEGATE' | 'PROXY' | 'ADMIN'): Entitlement => ({ ok: true, mode, actorUserId, onBehalfOfUserId, delegationId });
 
   if (action === 'CANCEL') {
-    return ctx.actorIsProxyAdmin && onBehalfOfUserId === null && delegationId === null ? granted('ADMIN') : refuse('ERR-KPI-05', 'CANCEL_NOT_ALLOWED');
+    return ctx.actorMayCancel && onBehalfOfUserId === null && delegationId === null ? granted('ADMIN') : refuse('ERR-KPI-05', 'CANCEL_NOT_ALLOWED');
   }
   if (step.actorRule !== 'SELF' && ctx.subjectUserId !== null && actorUserId === ctx.subjectUserId) {
     return refuse('ERR-KPI-05', 'SELF_APPROVAL');
@@ -221,11 +223,11 @@ export function entitlement(
     return granted('DELEGATE');
   }
   if (onBehalfOfUserId !== null) {
-    if (!ctx.actorIsProxyAdmin) return refuse('ERR-KPI-05', 'PROXY_NOT_ALLOWED');
+    if (!ctx.actorMayProxy) return refuse('ERR-KPI-05', 'PROXY_NOT_ALLOWED');
     return ctx.stepActors.includes(onBehalfOfUserId) ? granted('PROXY') : refuse('ERR-KPI-05', 'NOT_STEP_ACTOR');
   }
   if (ctx.stepActors.includes(actorUserId)) return granted('ACTOR');
-  if (ctx.stepActors.length === 0 && ctx.actorIsProxyAdmin) return granted('PROXY');
+  if (ctx.stepActors.length === 0 && ctx.actorMayProxy) return granted('PROXY');
   return refuse('ERR-KPI-05', 'NOT_STEP_ACTOR');
 }
 
