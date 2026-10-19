@@ -20,10 +20,17 @@ export function primaryAssignmentOn(
   assignments: readonly EmployeeAssignment[],
   date: IsoDate,
 ): EmployeeAssignment | null {
-  const candidates = assignments
-    .filter((a) => a.employeeId === employeeId && a.isPrimary && isEffectiveOn(a, date))
-    .sort((a, b) => (a.effectiveFrom < b.effectiveFrom ? 1 : -1));
+  const candidates = assignments.filter((a) => a.employeeId === employeeId && a.isPrimary && isEffectiveOn(a, date)).sort(latestFirst);
   return candidates[0] ?? null;
+}
+
+/**
+ * Assignments, latest `effectiveFrom` first; two starting the same day are ordered by id, so the
+ * answer never depends on the order the rows were read in.
+ */
+export function latestFirst(a: Pick<EmployeeAssignment, 'id' | 'effectiveFrom'>, b: Pick<EmployeeAssignment, 'id' | 'effectiveFrom'>): number {
+  if (a.effectiveFrom !== b.effectiveFrom) return a.effectiveFrom < b.effectiveFrom ? 1 : -1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 /** The direct manager on `date`, read from the primary assignment (BR-KPI-20: at the time of the action). */

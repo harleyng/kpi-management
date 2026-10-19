@@ -8,6 +8,7 @@ import {
   ratedScore,
   rollUpActual,
   roundScore,
+  scoreBreakdown,
   weightedScore,
   type ScoreLine,
 } from './scoreRules';
@@ -129,5 +130,23 @@ describe('purity', () => {
     const lines = Object.freeze([line('a', 50, 100), line('b', 50, 60)]);
     expect(weightedScore(lines)).toEqual(weightedScore(lines));
     expect(weightedScore([line('a', 100, 10)]).score).toBe(10); // no state carried over from the call above
+  });
+});
+
+describe('scoreBreakdown (BR-KPI-40, T6 4.6.2)', () => {
+  const d = (goalId: string, weight: number, achievementPct: number | null) => ({ goalId, weight, achievementPct });
+
+  it('shows the parts side by side and never re-derives the stored total', () => {
+    const b = scoreBreakdown({ totalScore: 90.5, adjustmentPct: 1 }, [d('a', 60, 90), d('b', 40, 87.5)]);
+    expect(b).toEqual({ raw: 89, complete: true, totalWeight: 100, adjustment: 1, total: 90.5, clamped: false });
+  });
+
+  it('flags an adjustment that took the score below 0 (the total is held at 0)', () => {
+    expect(scoreBreakdown({ totalScore: 0, adjustmentPct: -5 }, [d('a', 100, 1)])).toMatchObject({ raw: 1, total: 0, clamped: true });
+  });
+
+  it('a goal without an achievement makes raw provisional; none scored → raw null, not 0', () => {
+    expect(scoreBreakdown({ totalScore: 80, adjustmentPct: 0 }, [d('a', 50, 80), d('b', 50, null)])).toMatchObject({ raw: 80, complete: false, totalWeight: 100 });
+    expect(scoreBreakdown({ totalScore: null, adjustmentPct: 0 }, [d('a', 100, null)])).toMatchObject({ raw: null, complete: false, clamped: false });
   });
 });

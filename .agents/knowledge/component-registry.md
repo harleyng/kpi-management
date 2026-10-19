@@ -52,6 +52,19 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `SectionTitle` | A titled section inside a page body |
 | `CopyButton` | Hover-revealed copy-to-clipboard with an announced confirmation |
 
+## `src/components/results/` (T6)
+
+| Component | Purpose |
+|---|---|
+| `useResultPeriod` | The cycle + period a result screen shows, kept in `?cycle=&period=` and validated against the loaded lists (`cycleRules.defaultResultCycle` / `defaultResultPeriod` as fallback, URL replaced) |
+| `ResultPeriodPicker` | "Chu kỳ" / "Kỳ" selects for a `useResultPeriod` selection (`showPeriod={false}` for cycle-wide content) |
+| `ResultCells` | `ScoreValue` (Draft muted), `AdjustmentValue` (signed points), `RatingValue`, `PayoutValue` (`resultView.payoutState`: value · "Không áp dụng" · visible reason) |
+| `ResultsTab` | "Kết quả kỳ": status line (filter shortcuts), calculate / finalise (selected or all Drafts) / lock with confirmations, the table, selection of Drafts only |
+| `FinalizeIssuesPanel` | A refused all-or-none finalise: every issue grouped by result, in words, "Xem" opens the detail; `role="alert"` |
+| `ResultDetailDialog` | One result goal by goal + the three score parts side by side (`scoreBreakdown`) + the Draft adjustment form |
+| `RatingTab` / `PayoutRuleDialog` | The scale read-only (`ASSUMPTION Q2`) + payout rules list / editor (`validatePayoutRule` before saving) |
+| `PayrollExportTab` | Pre-export counts (`payrollPreview`), "Xuất file lương" (`result.export`), "Lịch sử xuất file" with per-row download and the lost-after-reload state |
+
 ## `src/contexts/`
 
 | File | Purpose |
@@ -65,7 +78,9 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 |---|---|
 | `errorCatalog.ts` | `ERROR_CATALOG` (ERR-KPI-01…13), `KpiError` (+ `issues`), `RuleIssue` / `ruleIssue()`, `toKpiError()`, `KpiDeferredError` (a gateway method waiting for its Phase 2 track — never retried), `isRetryable`, `errorSpecOf()` — tested |
 | `pagination.ts` | `paginate()`, `serverPageSlice()`, `DEFAULT_PAGE_SIZE`, `PAGE_SIZE_OPTIONS` — tested |
-| `utils.ts` | `cn`, `formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `foldDiacritics`, `downloadBlob` (vi-VN, Asia/Ho_Chi_Minh) |
+| `utils.ts` | `cn`, `formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `foldDiacritics`, `downloadBlob`, `downloadUrl` (T6; revokes a blob URL on a timeout) (vi-VN, Asia/Ho_Chi_Minh) |
+| `toastError.ts` (T6) | `toastError(error)` — a failure toast in the catalogue's words (the dev toolbar re-exports it) |
+| `resultView.ts` (T6) | Display mapping for the result screens: `buildResultRows` (one join, Maps), `payoutState`, `statusCounts`, `isShownToEmployee` (BR-KPI-46), `draftSelection`, `formatPoints`, `UNKNOWN_OWNER` — tested |
 | `sidebarStore.ts` | Zustand: sidebar collapsed (persisted as `kpi.sidebar`) |
 | `devStore.ts` | Zustand, NOT persisted: the dev toolbar's mirror of the mock's settings (`clockOverridden`, `latencyMs`, `failure`), `DEFAULT_LATENCY_MS`, `LATENCY_CHOICES`, `devActions`, `hasActiveOverride` |
 | `permissionRules.ts` | `PERMISSION_CODES` / `PERMISSION_CATALOGUE`, `DEFAULT_ROLE_PERMISSIONS`, `DEFAULT_ROLE_SCOPE`, `permissionId`, `permissionRows`, `defaultRolePermissionRows`, `buildAccessProfile`, **`can`**, `resourceOfOwner`, `resourceOfSubject`, `roleCodesOf`, `visibleNavGroups`, `canOpenPath` — tested (`permissionFixtures.test-util.ts`) |
@@ -86,16 +101,17 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | File | Main exports |
 |---|---|
 | `calcRules.ts` | `achievement` / `achievementPct` (6 methods → SCORED / NO_ACTUAL / NOT_COMPUTABLE), `applyFloorCap`, `targetForPeriod`, `goalAchievementInput`, `validateCalcMethod`, `validateTargetLevels`, `parseFormula` / `evaluateFormula` (safe, no `eval`) |
-| `scoreRules.ts` | `weightedScore` (provisional + `complete`), `lineWeightedScore`, `finalizeIssues` / `canFinalize`, `adjustedScore`, `roundScore`, `ratedScore`, `rollUpActual`, `aggregatePeriodActuals` |
+| `scoreRules.ts` | `weightedScore` (provisional + `complete`), `lineWeightedScore`, `finalizeIssues` / `canFinalize`, `adjustedScore`, `roundScore`, `ratedScore`, `rollUpActual`, `aggregatePeriodActuals`; T6: `scoreBreakdown` (raw · adjustment · stored total · clamped — never summed on screen) |
 | `goalPlanRules.ts` | `WEIGHT_TOLERANCE`, `totalWeight`, `isWeightComplete`, `submitIssues`, `canEditPlan`, `planStatusOnEnterStep`, `statusAfterUnlock`, `canLock` / `canUnlock`, `planAfterChanges`, `applyGoalChanges`, `changeItemIssues` (`{ draft }`) |
 | `alignmentRules.ts` | `wouldCreateCycle`, `allocationBuckets` ("chưa giao", leavers), `allocationIssue`, `checkAlignment` |
 | `ratingRules.ts` | `ratingFor`, `validateRatingScale`, `payoutPctFor`, `validatePayoutRule` |
 | `formRules.ts` | `canSubmit` (KPI_EVAL / GOAL_SETTING / GOAL_CHANGE), `validateScoreInput`, `evaluationTotal`, `columnPct` |
 | `workflowRules.ts` | `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
-| `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25) |
-| `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
+| `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25); T6: `defaultResultPeriod`, `defaultResultCycle` |
+| `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf`; T6: `subjectAssignment` (the assignment a payout is read for, shared with the payroll file) (BR-KPI-40, 43, 44) |
+| `payrollRules.ts` (T6) | BR-KPI-45: `isPayrollResult`, `payoutNote` / `PAYROLL_NOTE_LABEL` (Q20), `payrollPreview`, `buildPayrollSheet` (stored numbers only), `payrollFileName` |
 | `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
-| `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
+| `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn` (T6: ties broken by id, `latestFirst`), `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).
@@ -115,7 +131,10 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 
 | File | Hooks |
 |---|---|
-| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`) |
+| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`), T6: `usePositions`, `useAssignments(filter)` |
+| `goals.ts` (T6, reads only — T3 appends writes) | `useCycles`, `usePeriods(cycleId)`, `useGoalPlans(filter, {enabled})`, `useGoals(filter, {enabled})` |
+| `results.ts` (T6) | `useRatingScales`, `useRatingLevels`, `usePayoutRules`, `useSavePayoutRule`, `useDeletePayoutRule`, `usePeriodResults`, `useResultDetails`, selectors `useResultRows` / `usePayrollPreview` / `useResultBreakdown`, `useCalculateResults`, `useSetAdjustment`, `useFinalizeResults` (+ `isBlockedFinalize`: issues → panel, else toast), `useLockResults`, `usePayrollExports`, `useExportPayroll` (export, then download; the two fail separately) |
+| `system.ts` (T6 — T7 appends) | `downloadFile(tenantId, fileId)`, `useDownloadFile` |
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |

@@ -109,3 +109,31 @@ export function cycleAllowsLaunch(c: Pick<PerformanceCycle, 'status'>, formType:
   };
   return allowed[formType].includes(c.status) ? allow : refuse('ERR-KPI-04');
 }
+
+const byStart = (a: CyclePeriod, b: CyclePeriod) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : a.id < b.id ? -1 : 1);
+
+/**
+ * The period a results screen opens on (T6): the latest MONTH already over on `today` (in the tenant
+ * zone) — its evaluation is the newest that can have a result — else the cycle's first month, else
+ * its first period. `null` for no periods.
+ */
+export function defaultResultPeriod(periods: readonly CyclePeriod[], today: string): CyclePeriod | null {
+  const months = periods.filter((p) => p.periodType === 'Month').sort(byStart);
+  const over = months.filter((p) => p.endDate < today);
+  return over[over.length - 1] ?? months[0] ?? [...periods].sort(byStart)[0] ?? null;
+}
+
+/**
+ * The cycle a results screen opens on: the Active one, else Evaluating, else the latest started,
+ * else the first. `null` for none.
+ */
+export function defaultResultCycle(cycles: readonly PerformanceCycle[], today: string): PerformanceCycle | null {
+  const latest = [...cycles].sort((a, b) => (a.startDate < b.startDate ? 1 : a.startDate > b.startDate ? -1 : 0));
+  return (
+    latest.find((c) => c.status === 'Active') ??
+    latest.find((c) => c.status === 'Evaluating') ??
+    latest.find((c) => c.startDate <= today) ??
+    latest[latest.length - 1] ??
+    null
+  );
+}

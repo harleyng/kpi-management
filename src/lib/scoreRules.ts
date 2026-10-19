@@ -99,6 +99,40 @@ export function ratedScore(totalScore: number | null, adjustmentPct: number): nu
   return adjusted === null ? null : roundScore(adjusted);
 }
 
+/** How a stored result's score is made up, for the screens (T6 4.6.2). */
+export interface ScoreBreakdown {
+  /** The weighted score of the result's goal lines, before the adjustment; `null` when none is scored. */
+  raw: number | null;
+  /** Every goal has an achievement — otherwise `raw` is provisional. */
+  complete: boolean;
+  totalWeight: number;
+  /** Points, as stored. */
+  adjustment: number;
+  /** `PeriodResult.totalScore` AS STORED (adjusted; rounded once if Final / Locked) — never re-derived. */
+  total: number | null;
+  /** The adjustment took the score below 0, so the total was held at 0 (BR-KPI-40). */
+  clamped: boolean;
+}
+
+/**
+ * BR-KPI-40 — the parts of a stored result side by side. `total` is NOT `raw + adjustment`: the 0 floor
+ * and the one-time rounding sit between them, so a screen shows the three numbers and never sums them.
+ */
+export function scoreBreakdown(
+  result: { totalScore: number | null; adjustmentPct: number },
+  details: readonly { goalId: Id; weight: number; achievementPct: number | null }[],
+): ScoreBreakdown {
+  const score = weightedScore(details.map((d) => ({ ...d, status: 'Active' as const })));
+  return {
+    raw: score.score,
+    complete: score.complete,
+    totalWeight: score.totalWeight,
+    adjustment: result.adjustmentPct,
+    total: result.totalScore,
+    clamped: score.score !== null && score.score + result.adjustmentPct < 0,
+  };
+}
+
 /**
  * BR-KPI-36, `ASSUMPTION Q8` — a parent KPI flagged `rollUpFromChildren` takes the SUM of its CASCADE
  * children's current actuals. Any child without an actual (or no children at all) → no actual.

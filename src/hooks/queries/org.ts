@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/contexts/useSession';
 import { getDataGateway } from '@/integrations/data';
-import type { EmployeeFilter } from '@/integrations/data/types';
+import type { AssignmentFilter, EmployeeFilter } from '@/integrations/data/types';
 import { queryKey } from './keys';
 
 /**
@@ -37,6 +37,30 @@ export function useEmployees(filter: EmployeeFilter = {}) {
   return useQuery({
     queryKey: employeesKey(tenantId, filter),
     queryFn: () => getDataGateway().org.listEmployees(tenantId, filter),
+    staleTime: ORG_STALE_MS,
+  });
+}
+
+/** Added by T6 (unit / position names on the result screens). */
+export const positionsKey = (tenantId: string) => queryKey(tenantId, 'positions');
+
+export function usePositions() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: positionsKey(tenantId),
+    queryFn: () => getDataGateway().org.listPositions(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}
+
+/** Added by T6 — every assignment of the tenant (where someone sat at a period's end). */
+export const assignmentsKey = (tenantId: string, filter: AssignmentFilter = {}) => queryKey(tenantId, 'assignments', filter);
+
+export function useAssignments(filter: AssignmentFilter = {}) {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: assignmentsKey(tenantId, filter),
+    queryFn: () => getDataGateway().org.listAssignments(tenantId, filter),
     staleTime: ORG_STALE_MS,
   });
 }

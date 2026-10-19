@@ -31,6 +31,9 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/audit-log', 'Nhật ký'],
 ];
 
+/** Routes a Phase 2 track has built: they show their screen, not the "Chưa xây dựng" placeholder. */
+const BUILT = new Set(['/my/results', '/admin/results']); // T6
+
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -87,9 +90,10 @@ test.describe('@smoke app shell', () => {
         .getByRole('link', { name: title, exact: true })
         .click();
 
-      await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
+      // A built screen may keep its selection in the query string (`?cycle=&period=`).
+      await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}(\\?.*)?$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (!BUILT.has(path)) await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }

@@ -6,6 +6,7 @@ import {
   isEmployedDuring,
   isEffectiveOn,
   isEmployedOn,
+  latestFirst,
   isStillEmployedOn,
   managerOf,
   primaryAssignmentOn,
@@ -171,5 +172,15 @@ describe('scopeSubjectOn / scopeCoversEmployee', () => {
     expect(scopeCoversEmployee(userRole({ scopeType: 'Tenant' }), gone, ctx('x'))).toBe(false);
     const lastDay = scopeSubjectOn(employee({ id: 'e1', leftOn: '2027-01-10' }), assignments, '2027-01-10');
     expect(lastDay.inScope).toBe(true);
+  });
+});
+
+describe('latestFirst — a deterministic order for assignments', () => {
+  it('latest start first; the same start ordered by id, whatever the input order', () => {
+    const a = assignment({ id: 'as-a', effectiveFrom: '2027-01-01' });
+    const b = assignment({ id: 'as-b', effectiveFrom: '2027-01-01' });
+    const old = assignment({ id: 'as-0', effectiveFrom: '2020-01-01' });
+    expect([old, b, a].sort(latestFirst).map((x) => x.id)).toEqual(['as-a', 'as-b', 'as-0']);
+    expect(primaryAssignmentOn('e1', [b, a], '2027-02-01')?.id).toBe(primaryAssignmentOn('e1', [a, b], '2027-02-01')?.id);
   });
 });

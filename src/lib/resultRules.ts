@@ -44,7 +44,7 @@ import { achievement, goalAchievementInput, type NotComputableReason } from './c
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { columnPct } from './formRules';
 import { weightIssue } from './goalPlanRules';
-import { primaryAssignmentOn, unitAncestry } from './orgRules';
+import { latestFirst, primaryAssignmentOn, unitAncestry } from './orgRules';
 import { payoutPctFor, ratingFor, type PayoutSubject } from './ratingRules';
 import {
   adjustedScore,
@@ -344,18 +344,32 @@ function periodContext(data: ResultData, periodId: Id): { period: CyclePeriod; c
   return period && cycle ? { period, cycle } : null;
 }
 
-/** The payout subject of an Employee plan, as of its last working day in the period (BR-KPI-24, 42). */
-function payoutSubject(plan: GoalPlan, period: CyclePeriod, data: ResultData): PayoutSubject | null {
+/**
+ * The primary assignment an Employee plan's payout is read for (BR-KPI-24, 42): the one in force on
+ * their last working day in the period (`leftOn` when earlier than the period end), else the latest
+ * primary one that started by the period end. The payroll file prints the same unit and position
+ * (BR-KPI-45), read from the current assignment rows. `null` = not an Employee plan, or no assignment.
+ */
+export function subjectAssignment(
+  plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeId'>,
+  period: Pick<CyclePeriod, 'endDate'>,
+  data: Pick<ResultData, 'Employee' | 'EmployeeAssignment'>,
+): EmployeeAssignment | null {
   if (plan.ownerType !== 'Employee' || plan.ownerEmployeeId === null) return null;
   const employeeId = plan.ownerEmployeeId;
   const employee = data.Employee.find((e) => e.id === employeeId);
   const asOf = employee?.leftOn && employee.leftOn < period.endDate ? employee.leftOn : period.endDate;
-  const assignment =
+  return (
     primaryAssignmentOn(employeeId, data.EmployeeAssignment, asOf) ??
-    data.EmployeeAssignment.filter((a) => a.employeeId === employeeId && a.isPrimary && a.effectiveFrom <= period.endDate).sort((a, b) =>
-      a.effectiveFrom < b.effectiveFrom ? 1 : -1,
-    )[0] ??
-    null;
+    data.EmployeeAssignment.filter((a) => a.employeeId === employeeId && a.isPrimary && a.effectiveFrom <= period.endDate).sort(latestFirst)[0] ??
+    null
+  );
+}
+
+/** The payout subject of an Employee plan — its `subjectAssignment`'s unit chain and position. */
+function payoutSubject(plan: GoalPlan, period: CyclePeriod, data: ResultData): PayoutSubject | null {
+  if (plan.ownerType !== 'Employee' || plan.ownerEmployeeId === null) return null;
+  const assignment = subjectAssignment(plan, period, data);
   return assignment ? { unitAncestry: unitAncestry(assignment.orgUnitId, data.OrgUnit), positionId: assignment.positionId } : { unitAncestry: [], positionId: null };
 }
 

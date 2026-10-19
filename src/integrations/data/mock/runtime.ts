@@ -259,6 +259,59 @@ export class Runtime {
     };
   }
 
+  /**
+   * A user write that needs ASYNC work between reading and writing — rendering a file (T6's payroll
+   * workbook). Same registration, latency, failure injection (once), error mapping and events as
+   * `write`, in four steps:
+   * 1. authorize, then `prepare` on a transaction that is never committed (a refused actor never
+   *    has anything built);
+   * 2. `await produce(prepared)` outside any transaction;
+   * 3. a FRESH transaction: authorize again (a role revoked meanwhile counts), re-run `prepare`; if
+   *    `same` says the answer changed meanwhile → ERR-KPI-04 `CHANGED_DURING_WRITE`, nothing written;
+   * 4. `apply` and commit — synchronous like every write body, so it cannot interleave with another
+   *    write — then `afterCommit` (e.g. keep a file's bytes) and the events.
+   */
+  preparedWrite<A extends unknown[], P, Q, R>(
+    name: string,
+    auth: NoInfer<WriteAuth<A>>,
+    steps: {
+      prepare: (tx: Tx, ...args: A) => P;
+      produce: (prepared: P) => Promise<Q>;
+      apply: (tx: Tx, prepared: P, produced: Q, ...args: A) => R;
+      /** Default: the two answers serialise to the same JSON. */
+      same?: (before: P, now: P) => boolean;
+      /** Runs only once the commit is saved; must not throw. */
+      afterCommit?: (result: R, produced: Q) => void;
+    },
+  ): (tenantId: Id, actorUserId: Id, ...args: A) => Promise<R> {
+    this.register(name, 'write');
+    this.registry.auth.set(name, auth as WriteAuth<never[]>);
+    const same = steps.same ?? ((a: P, b: P) => JSON.stringify(a) === JSON.stringify(b));
+    return async (tenantId, actorUserId, ...args) => {
+      const input = cloneDeep(args);
+      let events: DomainEvent[];
+      let result: R;
+      let produced: Q;
+      try {
+        await this.preamble(name, 'write');
+        const readTx = this.newTx(tenantId, actorUserId);
+        authorizeWrite(readTx, actorUserId, name, auth, input);
+        const prepared = steps.prepare(readTx, ...input);
+        produced = await steps.produce(prepared);
+        const tx = this.newTx(tenantId, actorUserId);
+        authorizeWrite(tx, actorUserId, name, auth, input);
+        if (!same(prepared, steps.prepare(tx, ...input))) throw new KpiError('ERR-KPI-04', 'CHANGED_DURING_WRITE');
+        result = steps.apply(tx, prepared, produced, ...input);
+        events = this.commit(tx);
+      } catch (error) {
+        throw this.mapError(error, 'write', name);
+      }
+      steps.afterCommit?.(result, produced);
+      this.bus.emit(events);
+      return cloneDeep(result);
+    };
+  }
+
   /** A system write (T7's listeners): `(tenantId, ...args)`, no actor. */
   system<A extends unknown[], R>(name: string, body: (tx: Tx, ...args: A) => R): (tenantId: Id, ...args: A) => Promise<R> {
     this.register(name, 'system');

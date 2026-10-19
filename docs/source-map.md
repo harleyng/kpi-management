@@ -88,3 +88,10 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 |---|---|
 | 21–22 | KGI → CSF → KPI |
 | — | The six implementation steps (strategy → KGI → CSF → KPI → targets → review) |
+
+## Where the sources are silent
+
+| Topic | What exists | Rule |
+|---|---|---|
+| The payroll hand-off (T6) — the file's columns, who exports, when (before or after lock) | Only ERD `PAYROLL_EXPORT` (the export log: period, file, who, when). DATX "TH KQ" lists result columns but no hand-off; CMC, SF4C, the email template and the minutes say nothing | BR-KPI-45 — a Syntra decision; `ASSUMPTION Q19`, `Q20` |
+| What an employee sees of a result before HR finalises it | Nothing | BR-KPI-46 — a Syntra decision |

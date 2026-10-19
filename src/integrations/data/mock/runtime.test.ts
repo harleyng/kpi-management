@@ -77,7 +77,6 @@ describe('mock runtime — the contract surface', () => {
       'actuals.commitImport': 'T4', // WBS 4.4.3 importRules
       'actuals.runSync': 'T4', // WBS 4.4.5 the simulated ERP Sale connector
       'actuals.stageImport': 'T4', // WBS 4.4.3
-      'results.exportPayroll': 'T6', // WBS 4.6.4
     });
     // Every user write declares its authorization (authorize.ts), deferred ones included.
     for (const [name, kind] of methods) if (kind === 'write') expect(auth.has(name), name).toBe(true);

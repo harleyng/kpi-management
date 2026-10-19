@@ -311,10 +311,11 @@ describe('tenant isolation — coverage', () => {
 
   it('Demo Co is not empty where it is read, so the scans below can fail', async () => {
     const { gateway } = newGateway();
+    // The seed has no payroll export (none is seeded, by choice): Demo Co makes one first.
+    await gateway.results.exportPayroll(D, demoActor, DEMO.id('CyclePeriod', 'T01'));
     for (const [name, read] of Object.entries(LIST_READS)) {
       const result = await read(gateway);
       const size = Array.isArray(result) ? result.length : (result as { items: unknown[] }).items.length;
-      if (name === 'results.listPayrollExports') continue; // empty until T6 wires exportPayroll
       expect(size, name).toBeGreaterThan(0);
     }
   });
@@ -498,6 +499,7 @@ const SCORING_ID_WRITES: Record<string, [CollectionName, ById]> = {
   'results.setAdjustment': ['PeriodResult', (gw, id) => gw.results.setAdjustment(D, demoActor, id, 1)],
   'results.finalizeResults': ['CyclePeriod', (gw, id) => gw.results.finalizeResults(D, demoActor, id)],
   'results.lockResults': ['CyclePeriod', (gw, id) => gw.results.lockResults(D, demoActor, id)],
+  'results.exportPayroll': ['CyclePeriod', (gw, id) => gw.results.exportPayroll(D, demoActor, id)],
 };
 
 describe('tenant isolation — the result lifecycle (scoring lane)', () => {

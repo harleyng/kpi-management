@@ -89,7 +89,7 @@ who holds every permission and sees all five groups.
 | `/` | → redirects to `/my/kpi` | — | — |
 | `/my/kpi` | KPI của tôi | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/tasks` | Việc cần xử lý | Của tôi · — (all) | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
+| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-46) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
 | `/team/kpi` | KPI đội nhóm | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
 | `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
@@ -98,7 +98,7 @@ who holds every permission and sees all five groups.
 | `/admin/templates` | Bộ mẫu | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2) |
 | `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
 | `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
-| `/admin/results` | Kết quả & lương | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
+| `/admin/results` | Kết quả & lương — **built (T6)**: tabs Kết quả kỳ · Xếp loại & quy đổi · Xuất file lương (`?tab=&cycle=&period=`); export needs `result.export` (CNB) | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
 | `/system/org` | Tổ chức | Hệ thống · `org.manage` | 4.1.1–4.1.4, 4.1.7 (T1) |
 | `/system/users` | Người dùng & quyền | Hệ thống · `user.manage` | 4.1.5–4.1.6 (T1) |
 | `/system/data-sources` | Nguồn dữ liệu | Hệ thống · `datasource.manage` | 4.4.1, 4.4.4–4.4.5 (T4) |
@@ -195,6 +195,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `workflowContext.ts` | The workflow methods' shared plumbing: `throwRefusal` / `throwIssues` / `throwDecision` (a rule's answer → `KpiError`), `refOrInvalid` (a payload id → ERR-KPI-06 worded like the integrity check), `directoryOf`, `entitlementCtx`, `assigneesFor`, `assertMayEdit` (EDIT standing + `editRefusal`), `assertPlanEditable` (`canEditPlan` with its context from the rows), `setPlanStatus` (the one plan-status write: LOCK / UNLOCK audit + `goalPlan.statusChanged`), `fireLaunch` (recipients → Draft plans → forms → evaluation items with actual snapshots → Launched → `form.launched`). Decides nothing |
 | `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
+| `payrollWorkbook.ts` (T6) | Renders `payrollRules.buildPayrollSheet` as the `.xlsx` payroll file (sheets "Lương KPI", "Thông tin") — the ONLY importer of exceljs, dynamically, so it is an async chunk of its own |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
 `groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
@@ -205,11 +206,20 @@ guards: `saveCalcMethod` (`validateCalcMethod`), `saveRatingScale` (`validateRat
 `savePayoutRule` (`validatePayoutRule` + level in scale) — a reference that does not resolve is left to
 the integrity check, so a foreign id still answers like a missing one.
 
+`results.exportPayroll` (T6, BR-KPI-45) is the one method built on **`Runtime.preparedWrite`** — a user
+write with async work between reading and committing: authorize → `prepare` on an uncommitted
+transaction (`buildPayrollSheet`) → `await produce` outside any transaction (render the workbook) → a
+fresh transaction that authorizes again and re-runs `prepare`; if the answer changed meanwhile (ignoring
+its clock reading) → ERR-KPI-04 `CHANGED_DURING_WRITE`, else `apply` (FileObject + PayrollExport +
+`payroll.exported`) and commit; `afterCommit` keeps the bytes in `rt.blobs` (memory only). Latency and
+failure injection run once; the registration, `auth` and events are `write`'s.
+
 **Track-owned deferrals (after Gate 1).** Every Phase 1 rule is wired: no method is deferred and no guard
 is pending, bar a Phase 2 track's own work package (`registry.trackOwned`, pinned by the Gate 1 test in
 `src/integrations/data/mock/runtime.test.ts`; adding to it is a Large change):
 - *Deferred* (rejects `KpiDeferredError` until the track wires it; its `auth` is already declared) —
-  T4: `actuals.stageImport`, `commitImport` (4.4.3), `runSync` (4.4.5); T6: `results.exportPayroll` (4.6.4).
+  T4: `actuals.stageImport`, `commitImport` (4.4.3), `runSync` (4.4.5). (T6's `results.exportPayroll`
+  was wired by T6, 2026-10-19.)
 - *Pending guard* — none. (`actuals.rejectImport` was wired at Gate 1 QA: only a Validating batch,
   `actualRules.canRejectImport`; T4's import framework builds the rest of the batch lifecycle.)
 
@@ -244,7 +254,8 @@ the seed hash, the gateway surface (`group.method:kind[:permission]`) and the en
 `SEED_VERSION` is `2027-04-06.G1`. A failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4
-`Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (T6, `EMPTY_UNTIL_WIRED`).
+`Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (`EMPTY_UNTIL_WIRED`: T6 wired the
+export without seeding one).
 
 ---
 

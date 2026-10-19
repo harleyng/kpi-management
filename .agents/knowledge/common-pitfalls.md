@@ -9,6 +9,31 @@
 
 ---
 
+## 2026-10-19 — A mock write cannot await: async work (rendering a file) goes through `preparedWrite` (T6)
+
+Write bodies are synchronous so two writes never interleave — but exceljs renders asynchronously. Doing
+the render in a read, then a plain `write`, skips authorizing before any data is built and races a write
+in between. **Rule.** Use `Runtime.preparedWrite`: authorize → prepare → `await produce` → fresh
+transaction that authorizes again and re-checks the prepared answer (ERR-KPI-04 `CHANGED_DURING_WRITE`)
+→ apply → commit → `afterCommit`. Exclude the clock reading from the comparison, or every export refuses.
+
+---
+
+## 2026-10-19 — jsdom's `Blob` has no `arrayBuffer()`; jsdom has no `URL.createObjectURL`
+
+A test that reads a file back through `blob.arrayBuffer()` throws under Vitest. **Rule.** Expose the bytes
+(`renderPayrollWorkbook` returns the buffer, `buildPayrollWorkbook` wraps it) and test those; stub
+`URL.createObjectURL` in a test that calls `system.getFileUrl`.
+
+---
+
+## 2026-10-19 — Playwright's accessible-name match is a substring: "Kỳ" also finds "Chu kỳ"
+
+`getByRole('combobox', { name: 'Kỳ' })` resolved to both the cycle and the period select (strict-mode
+violation). **Rule.** Pass `exact: true` for a short name that is part of another.
+
+---
+
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 
 `clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not

@@ -1,5 +1,6 @@
-import type { Id, RatingLevel } from '@/data/types';
+import type { FileObject, Id, PayrollExport, RatingLevel } from '@/data/types';
 import { KpiError, ruleIssue, toKpiError } from '@/lib/errorCatalog';
+import { buildPayrollSheet, payrollFileName, type PayrollSheet } from '@/lib/payrollRules';
 import { validatePayoutRule, validateRatingScale } from '@/lib/ratingRules';
 import {
   applyAdjustment,
@@ -14,8 +15,10 @@ import {
 import type { ChildInput, PeriodResultFilter, ResultsGateway } from '../../types';
 import { removeRow } from '../integrity';
 import { eqOpt, inList, newId, saveChildren, upsert } from '../rows';
+import { clockOf } from '../authorize';
 import type { Runtime } from '../runtime';
 import type { Tx } from '../store';
+import { buildPayrollWorkbook, PAYROLL_MIME_TYPE } from '../payrollWorkbook';
 
 /** Everything `resultRules` reads, straight from the transaction (the rules filter by period). */
 function resultData(tx: Tx): ResultData {
@@ -61,6 +64,31 @@ function apply(tx: Tx, changes: ResultChanges, action?: 'LOCK'): void {
   }
   for (const detail of changes.addedDetails) tx.insert('ResultDetail', detail);
 }
+
+/** Everything `payrollRules` reads. */
+function payrollData(tx: Tx) {
+  return {
+    PerformanceCycle: tx.all('PerformanceCycle'),
+    CyclePeriod: tx.all('CyclePeriod'),
+    GoalPlan: tx.all('GoalPlan'),
+    Employee: tx.all('Employee'),
+    EmployeeAssignment: tx.all('EmployeeAssignment'),
+    OrgUnit: tx.all('OrgUnit'),
+    JobPosition: tx.all('JobPosition'),
+    RatingScale: tx.all('RatingScale'),
+    RatingLevel: tx.all('RatingLevel'),
+    PeriodResult: tx.all('PeriodResult'),
+  };
+}
+
+/** Who the file says exported it: the person behind the account, else the account's display name. */
+function actorName(tx: Tx): string {
+  const account = tx.get('UserAccount', tx.ctx.actorUserId as Id);
+  const employee = account.employeeId ? tx.find('Employee', account.employeeId) : undefined;
+  return employee?.fullName ?? account.displayName;
+}
+
+const withoutTime = ({ exportedAt: _exportedAt, ...rest }: PayrollSheet) => rest;
 
 const periodResults = (tx: Tx, periodId: Id) => tx.all('PeriodResult').filter((r) => r.periodId === periodId);
 
@@ -158,11 +186,45 @@ export function resultsGroup(rt: Runtime): ResultsGateway {
       tx
         .all('PayrollExport')
         .filter((e) => eqOpt(periodId, e.periodId))
-        .sort((a, b) => (a.exportedAt < b.exportedAt ? 1 : -1)),
+        .sort((a, b) => (a.exportedAt !== b.exportedAt ? (a.exportedAt < b.exportedAt ? 1 : -1) : a.id < b.id ? 1 : -1)),
     ),
-    exportPayroll: rt.deferred('results.exportPayroll', 'write', 'T6 4.6.4 (the payroll export file)', {
-      track: 'T6',
-      auth: { permission: 'result.export' },
+    // BR-KPI-45 — the file is rendered from `payrollRules.buildPayrollSheet` (stored numbers, never
+    // recomputed); exporting writes the file and its record and changes no result.
+    exportPayroll: rt.preparedWrite('results.exportPayroll', { permission: 'result.export' }, {
+      prepare: (tx, periodId: Id) => {
+        tx.get('CyclePeriod', periodId);
+        const outcome = buildPayrollSheet(payrollData(tx), periodId, {
+          tenantName: tx.globals.tenants.get(tx.tenantId)?.name ?? '',
+          timeZone: clockOf(tx).tz,
+          exportedAt: tx.now,
+          exportedByName: actorName(tx),
+        });
+        if (!outcome.ok) throw toKpiError(outcome.issues);
+        return outcome.sheet;
+      },
+      produce: buildPayrollWorkbook,
+      // The fresh read differs only by its clock reading — anything else means the data moved.
+      same: (before, now) => JSON.stringify(withoutTime(before)) === JSON.stringify(withoutTime(now)),
+      apply: (tx, sheet, blob, periodId: Id) => {
+        const fileId = newId();
+        const file: FileObject = {
+          id: fileId,
+          tenantId: tx.tenantId,
+          storageKey: `mock/${fileId}`,
+          fileName: payrollFileName(sheet),
+          mimeType: PAYROLL_MIME_TYPE,
+          sizeBytes: blob.size,
+          uploadedBy: tx.ctx.actorUserId as Id,
+          uploadedAt: sheet.exportedAt,
+        };
+        tx.insert('FileObject', file);
+        const record: PayrollExport = { id: newId(), tenantId: tx.tenantId, periodId, fileId, exportedBy: tx.ctx.actorUserId as Id, exportedAt: sheet.exportedAt };
+        tx.insert('PayrollExport', record);
+        tx.emit({ type: 'payroll.exported', periodId, exportId: record.id });
+        return record;
+      },
+      // Memory only, like every mock file (persistence.ts): a reload keeps the record, not the bytes.
+      afterCommit: (record, blob) => rt.blobs.set(`${record.tenantId}/${record.fileId}`, blob),
     }),
   };
 }
