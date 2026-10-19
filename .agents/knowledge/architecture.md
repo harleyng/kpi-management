@@ -99,8 +99,8 @@ who holds every permission and sees all five groups.
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
 | `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
 | `/admin/cycles` | Chu kỳ | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
-| `/admin/library` | Thư viện KPI | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 (T2) |
-| `/admin/templates` | Bộ mẫu | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2) |
+| `/admin/library` | Thư viện KPI — tabs `?tab=` chi-tieu · danh-muc · phuong-phap; filters `q`, `vc`, `tt` in the URL | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 export (T2, built) |
+| `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
 | `/admin/launches` | Khởi chạy phiếu | Quản trị KPI · `form.launch` (HR, CNB) | D5, 4.5.1 (T5) |
 | `/admin/actuals` | Số liệu & import | Quản trị KPI · `actual.import` (HR, CNB) | 4.4.2–4.4.6 (T4), 4.3.7 (T3) |
 | `/admin/results` | Kết quả & lương | Quản trị KPI · `result.finalize` (HR, CNB) | 4.6.1–4.6.4 (T6) |
@@ -201,6 +201,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
 | `groups/orgTx.ts` (T1) | The org writes at TRANSACTION level — `saveOrgUnitTx`, `savePositionTx`, `saveEmployeeTx`, `saveAssignmentTx`, `saveAccountTx`, `saveUserRoleTx`, `deleteUserRoleTx`, `setRolePermissionsTx`. `org.save*` call them, and T4's `commitImport` calls them for an OrgData batch (employees → assignments → accounts) — a method cannot call another. Each: write the rows → `validateTransaction` (references, owners, unique, CHECKs: a foreign id is refused like a missing one BEFORE any rule reads it) → `orgAdminRules` / `accessAdminRules` on the written state vs the stored row → `throwIssues`. Behaviours: **B1** a new primary assignment from D ends the running one on D − 1 (`transferPlan`); **B2** a new account of an employee gets EMPLOYEE / Self (`accountPlan`); **B3** a recorded last working day ends the assignments running past it (`resignationPlan`); `setRolePermissions` writes the DIFF only; every access change passes `accessIssues` (BR-KPI-72) |
+| `groups/library.ts` | (T2) each `library.save*` reads what `libraryRules` needs inside the tx (other codes, rows referencing a unit or method via `REVERSE_REFS`, Active templates holding a KPI), normalises codes, and throws the rule's issues — the lock on a used method is reported after `validateCalcMethod` |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
 `groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
@@ -286,7 +287,7 @@ delta Phase 5 applies when it writes the SQL schema.
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed (**done 2026-10-19**, rules wired at Gate 1) · **1.3** session
 + permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (**done 2026-10-19**) →
-**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel (**T1 built 2026-10-19**, `track/t1`), each in its own git worktree, merged T1 → T2 → T7 → T3
+**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel (T1 and T2 built 2026-10-19 and merged; the rest are being merged in order), each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 
 ---

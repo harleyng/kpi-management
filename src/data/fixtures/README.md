@@ -164,6 +164,11 @@ to the workbook — each marked `// Q14` in `catalog.ts`:
 7. **Numbers**: Vietnamese dot thousands read as thousands ("28.957" = 28 957); fractions stored as
    percent on a 0–100 scale (0.15 → 15); DATX targets are monthly — goals hold the year (× 12 for SUM).
 
+The seed predates the library's write rules (business-rules.md §3b, track T2) and is NOT changed by them:
+the HCNS template is Active while holding the three Draft HCNS KPIs, and Demo Co's two Active templates
+total 50% / 40%. Those are exactly the warning cases the template screen shows (`ASSUMPTION Q26`); saving
+any seed row unchanged succeeds (`mock/library.test.ts`).
+
 Other defaults: every KPI is monthly; aggregation SUM for money and counts, AVG for ratios, LAST for
 headcount and stock (`ASSUMPTION Q15`); data sources ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập
 tay" are invented — Sorama, My Result, CMS and MHTC are named in the workbook (`ASSUMPTION Q16`);

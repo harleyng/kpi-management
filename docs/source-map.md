@@ -82,6 +82,13 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 | Department sheets (Marketing, HCNS, TC-KT, …) | "Mục tiêu chung (3–5) — KGI", the KPI set, SMART reminder, monthly target allocation | BR-KPI-02, 11; templates |
 | "TH KQ" | Result roll-up per employee: % KPI completion, % KPI pay, rating, rule violations, attendance — **broken with `#REF!`**, and holds real names | BR-KPI-40 (columns only); Q2. **Never copy its rows** |
 
+### KPI library rules (WBS 4.2, track T2)
+
+None of the CMC guides describes a library screen; the nearest references are HR guide p. 22 (the BSC
+goal type) and pp. 61–63 (the import template the library export's column order anticipates). The
+library's write rules BR-KPI-74…76 are therefore **Syntra decisions** (product owner, 2026-10-19), on
+`ASSUMPTION Q25`–`Q28`; the catalogue itself comes from the DATX sheet above.
+
 ### DATX KPI guide 2023 (slides)
 
 | Pages | Topic |

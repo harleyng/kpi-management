@@ -59,11 +59,11 @@ export function EditSheet({
       <Sheet open={open} onOpenChange={requestClose}>
         <SheetContent className={cn('gap-0 p-0', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
           <form onSubmit={submit} className="flex h-full min-h-0 flex-col" noValidate>
-            <SheetHeader className="pb-4">
+            <SheetHeader>
               <SheetTitle>{title}</SheetTitle>
               {description && <SheetDescription>{description}</SheetDescription>}
             </SheetHeader>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-5">{children}</div>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">{children}</div>
             {problems.length > 0 && (
               <ul role="alert" className="space-y-1 border-t bg-support-negative-subtle px-5 py-2 text-sm text-support-negative">
                 {problems.map((p) => (
