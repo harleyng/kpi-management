@@ -54,7 +54,7 @@ npm run typecheck && npm run test && npm run build && npm run lint
 ## Deployment
 
 - **Repository:** https://github.com/harleyng/kpi-management (private)
-- **Production:** https://kpi-management-theta.vercel.app (Vercel project `kpi-management`, team
+- **Production:** https://syntra-kpi.vercel.app (Vercel project `kpi-management`, team
   *harleyng's projects*)
 - **A push to `main` is a production deploy** — Vercel is connected to the GitHub repository. Every
   other branch gets its own preview deployment.
