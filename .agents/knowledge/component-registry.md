@@ -47,7 +47,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `OrgUnitTree` / `OrgUnitTreeView` | ARIA tree of the org (roving tabindex, ↑↓←→ Home End Enter/Space), single or multiple, search above >10 units |
 | `InlineNotice` (T4) | A short tinted notice inside a panel (`info` / `warning` / `negative`, 1px border, icon + title + body) — why an action is blocked, what a preview means; `alert` only for something that just failed |
 | `ConfirmDialog` | Confirmation before an irreversible action (lock, finalise, delete); `destructive` for removals |
-| `StatusBadge` | The `Tone` primitive, plus one badge per state set (`GoalPlanStatusBadge`, `FormStatusBadge` with `atMyStep`, `OverdueBadge`, `CycleStatusBadge`, `PeriodResultStatusBadge`, `GoalStatusBadge`, `LibraryStatusBadge`, `LaunchStatusBadge`, `ImportBatchStatusBadge`, `SyncRunStatusBadge`, `NotificationStatusBadge`, `EmploymentStatusBadge`, `RecordStatusBadge`); tones in `statusTones.ts` |
+| `StatusBadge` | The `Tone` primitive, plus one badge per state set (`GoalPlanStatusBadge`, `FormStatusBadge` with `atMyStep`, `OverdueBadge`, `CycleStatusBadge`, `PeriodResultStatusBadge`, `GoalStatusBadge`, `LibraryStatusBadge`, `LaunchStatusBadge`, `ImportBatchStatusBadge`, `SyncRunStatusBadge`, `NotificationStatusBadge`, `EmploymentStatusBadge`, `RecordStatusBadge`); tones in `statusTones.ts`; `AttentionBadge` (Phase 3: "Dưới ngưỡng" / "Thiếu số liệu" / "Xếp loại thấp", `ATTENTION_LABEL` in `statusTones.ts`) |
 | `Pagination` | Footer of a paged table; pairs with `paginate()` |
 | `SearchInput` | Magnifier-in-a-field; the caller filters (with `foldDiacritics`) |
 | `SectionTitle` | A titled section inside a page body |
@@ -180,6 +180,20 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `RatingTab` / `PayoutRuleDialog` | The scale read-only (`ASSUMPTION Q2`) + payout rules list / editor (`validatePayoutRule` before saving) |
 | `PayrollExportTab` | Pre-export counts (`payrollPreview`), "Xuất file lương" (`result.export`), "Lịch sử xuất file" with per-row download and the lost-after-reload state |
 
+## `src/components/dashboard/` (Phase 3, WBS 4.7.1–4.7.4)
+
+| Component | Purpose |
+|---|---|
+| `useDashboardSelection` / `useFocusUnit` | `?cycle=&period=` (period defaults to `defaultDashboardPeriod` once every period's results loaded) and `?unit=` (pushed, so Back returns up; a unit outside the scope falls back to the root) |
+| `OverviewTab` | "Tổng quan": breadcrumb, `UnitSummary`, child units or staff, side column (attention, BSC, trend, assistant); "Kỳ chưa chốt" notice; whole-read error with "Thử lại" |
+| `UnitSummary` / `UnitBreadcrumb` | The focus unit's figures as a definition strip; `<nav aria-label="Đường dẫn">` starting at the viewer's highest unit, `aria-current` on the last |
+| `ChildUnitsTable` / `StaffTable` | Child units (own score + status, Δ, staff average n/m, "Xếp loại thấp"); the unit's people (stored score, rating, % lương, Δ, status) — a name opens T6's `ResultDetailDialog` with `plan` (visibility mode) |
+| `SidePanels` | `Panel` / `PanelState` (own loading / error), `AttentionList` (5 + "Xem tất cả", hidden goals counted), `PerspectiveBars` (a table: neutral bars, 100% line, weight share), `TrendChart` (Recharts, no animation, hollow Draft points, "Xem dạng bảng") |
+| `DashboardFigures` | `DeltaValue` ("(tạm tính)", why it is missing), `StaffAverageValue`, `Figure` |
+| `InsightCard` | "Trợ lý KPI · Giả lập": collapsed summary, a labelled question box + 5 suggested questions, `aria-live` answers, catalogue errors with retry |
+| `OperationsTab` | "Vận hành": registration / evaluation / results sections, progress bar, overdue table → `/forms/:id`, "Xuất báo cáo vận hành (Excel)" (exceljs on click, disabled with its reason when empty) |
+| `MyKpiSummary` | "KPI của tôi" on `/my/results`: latest official result, Δ only against an official month, months as text, attention list |
+
 ## `src/contexts/`
 
 | File | Purpose |
@@ -224,7 +238,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `ratingRules.ts` | `ratingFor`, `validateRatingScale`, `payoutPctFor`, `validatePayoutRule` |
 | `formRules.ts` | `canSubmit` (KPI_EVAL / GOAL_SETTING / GOAL_CHANGE), `validateScoreInput`, `evaluationTotal`, `columnPct` |
 | `workflowRules.ts` | `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
-| `libraryRules.ts` (T2) | BR-KPI-74…76: `normaliseCode`, `codeIssues`, `otherCodesOf`, `perspectiveIssues`, `measureUnitIssues`, `calcMethodIssues` (+ separate `lock`), `methodScoringChanged`, `kpiDefinitionIssues`, `activeTemplatesContaining`, `templateIssues` → `{ errors, warnings }`, `templateWeightTotal`, `libraryUsage`, `templateAudience`; export rows `libraryExportRows`, `templateExportRows` |
+| `libraryRules.ts` (T2) | BR-KPI-74…80: `normaliseCode`, `codeIssues`, `otherCodesOf`, `perspectiveIssues`, `measureUnitIssues`, `calcMethodIssues` (+ separate `lock`), `methodScoringChanged`, `kpiDefinitionIssues`, `activeTemplatesContaining`, `templateIssues` → `{ errors, warnings }`, `templateWeightTotal`, `libraryUsage`, `templateAudience`; export rows `libraryExportRows`, `templateExportRows` |
 | `workflowRules.ts` | (T7: `effectiveOverdueBehaviour` — what the scheduler will really do, shared by `overdueActions` and the reminder) `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
 | `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25); T3: `generatePeriods`, `mergeGeneratedPeriods`, `periodInput`, `nextCycleStatus`, `defaultCycleId` |
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf`; T6: `subjectAssignment` (the assignment a payout is read for, shared with the payroll file) (BR-KPI-40, 43, 44) |
@@ -237,7 +251,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `importRules.ts` (T4) | THE shared import framework: `ImportColumn` / `ImportTemplateSpec`, `parseSheet(spec, matrix)`, `normaliseCell`, `parseNumberCell` / `parseDateCell` / `parseTextCell`, `importError`, `batchCounts`, `canCommitImport`, `canRejectImport`, `errorsByRow`, `previewOrder` (BR-KPI-53, 54) — shared by T1/T2/T3, changing it is Large |
 | `actualImportRules.ts` (T4) | `ACTUAL_IMPORT_SPEC` / `ACTUAL_COLUMNS`, `resolveActualRow`, `validateActualRows`, `actualImportWarnings`, `actualTemplateRows` (BR-KPI-53) |
 | `actualEntryRules.ts` (T4) | `buildActualEntryRows` (the manual-entry table, decided whole), `actualEntrySummary`, `filterActualEntryRows`, `defaultCycle` / `monthsOf` / `defaultMonth` (the shared pickers) |
-| `excel.ts` (T4) | `writeTemplate(spec, rows, lists)` → Blob, `readSheet(buffer)` → cell matrix — exceljs, loaded lazily; imported only by lazy screens |
+| `excel.ts` (T4) | `writeTemplate(spec, rows, lists)` → Blob, `writeSheets(sheets)` → a plain report workbook (Phase 3), `readSheet(buffer)` → cell matrix — exceljs, loaded lazily; imported only by lazy screens |
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
 | `notificationRules.ts` (T7) | `NOTIFICATION_VARIABLES`, `VARIABLES_BY_EVENT`, `templateVariables`, `templateIssues`, `renderTemplate` (never a raw `{{…}}`), `formatViDate`, `periodPhrase`, `deadlineConsequence`, `notificationRecipients`, `stepActedNotification`, `notificationRef`, `notificationSourceKey`, `inAppTemplateFor`, `isInAppNotification` (BR-KPI-45…47) |
 | `auditRules.ts` (T7) | `auditChanges` (field diff; `null` = unreadable), `auditSubjectName` (name column, else the person it is about), `dayRangeToInstants` (BR-KPI-49) |
@@ -247,6 +261,8 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `numberInput.ts` | `parseDecimalInput` (vi-VN `9.600.000.000` / `92,5`; blank → `null`, never 0), `formatDecimalInput` |
 | `formViewRules.ts` (T5) | `formStanding` (what a user may do on a form now — a composition of `workflowRules`, display hint), `submitCheckInput` (THE content-check builder, shared with the mock), `stepTiming`, `delegationState` / `isDelegationRevocable`, `goalDraftFromGoal` / `goalDraftFromKpi`, `workflowEditWarnings`, `actorDirectoryOf` — tested, incl. `formViewRules.parity.test.ts` against the seeded mock |
 | `payrollRules.ts` (T6) | BR-KPI-81: `isPayrollResult`, `payoutNote` / `PAYROLL_NOTE_LABEL` (Q39), `payrollPreview`, `buildPayrollSheet` (stored numbers only), `payrollFileName` |
+| `dashboardRules.ts` (Phase 3) | BR-KPI-83…89, Q40–Q43: `buildDashboard` (scope via `can('dashboard.view')`, staff placed per period by `subjectAssignment`, own-plan score, Δ, official staff average), `staffOfUnit`, `unitPath`, `rankableUnits`, `scoreDelta`, `previousPeriod`, `defaultDashboardPeriod`, `flaggedLevelIds` / `isResultFlagged`, `goalAttention` (`AT_RISK_ACHIEVEMENT_PCT` = 90), `perspectiveBreakdown`, `trendSeries`, `latestOfficialResult`, `formProgress` / `overdueRows` (T5's `stepTiming`), `planProgress`, `ratingDistribution`, `formsInScope` / `plansInScope` / `resultsInScope`, `operationsReport`, `dashboardSnapshot` / `snapshotDigest` / `rankSnapshotUnits` — tested, seed gate in `mock/dashboard.seed.test.ts` |
+| `dashboardExport.ts` (Phase 3) | `operationsSheets` (the "Vận hành" sections as `ReportSheet`s), `isOperationsReportEmpty` — tested |
 | `isoDate.ts` | `Clock`, `todayOf`, `toZonedDate`, `addDays`, `daysBetween`, `minDate`, `isWithin`, `isIsoDate`, `addDaysToInstant` (calendar days in a zone, wall time kept), `toZonedLocalInput` / `fromZonedLocalInput` (`datetime-local` ↔ instant), `zoneOffsetLabel` (`GMT+7`) |
 
 Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed fixtures).
@@ -258,7 +274,7 @@ Test factories for rule tests: `src/test/builders.ts` (deliberately not the seed
 | `data/index.ts` | `getDataGateway()`, `resolveAdapterName()` — tested |
 | `data/types.ts` | The `DataGateway` contract (Phase 1.1 fills it) |
 | `data/mockGateway.ts` / `data/supabaseGateway.ts` | Adapters — never imported outside `integrations/data/` |
-| `insight/index.ts` | `getInsightGateway()` — the simulated AI assistant (Phase 3) |
+| `insight/index.ts` · `types.ts` · `mockInsightGateway.ts` | `getInsightGateway()`; the contract (`summarise` / `explain` / `ask` over a `DashboardSnapshot`, `SUGGESTED_QUESTIONS`, `MAX_QUESTION_LENGTH`); the deterministic mock (`intentOf` — whole-phrase matching, diacritics folded) — tested |
 
 ## `src/hooks/queries/`
 
@@ -279,6 +295,9 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | `toasts.ts` | `toastWriteError` (catalogue copy, optional persistent), `toastSaved` |
 | `forms.ts` (T5) | Workflows, launches, launch rules, forms (paged), one form, actions, evaluation items, change items, inbox, delegations — reads with `*Key`; writes invalidate their roots; `useActOnForm` saves `UnsavedEdits` then acts · `useFormList(filter)` (T3: all pages at once, own `forms/all` key). T7's read-only `workflows.ts` was folded in here at the merge |
 | additions | `library.ts` `useCalcMethods`; `org.ts` `usePositions`; `session.ts` `useGatewayClock` (the gateway clock + tenant zone, re-read each render) |
+| `dashboard.ts` (Phase 3) | `useDashboardModel(selection)` (→ `DashboardData`, `buildDashboard`, one combined state), `useResultLines(result, plan)` (attention + BSC for one result, names by visibility), `useOperationsReport(selection, read)` |
+| `insight.ts` (Phase 3) | `useInsightSummary(snapshot)`, `useExplainInsight(snapshot, nodeId)` (`insightKey` = tenant, `insight`, kind, snapshot digest), `useAskInsight()` (mutation, nothing stored) |
+| `results.ts` additions (Phase 3) | `useResultsOfPeriods(periodIds)` (one query per period, `periodResultsKey`; data only once all loaded); `useResultBreakdown(result, { plan })` — with `plan`, goal names follow visibility (`hidden` lines) |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |
 | `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
 

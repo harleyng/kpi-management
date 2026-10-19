@@ -142,7 +142,7 @@ describe('calcMethodIssues (BR-KPI-80) and methodScoringChanged', () => {
   });
 });
 
-describe('kpiDefinitionIssues (BR-KPI-74…75)', () => {
+describe('kpiDefinitionIssues (BR-KPI-74…79)', () => {
   const ctx = { otherCodes: [] as string[], activeTemplatesContaining: [] as string[] };
 
   it('accepts a complete Active definition', () => {

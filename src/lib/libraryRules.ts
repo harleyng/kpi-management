@@ -24,7 +24,7 @@ import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { GOAL_COUNT, isWeightComplete } from './goalPlanRules';
 
 /**
- * The KPI library's write rules (track T2, WBS 4.2.1–4.2.4) — BR-KPI-74…76 in business-rules.md §3b.
+ * The KPI library's write rules (track T2, WBS 4.2.1–4.2.4) — BR-KPI-74…80 in business-rules.md §3b.
  *
  * Pure functions over plain rows: the mock reads what a rule needs inside its transaction and throws
  * the issues with `toKpiError`; a Phase 5 RPC reads the same rows and calls the same functions. The

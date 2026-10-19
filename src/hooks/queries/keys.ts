@@ -53,6 +53,11 @@ export const KEY_ROOTS = {
   files: ['FileObject'],
   notificationTemplates: ['NotificationTemplate'],
   notifications: ['Notification'],
+  /**
+   * The simulated assistant (Phase 3). Its keys carry the DIGEST of the snapshot it was asked about
+   * (`dashboardRules.snapshotDigest`), so new numbers are a new key — no entity needs to stale it.
+   */
+  insight: [],
   /** The audit log records every change, so every change refreshes it. */
   auditLog: '*',
 } as const satisfies Record<string, readonly EntityName[] | '*'>;

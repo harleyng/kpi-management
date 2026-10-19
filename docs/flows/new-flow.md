@@ -16,7 +16,7 @@ flowchart LR
   D --> E[Nhập số thực tế hằng tháng<br/>tay · Excel · API]
   E --> F[Quy trình 3<br/>Đánh giá KPI tháng]
   F --> G[Kết quả: điểm có trọng số<br/>→ xếp loại → % lương]
-  G --> H[Dashboard sống<br/>công ty · bộ phận · cá nhân]
+  G --> H[Dashboard sống<br/>công ty · bộ phận · cá nhân<br/>mục 4F]
   D -. khi cần .-> X[Quy trình 2<br/>Điều chỉnh KPI]
   X -.-> D
 ```
@@ -255,6 +255,40 @@ flowchart LR
 5. **Bằng chứng** (tệp hoặc đường dẫn) gắn vào chỉ tiêu theo tháng; link trong tệp Excel thành bằng chứng
    của số vừa ghi.
 
+## 4F. Dashboard sống và trợ lý (Phase 3)
+
+Mở **Điều hành → Dashboard**. Ai thấy gì do quyền "Xem dashboard" và phạm vi của họ quyết định
+(`business-rules.md` §11):
+
+| Người xem | Bắt đầu ở | Thấy |
+|---|---|---|
+| Ban điều hành, HR, Quản trị hệ thống | Công ty | Mọi khối, phòng ban và nhân viên |
+| Quản lý (vd. trưởng phòng Kinh doanh) | Đơn vị mình phụ trách | Đơn vị mình, đơn vị trực thuộc và nhân viên trong đó — không thấy công ty hay khối phía trên |
+| Nhân viên | — (không có dashboard) | Phần "KPI của tôi" ở **Kết quả của tôi**: điểm, xếp loại, % hưởng lương KPI của kỳ đã chốt gần nhất, chênh lệch với kỳ trước và chỉ tiêu cần chú ý |
+
+```mermaid
+flowchart LR
+  C[Công ty<br/>điểm kế hoạch công ty] --> K[Khối<br/>chưa có kế hoạch riêng:<br/>điểm trung bình nhân viên]
+  K --> P[Phòng ban<br/>điểm kế hoạch phòng]
+  P --> N[Nhân viên<br/>chi tiết từng chỉ tiêu]
+```
+
+- **Tổng quan.** Chọn chu kỳ và kỳ; mặc định là tháng gần nhất đã có kết quả chốt. Mỗi đơn vị hiện điểm
+  của chính kế hoạch đơn vị (đúng số đã lưu, không tính lại), xếp loại, chênh lệch với kỳ trước, số nhân
+  viên đã có kết quả chốt và điểm trung bình nhân viên (không trọng số, chỉ kết quả đã chốt — giả định
+  Q40). Khối không có kế hoạch riêng thì ghi "Chưa có kế hoạch". Bấm tên đơn vị để đi xuống; bấm tên
+  nhân viên để xem từng chỉ tiêu.
+- **Tạm tính.** Kết quả chưa chốt hiện nhãn "Tạm tính" và không vào các con số thống kê chính thức.
+- **Cần chú ý.** Chỉ tiêu dưới 90% hoàn thành là "Dưới ngưỡng"; chưa có số là "Thiếu số liệu" (không
+  bao giờ tính là 0); kết quả ở hai mức xếp loại thấp nhất là "Xếp loại thấp" (giả định Q41).
+- **Nhân viên chuyển đơn vị hoặc nghỉ việc** được tính ở đơn vị họ thuộc vào ngày cuối kỳ (giả định Q43).
+- **Vận hành.** Tiến độ đăng ký KPI của chu kỳ, phiếu đánh giá của kỳ theo trạng thái và theo bước,
+  kết quả kỳ theo trạng thái và xếp loại, danh sách phiếu quá hạn (cùng cách tính với màn hình Duyệt &
+  đánh giá). Nút "Xuất báo cáo vận hành (Excel)" — khác với file lương của C&B.
+- **Trợ lý KPI (giả lập).** Tóm tắt đơn vị đang xem và trả lời khoảng 5 loại câu hỏi (điểm, cao nhất /
+  thấp nhất, so với kỳ trước, chỉ tiêu cần chú ý, phiếu quá hạn) — chỉ từ số liệu đang hiển thị trong
+  phạm vi người xem. Không phải đánh giá chính thức; không ảnh hưởng điểm.
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -266,7 +300,7 @@ flowchart LR
 | 5 | Số liệu không nguồn, không bằng chứng | Mỗi KPI có nguồn; mỗi số ghi rõ tay / Excel / API; bằng chứng đính kèm | Kiểm chứng được khi chấm | BR-KPI-05, 52 |
 | 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % hưởng lương KPI tính tự động; file lương xuất từ kết quả đã chốt; dashboard sống | Ban điều hành thấy ngay; C&B không chép số tay | BR-KPI-35, 40–46 |
 | 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch (ngày 1 hằng tháng) | Không quên kỳ nào | BR-KPI-19 (D5) |
-| 8 | Mỗi phòng tự gõ bộ KPI trong sheet riêng, tổng trọng số có bộ không đủ 100% | Thư viện chỉ tiêu mẫu và bộ mẫu dùng chung; trọng số lệch được cảnh báo | Cùng tên, cùng cách tính giữa các phòng | BR-KPI-74…76 |
+| 8 | Mỗi phòng tự gõ bộ KPI trong sheet riêng, tổng trọng số có bộ không đủ 100% | Thư viện chỉ tiêu mẫu và bộ mẫu dùng chung; trọng số lệch được cảnh báo | Cùng tên, cùng cách tính giữa các phòng | BR-KPI-74…80 |
 
 ## 6. Câu hỏi mở
 
@@ -300,6 +334,10 @@ trực tiếp đến quy trình:
 | Q37 | Đồng bộ API có ghi đè số người đã nhập (tay, Excel) không? | Không: bỏ qua và ghi nhật ký | HR |
 | Q38 | Kết quả nào được xuất sang lương, và xuất có khóa kết quả không? | Kết quả cá nhân đã chốt hoặc đã khóa; xuất không đổi trạng thái | Product owner + C&B |
 | Q39 | Kết quả đã chốt nhưng chưa có % hưởng lương KPI (chưa có quy tắc, chưa xếp loại): chặn xuất hay vẫn xuất? | Vẫn xuất, cột % để trống kèm ghi chú | C&B |
+| Q40 | Khối (không có kế hoạch riêng) hiện điểm gì? | "Chưa có kế hoạch" + điểm trung bình nhân viên đã chốt, không trọng số | Product owner + HR |
+| Q41 | Khi nào chỉ tiêu / kết quả "cần chú ý"? | Chỉ tiêu dưới 90% hoàn thành; kết quả ở hai mức xếp loại thấp nhất | HR |
+| Q42 | Dashboard so sánh với kỳ nào? | Kỳ liền trước cùng loại trong chu kỳ; thiếu số thì không so sánh | Product owner |
+| Q43 | Nhân viên chuyển đơn vị / nghỉ việc tính ở đơn vị nào? | Đơn vị họ thuộc vào ngày cuối của từng kỳ | Product owner (đã chốt 19/10/2026) |
 
 ## 7. Quyết định đã chốt
 
@@ -387,3 +425,12 @@ trực tiếp đến quy trình:
 - Thang xếp loại mẫu chỉ xem, chưa sửa trên màn hình cho tới khi có câu trả lời Q2; quy tắc quy đổi thì
   sửa được để thử.
 - Nhân viên chỉ thấy số của kết quả đã chốt.
+**19/10/2026 — Phase 3, dashboard và trợ lý (product owner duyệt).** Chi tiết: `business-rules.md` §11.
+
+- Dashboard một màn hình đi từ công ty xuống nhân viên; quản lý bắt đầu ở đơn vị mình. Nhân viên xem
+  "KPI của tôi" trong Kết quả của tôi.
+- Điểm hiển thị đúng như đã lưu; kết quả tạm tính có nhãn và không vào thống kê chính thức.
+- Khối chưa có kế hoạch riêng: hiện điểm trung bình nhân viên (Q40); ngưỡng cần chú ý 90% và hai mức
+  xếp loại thấp nhất (Q41); so với kỳ liền trước (Q42); người chuyển đơn vị tính theo từng kỳ (Q43).
+- Trợ lý KPI là bản giả lập, chỉ đọc số liệu đang hiển thị trong phạm vi người xem.
+

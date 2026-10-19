@@ -8,6 +8,7 @@ import { PeriodResultStatusBadge } from '@/components/shared/StatusBadge';
 import { PayoutValue, RatingValue, ScoreValue } from '@/components/results/ResultCells';
 import { ResultDetailDialog } from '@/components/results/ResultDetailDialog';
 import { ResultPeriodPicker } from '@/components/results/ResultPeriodPicker';
+import { MyKpiSummary } from '@/components/dashboard/MyKpiSummary';
 import { useResultPeriod } from '@/components/results/useResultPeriod';
 import { useSession } from '@/contexts/useSession';
 import type { CyclePeriod, Id } from '@/data/types';
@@ -23,7 +24,8 @@ interface MyRow extends ResultRow {
 }
 
 /**
- * "Kết quả của tôi" — WBS 4.6.4, Track T6 (every role with an employee record, BR-KPI-62). Only
+ * "Kết quả của tôi" — WBS 4.6.4, Track T6 (every role with an employee record, BR-KPI-62), with the
+ * "KPI của tôi" summary on top (WBS 4.7.2, Phase 3). Only
  * finalised results show figures: a Draft may still be adjusted by HR, so it reads "Đang tổng hợp"
  * and no provisional number reaches the page.
  */
@@ -126,6 +128,9 @@ function MyResults({ employeeId, name }: { employeeId: Id; name: string }) {
   return (
     <div className="space-y-4">
       <ResultPeriodPicker selection={selection} showPeriod={false} />
+      {results.data && selection.periods && plans.data && (
+        <MyKpiSummary results={results.data} periods={selection.periods} plans={plans.data} levels={levels.data ?? []} />
+      )}
       <DataTable
         label={`Kết quả của tôi, ${cycle.name}`}
         columns={columns}

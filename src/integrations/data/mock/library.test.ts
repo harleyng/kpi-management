@@ -4,7 +4,7 @@ import type { DataGateway, DomainEvent } from '../types';
 import { flush, newGateway, rejection } from './gateway.test-util';
 
 /**
- * The library's write rules in the mock (track T2, BR-KPI-74…76): what each save refuses, what it
+ * The library's write rules in the mock (track T2, BR-KPI-74…80): what each save refuses, what it
  * normalises, and that the seed — which predates the rules — still saves unchanged. The rules'
  * own edge cases are in `src/lib/libraryRules.test.ts`.
  */

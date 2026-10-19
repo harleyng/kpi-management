@@ -90,3 +90,31 @@ export async function readSheet(data: ArrayBuffer): Promise<unknown[][]> {
   }
   return matrix;
 }
+
+/** One sheet of a report: a header row, then the rows — numbers stay numbers, `null` is an empty cell. */
+export interface ReportSheet {
+  name: string;
+  columns: readonly { header: string; width?: number }[];
+  rows: readonly (readonly (string | number | null)[])[];
+}
+
+/**
+ * A plain report workbook (the dashboard's "Xuất báo cáo vận hành", WBS 4.7.3): one sheet per section,
+ * bold frozen header row. Sheet names are cut to Excel's 31 characters.
+ */
+export async function writeSheets(sheets: readonly ReportSheet[]): Promise<Blob> {
+  const wb = await newWorkbook();
+  wb.creator = 'Syntra KPI';
+  for (const spec of sheets) {
+    const sheet = wb.addWorksheet(spec.name.slice(0, 31), { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = spec.columns.map((c) => ({ header: c.header, width: c.width ?? 18 }));
+    const header = sheet.getRow(1);
+    header.font = { bold: true };
+    header.eachCell((cell) => {
+      cell.fill = HEADER_FILL;
+    });
+    for (const row of spec.rows) sheet.addRow([...row]);
+  }
+  const buffer = await wb.xlsx.writeBuffer();
+  return new Blob([buffer as ArrayBuffer], { type: XLSX_MIME });
+}

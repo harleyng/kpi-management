@@ -43,6 +43,7 @@ const BUILT: ReadonlySet<string> = new Set([
   '/admin/actuals', '/system/data-sources', // T4
   '/my/tasks', '/team/reviews', '/admin/launches', // T5
   '/my/results', '/admin/results', // T6
+  '/dashboard', // Phase 3
 ]);
 
 /**

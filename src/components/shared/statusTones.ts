@@ -146,3 +146,20 @@ export const DELEGATION_STATE_TONE: Readonly<Record<DelegationState, Tone>> = {
  */
 export const PLAN_ADJUSTING_LABEL = 'Đang điều chỉnh';
 export const PLAN_ADJUSTING_TONE: Tone = 'info';
+
+/**
+ * The dashboard's attention flags (BR-KPI-86, Phase 3) — derived from a stored achievement % or rating,
+ * never a status: a goal "Dưới ngưỡng" (below `AT_RISK_ACHIEVEMENT_PCT`) or "Thiếu số liệu" (no
+ * achievement — never a warning, never 0), and a result in one of the scale's lowest bands
+ * ("Xếp loại thấp"). The column that holds them is "Cần chú ý".
+ */
+export const ATTENTION_LABEL = {
+  BELOW_THRESHOLD: 'Dưới ngưỡng',
+  MISSING: 'Thiếu số liệu',
+  LOW_RATING: 'Xếp loại thấp',
+} as const;
+export const ATTENTION_TONE: Readonly<Record<keyof typeof ATTENTION_LABEL, Tone>> = {
+  BELOW_THRESHOLD: 'warning',
+  MISSING: 'muted',
+  LOW_RATING: 'warning',
+};

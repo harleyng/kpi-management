@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { MissingValue } from '@/components/shared/DataTable';
 import { ErrorState } from '@/components/shared/ErrorStateCard';
 import { PeriodResultStatusBadge } from '@/components/shared/StatusBadge';
-import { OWNER_TYPE_LABEL, type CyclePeriod, type RatingLevel } from '@/data/types';
+import { OWNER_TYPE_LABEL, type CyclePeriod, type GoalPlan, type RatingLevel } from '@/data/types';
 import { useResultBreakdown, useSetAdjustment } from '@/hooks/queries/results';
 import { errorSpecOf } from '@/lib/errorCatalog';
 import { isWeightComplete } from '@/lib/goalPlanRules';
@@ -25,6 +25,8 @@ interface ResultDetailDialogProps {
   canAdjust: boolean;
   /** Read by the scale's banner — "Thang mẫu" while the scale is an assumption (Q2). */
   scaleName?: string | null;
+  /** The result's plan, when the viewer may not be entitled to all of it (the dashboard): goal names then follow visibility. */
+  plan?: GoalPlan;
 }
 
 /**
@@ -32,9 +34,9 @@ interface ResultDetailDialogProps {
  * then the three parts of the score side by side — they are never summed on screen, because the 0
  * floor and the one-time rounding sit between them (`scoreRules.scoreBreakdown`).
  */
-export function ResultDetailDialog({ row, period, levels, onOpenChange, canAdjust, scaleName }: ResultDetailDialogProps) {
+export function ResultDetailDialog({ row, period, levels, onOpenChange, canAdjust, scaleName, plan }: ResultDetailDialogProps) {
   const result = row?.result ?? null;
-  const { view, query } = useResultBreakdown(result);
+  const { view, query } = useResultBreakdown(result, { plan });
   const phase = loadPhase(query, view !== undefined);
 
   return (
@@ -76,7 +78,9 @@ export function ResultDetailDialog({ row, period, levels, onOpenChange, canAdjus
                   <TableBody>
                     {view.lines.map((line) => (
                       <TableRow key={line.id}>
-                        <TableCell className="max-w-[18rem]">{line.goalName ?? <span className="text-muted-foreground">Chỉ tiêu không còn trong kế hoạch</span>}</TableCell>
+                        <TableCell className="max-w-[18rem]">
+                          {line.goalName ?? <span className="text-muted-foreground">{line.hidden ? 'Chỉ tiêu riêng tư — không thuộc phạm vi xem' : 'Chỉ tiêu không còn trong kế hoạch'}</span>}
+                        </TableCell>
                         <TableCell className="tabular text-right">{formatNumber(line.weight, 2)}</TableCell>
                         <TableCell className="text-right">
                           {line.achievementPct === null ? (

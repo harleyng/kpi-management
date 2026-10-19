@@ -16,7 +16,7 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
-> **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-74…76), enforced by
+> **Track T2 (2026-10-19)** added §3b — the KPI library's write rules (BR-KPI-74…80), enforced by
 > `src/lib/libraryRules.ts` in every `library.save*` of the mock.
 > **Track T7 (2026-10-19)** added §4b — notifications, files and the audit log — in
 > `src/lib/notificationRules.ts`, `src/lib/fileRules.ts` and `src/lib/auditRules.ts`.
@@ -28,6 +28,8 @@
 > framework), `actualImportRules.ts`, `actualEntryRules.ts`, and the sync / evidence rules in `actualRules.ts`.
 > **Track T6 (2026-10-19)** added the payroll export (BR-KPI-81, `src/lib/payrollRules.ts`, `ASSUMPTION
 > Q38`, `Q39`) and the result screens; the glossary below gained the result and pay terms.
+> **Phase 3 (2026-10-19)** added §11 — the live dashboard and the simulated assistant (BR-KPI-83…89,
+> `ASSUMPTION Q40`–`Q43`) — in `src/lib/dashboardRules.ts` and `src/integrations/insight/`.
 
 ---
 
@@ -581,7 +583,8 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 
 **Derived flags shown beside a status, never a status** (labels in `src/components/shared/statusTones.ts`):
 "Quá hạn" (`OVERDUE_LABEL`, a form past its step deadline — `workflowRules.isOverdue`) and
-"Đang điều chỉnh" (`PLAN_ADJUSTING_LABEL`, a Locked plan with an open GOAL_CHANGE form, BR-KPI-15).
+"Đang điều chỉnh" (`PLAN_ADJUSTING_LABEL`, a Locked plan with an open GOAL_CHANGE form, BR-KPI-15), and the
+dashboard's "Cần chú ý" flags (`ATTENTION_LABEL`): "Dưới ngưỡng", "Thiếu số liệu", "Xếp loại thấp" (BR-KPI-86).
 
 ## 6. Error catalogue
 
@@ -731,6 +734,10 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q37 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
 | Q38 | Which results may be exported to payroll, and does exporting lock them? | Employee results that are Final OR Locked; exporting changes no status (locking stays HR's separate act) | BR-KPI-43, 45 |
 | Q39 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-81 |
+| Q40 | A Khối (or any unit) has no plan of its own: what is its score? | None — "Chưa có kế hoạch". Beside it, the UNWEIGHTED mean of its people's official (Final / Locked) results, labelled "Điểm trung bình nhân viên (không trọng số)" with its n/m; `null`, never 0, when nobody counts. Never ranked against a plan score | BR-KPI-85 |
+| Q41 | When does a goal / a result "need attention"? | A goal below 90% achievement (exactly 90 is not; a fixed number, independent of the rating scale); a goal with no achievement is "Thiếu số liệu", never a warning. A result whose rating is one of the scale's two lowest bands (one on a scale of < 3) | BR-KPI-86 |
+| Q42 | What does the dashboard compare a period with? | The previous period of the same type in the same cycle — never an earlier one that happens to have data. Points, rounded once; "(tạm tính)" when a Draft is on either side; none for the first period | BR-KPI-87 |
+| Q43 | Under which unit does someone who moved (E021) or left (E024) count? | The unit they sat in on the period's last day (their last working day when earlier) — per period: earlier months under the old unit. Someone with no primary assignment then is "chưa xếp đơn vị", shown to a tenant-wide viewer only | BR-KPI-84 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 
@@ -847,4 +854,55 @@ lists the one exception: E040, whose manager was hired after them).
   for someone who has left (`EMPLOYEE_LEFT_IMPORT`); a new person's first assignment starts on the later
   of their hire date and today; a changed unit /
   position / manager is a transfer from that day; a `login` with no Active account creates one.
+
+## 11. Live dashboard and assistant (Phase 3, WBS 4.7.1–4.7.4)
+
+Screens: `/dashboard` — "Tổng quan" (4.7.1 executive + 4.7.2 manager, one drill-down) and "Vận hành"
+(4.7.3); "KPI của tôi" on `/my/results` (4.7.2 personal); "Trợ lý KPI · Giả lập" (4.7.4). Rules:
+`src/lib/dashboardRules.ts`; the assistant: `src/integrations/insight/`. *Source: NoteX minutes
+("dashboard sống"), plan §6.2, roadmap R9/R10 — the layout, thresholds, trend and assistant wording have
+no source and are Syntra decisions (`docs/source-map.md`).*
+
+- **BR-KPI-83 — Scope.** `/dashboard` needs `dashboard.view` (MANAGER over their unit + children, HR,
+  BOD, ADMIN tenant-wide; C&B and EMPLOYEE do not hold it). A unit is shown when the grant covers it
+  (the root unit = the Company resource); the view starts at the viewer's HIGHEST visible unit — a
+  manager's breadcrumb starts at their own unit, with no company above it. Every count (people, forms,
+  plans, results) is over subjects placed in a visible unit (BR-KPI-84). A goal name follows goal
+  visibility (BR-KPI-08): a PRIVATE goal the viewer may not see keeps its numbers but is "không thuộc
+  phạm vi xem", never named — on the dashboard, in T6's result dialog opened from it, and in the
+  assistant. "KPI của tôi" reads `result.view` / Self only.
+- **BR-KPI-84 — Stored figures, official counts.** A result's score, rating and % lương KPI are shown
+  AS STORED (never recomputed). A Draft is shown "Tạm tính" and never enters an official count — the
+  staff average (Q40), the rating distribution, "Nhân viên có kết quả". A person is placed, per period,
+  in the unit of their primary assignment on the period's last day (their last working day when
+  earlier — `resultRules.subjectAssignment`, the same as T6's screens and the payroll file; Q43), and
+  counts when they worked at least one day of the period and hold an Employee plan of the cycle.
+- **BR-KPI-85 — Unit score.** A unit's score is its OWN plan's result (the Company plan for the root,
+  the OrgUnit plan below). A unit without a plan (every Khối in the seed) shows "Chưa có kế hoạch" and
+  the staff average (Q40); a staff average is never called a unit score, never ranked against one
+  (best / worst consider units with their own scored plan only).
+- **BR-KPI-86 — Attention (Q41).** "Chỉ tiêu cần chú ý" lists the stored goal lines (`ResultDetail`) of
+  the unit's own result below `AT_RISK_ACHIEVEMENT_PCT` = 90 ("Dưới ngưỡng") or without an achievement
+  ("Thiếu số liệu"), worst first. "Xếp loại thấp" flags a result in the scale's two lowest bands — an
+  Employee Draft never flags. The BSC view groups the same lines by the goal's perspective (unknown →
+  "Chưa phân loại") through `scoreRules.weightedScore`: an average achievement and a weight share per
+  perspective — never parts of the total score.
+- **BR-KPI-87 — Difference and trend (Q42).** "Chênh lệch so với kỳ trước (điểm)" = current − previous
+  period of the same type and cycle, rounded once (`roundScore`); missing on either side → none (never
+  0); "(tạm tính)" when either side is a Draft. The trend draws the plan's stored score per month, a
+  Draft point hollow. An employee never sees a Draft point or a Draft side of a difference (BR-KPI-82).
+- **BR-KPI-88 — Operations report.** Per cycle: Employee Goal Plans by status (subjects placed today);
+  per period: evaluation forms by status and by current step, completion = Completed / not Cancelled,
+  results by status and the rating distribution of official Employee results. "Quá hạn" is T5's own
+  test (`formViewRules.stepTiming`) — a form past its current step's deadline, including one frozen by
+  AUTO_LOCK — so the dashboard and "Duyệt & đánh giá" always agree. "Xuất báo cáo vận hành (Excel)" writes
+  the same sections, one sheet each; disabled with its reason when there is nothing to export. It is a
+  report, not the payroll file (BR-KPI-81, `result.export`).
+- **BR-KPI-89 — The assistant is a simulation.** "Trợ lý KPI" answers from a `DashboardSnapshot` — the
+  figures of the unit in focus and its visible children, in the viewer's scope — and nothing else: it
+  never computes (every number it says is a snapshot field, `figureRefs`), never ranks a staff average,
+  and answers ~5 intents (unit score, best / worst, change, attention, overdue), refusing the rest by
+  listing them. Same snapshot → same words. A snapshot of another tenant, an empty or > 300-character
+  question → ERR-KPI-06. Labelled "Giả lập" wherever it speaks; nothing it says feeds a score. A real
+  model (out of P1) would get the same snapshot as its only context.
 

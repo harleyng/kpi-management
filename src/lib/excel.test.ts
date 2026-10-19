@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ACTUAL_IMPORT_SPEC } from './actualImportRules';
-import { readSheet, writeTemplate, XLSX_MIME } from './excel';
+import { readSheet, writeSheets, writeTemplate, XLSX_MIME } from './excel';
 import { parseSheet } from './importRules';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
@@ -60,5 +60,20 @@ describe('writeTemplate → readSheet → parseSheet round trip', () => {
 
   it('a file that is not a workbook throws (the screen shows FILE_UNREADABLE)', async () => {
     await expect(readSheet(new TextEncoder().encode('không phải excel').buffer as ArrayBuffer)).rejects.toThrow();
+  });
+});
+
+describe('writeSheets — a report workbook (dashboard export, WBS 4.7.3)', () => {
+  it('writes each sheet with its header row; numbers stay numbers, null stays empty', async () => {
+    const blob = await writeSheets([
+      { name: 'Đánh giá T02', columns: [{ header: 'Trạng thái' }, { header: 'Số phiếu' }], rows: [['Hoàn thành', 22], ['Quá hạn', null]] },
+      { name: 'Một tên sheet rất dài vượt quá ba mươi mốt ký tự', columns: [{ header: 'A' }], rows: [] },
+    ]);
+    expect(blob.type).toBe(XLSX_MIME);
+    const matrix = await readSheet(await blob.arrayBuffer());
+    expect(matrix[0]).toEqual(['Trạng thái', 'Số phiếu']);
+    expect(matrix[1]).toEqual(['Hoàn thành', 22]);
+    expect(matrix[2]?.[0]).toBe('Quá hạn');
+    expect(matrix[2]?.[1] ?? null).toBeNull();
   });
 });

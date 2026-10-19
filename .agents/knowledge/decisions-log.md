@@ -6,6 +6,38 @@
 
 ---
 
+## 2026-10-19 — Phase 3: one scoped drill-down, stored figures only, an assistant that only phrases a snapshot
+
+**Decision.** (product owner: tracks merged first; Q40–Q43 defaults; a thin deterministic assistant)
+`/dashboard` is ONE drill-down ("Tổng quan") rooted at the viewer's highest `dashboard.view` unit — the
+manager dashboard is the same screen scoped to their unit — plus "Vận hành"; the employee's view is
+"KPI của tôi" on `/my/results`. Stored results are shown as stored; a Draft is "Tạm tính" and never in an
+official count. A Khối shows "Chưa có kế hoạch" + an unweighted official staff average (Q40), never
+ranked against plan scores. Attention: goal < 90%, result in the scale's two lowest bands (Q41). Δ vs the
+previous period of the same type, rounded once (Q42). People are placed per period by
+`subjectAssignment` (Q43) and the scope is checked per UNIT, not via `coverage.employeeIds` (which is
+"as of today" and drops leavers). "Quá hạn" = T5's `stepTiming`. The `InsightGateway` takes a
+scope-filtered `DashboardSnapshot` and phrases it; its keys carry the snapshot digest. No contract or
+fixture change.
+
+**Why.** A Khối average presented as a "unit score" would rank people-averages against plan scores (cto /
+hr-performance-expert). Re-deriving a score on screen could disagree with T6's screens and the payroll
+file — the dashboard and the gate test read the stored rows. A person checked through today's employee
+coverage vanishes from every past month once they resign (system-architect). An assistant fed raw reads
+could cite a PRIVATE goal or another unit the viewer cannot see; fed only the snapshot, it cannot.
+T6's `useResultBreakdown` named every goal (fine for HR and the person); from the dashboard a manager or
+BOD would have seen PRIVATE goal names — it now takes `{ plan }` for visibility mode.
+
+**Consequence.** `src/lib/dashboardRules.ts` is the only place a dashboard number is derived; the seed gate
+(`mock/dashboard.seed.test.ts`) pins T02 company 106.07 Draft, departments' stored scores, Khối staff
+averages, T03 forms 20/6/1, plans 23/1/1/1/2, the T02 rating distribution A 3 · B 12 · C 2, E021 / E024
+/ E018 placement, the manager's scope and Demo Co isolation. The "Quá hạn" count includes a form frozen
+by AUTO_LOCK (E027), as T5's lists do — change both together if HR wants frozen forms apart.
+
+**Updated alongside.** `business-rules.md` §5 (derived flags), §8 (Q40–Q43), new §11 (BR-KPI-83…89);
+`docs/flows/new-flow.md` §1, new §4F, §6, §7; `architecture.md` (route table, `InsightGateway`, "Dashboard
+data", phases); `component-registry.md`; `docs/source-map.md`.
+
 ## 2026-10-19 — Phase 2 integration: tracks merged T1→T2→T7→T3→T4→T5→T6, ids renumbered, duplicate hooks folded
 
 **Decision.** All seven tracks are on `main` (each merge passed the Phase 4 gate; Playwright smoke green
@@ -81,7 +113,7 @@ login. "Đơn vị" alone read like "Đơn vị tính" on T2's screens.
 **Updated alongside.** `business-rules.md` §0, §8 (Q21, Q24), §10 (BR-KPI-71…73); `docs/flows/new-flow.md` §7.
 ## 2026-10-19 — Track T2: library write rules, export now, import on T4's framework
 
-**Decision.** The KPI library (WBS 4.2.1–4.2.4) enforces BR-KPI-74…76 through `src/lib/libraryRules.ts`,
+**Decision.** The KPI library (WBS 4.2.1–4.2.4) enforces BR-KPI-74…80 through `src/lib/libraryRules.ts`,
 called inside each `library.save*` of the mock — no contract or fixture change. Product-owner choices:
 1. **Export now, import later**: "Xuất Excel" (library, templates, code lists) ships; Library import waits
    for T4's shared framework (4.4.3) and the `LibraryImportRow` columns it needs (a contract change then);

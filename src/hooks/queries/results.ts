@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSession } from '@/contexts/useSession';
-import type { CyclePeriod, Id, PayoutRule, PeriodResult } from '@/data/types';
+import type { CyclePeriod, GoalPlan, Id, PayoutRule, PeriodResult } from '@/data/types';
 import { getDataGateway } from '@/integrations/data';
 import type { PeriodResultFilter, Upsert } from '@/integrations/data/types';
 import { KpiError } from '@/lib/errorCatalog';
 import { payrollPreview } from '@/lib/payrollRules';
-import { combineQueries } from '@/lib/queryState';
+import { combineQueries, type QueryState } from '@/lib/queryState';
 import { buildResultRows, statusCounts } from '@/lib/resultView';
 import { scoreBreakdown } from '@/lib/scoreRules';
 import { toastError } from '@/components/shared/toastError';
-import { useGoalPlans, useGoalRows } from './goals';
+import { useGoalPlans, useGoalRows, useGoals } from './goals';
 import { queryKey } from './keys';
 import { useAssignments, useEmployees, useOrgUnits } from './org';
 import { downloadFile } from './system';
@@ -95,6 +95,29 @@ export function usePeriodResults(filter: PeriodResultFilter, options: { enabled?
   });
 }
 
+/**
+ * The results of several periods (one query per period, under `periodResultsKey` — the same cache the
+ * results screens use). `data` only once every period has loaded: a trend drawn from half the months
+ * would show gaps that are not real.
+ */
+export function useResultsOfPeriods(periodIds: readonly Id[] | undefined) {
+  const { tenantId } = useSession();
+  return useQueries({
+    queries: (periodIds ?? []).map((periodId) => ({
+      queryKey: periodResultsKey(tenantId, { periodId }),
+      queryFn: () => getDataGateway().results.listPeriodResults(tenantId, { periodId }),
+    })),
+    combine: combineResults,
+  });
+}
+
+function combineResults(queries: UseQueryResult<PeriodResult[]>[]): { data: PeriodResult[] | undefined; query: QueryState } {
+  return {
+    data: queries.every((q) => q.data !== undefined) ? queries.flatMap((q) => q.data ?? []) : undefined,
+    query: combineQueries(queries),
+  };
+}
+
 export const resultDetailsKey = (tenantId: string, resultId: Id | null) => queryKey(tenantId, 'results', 'details', resultId);
 
 export function useResultDetails(resultId: Id | null) {
@@ -139,19 +162,30 @@ export function usePayrollPreview(periodId: Id | null, cycleId: Id | null) {
   return { preview, query };
 }
 
-/** One result's goal lines with their names, and how its score is made up (`scoreBreakdown`). */
-export function useResultBreakdown(result: PeriodResult | null) {
+/**
+ * One result's goal lines with their names, and how its score is made up (`scoreBreakdown`).
+ *
+ * Without `plan`, every goal is named — for a viewer entitled to the whole plan (the person themself,
+ * HR on the results screen). With `plan` (the dashboard, Phase 3), names follow goal visibility (D2,
+ * BR-KPI-08): a PRIVATE goal the viewer may not see keeps its numbers but is marked `hidden`, never named.
+ */
+export function useResultBreakdown(result: PeriodResult | null, options: { plan?: GoalPlan } = {}) {
   const details = useResultDetails(result?.id ?? null);
-  const goals = useGoalRows({ goalPlanIds: result ? [result.goalPlanId] : [] }, { enabled: result !== null });
-  const query = combineQueries([details, goals]);
+  const filter = { goalPlanIds: result ? [result.goalPlanId] : [] };
+  const scoped = options.plan !== undefined;
+  // Both read the same cached goal list (one fetch): the rows say a goal exists, `useGoals` whether it may be named.
+  const rows = useGoalRows(filter, { enabled: result !== null });
+  const visible = useGoals(filter, options.plan ? [options.plan] : undefined, { enabled: result !== null && scoped });
+  const query = combineQueries(scoped ? [details, rows, visible] : [details, rows]);
   const view = useMemo(() => {
-    if (!result || !details.data || !goals.data) return undefined;
-    const names = new Map(goals.data.map((g) => [g.id, g.name]));
+    if (!result || !details.data || !rows.data || (scoped && !visible.data)) return undefined;
+    const exists = new Set(rows.data.map((g) => g.id));
+    const names = new Map((scoped ? (visible.data?.goals ?? []) : rows.data).map((g) => [g.id, g.name]));
     return {
-      lines: details.data.map((d) => ({ ...d, goalName: names.get(d.goalId) ?? null })),
+      lines: details.data.map((d) => ({ ...d, goalName: names.get(d.goalId) ?? null, hidden: exists.has(d.goalId) && !names.has(d.goalId) })),
       breakdown: scoreBreakdown(result, details.data),
     };
-  }, [result, details.data, goals.data]);
+  }, [result, details.data, rows.data, visible.data, scoped]);
   return { view, query };
 }
 

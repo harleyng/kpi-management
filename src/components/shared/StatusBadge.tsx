@@ -30,6 +30,8 @@ import {
   type SyncRunStatus,
 } from '@/data/types';
 import {
+  ATTENTION_LABEL,
+  ATTENTION_TONE,
   CYCLE_STATUS_TONE,
   DELEGATION_STATE_TONE,
   EMPLOYMENT_STATUS_TONE,
@@ -169,4 +171,9 @@ export function DelegationStateBadge({ state }: { state: DelegationState }) {
 /** Beside a Locked plan's status while an adjustment form is open on it (BR-KPI-15). */
 export function PlanAdjustingBadge() {
   return <StatusBadge tone={PLAN_ADJUSTING_TONE}>{PLAN_ADJUSTING_LABEL}</StatusBadge>;
+}
+
+/** A dashboard attention flag (BR-KPI-86) — always with its words, never a coloured dot alone. */
+export function AttentionBadge({ kind }: { kind: keyof typeof ATTENTION_LABEL }) {
+  return <StatusBadge tone={ATTENTION_TONE[kind]}>{ATTENTION_LABEL[kind]}</StatusBadge>;
 }

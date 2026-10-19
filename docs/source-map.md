@@ -87,7 +87,7 @@ is **locked and cannot be edited**). Feeds BR-KPI-12, BR-KPI-13 and the notifica
 
 None of the CMC guides describes a library screen; the nearest references are HR guide p. 22 (the BSC
 goal type) and pp. 61–63 (the import template the library export's column order anticipates). The
-library's write rules BR-KPI-74…76 are therefore **Syntra decisions** (product owner, 2026-10-19), on
+library's write rules BR-KPI-74…80 are therefore **Syntra decisions** (product owner, 2026-10-19), on
 `ASSUMPTION Q25`–`Q28`; the catalogue itself comes from the DATX sheet above.
 
 ### DATX KPI guide 2023 (slides)
@@ -110,3 +110,5 @@ and positions, accounts, role guard rails) or tenant management. Every rule in `
 |---|---|---|
 | The payroll hand-off (T6) — the file's columns, who exports, when (before or after lock) | Only ERD `PAYROLL_EXPORT` (the export log: period, file, who, when). DATX "TH KQ" lists result columns but no hand-off; CMC, SF4C, the email template and the minutes say nothing | BR-KPI-45 — a Syntra decision; `ASSUMPTION Q38`, `Q39` |
 | What an employee sees of a result before HR finalises it | Nothing | BR-KPI-82 — a Syntra decision |
+| The live dashboard (Phase 3) — its layout, drill-down, unit score without a plan, attention thresholds, trend, operations report | NoteX minutes ask for a "dashboard sống" with KPI changes daily (§2.3); plan §6.2 / §7.1 name the screen and its roles; roadmap R9 ("drill-down công ty → cá nhân; số khớp dữ liệu"), R10 ("tóm tắt và cảnh báo KPI lệch trong phạm vi quyền"). The CMC HR guide pp. 7–8 shows a calibration bell curve (not adopted in P1) | BR-KPI-83…88, `ASSUMPTION Q40`–`Q43` — Syntra decisions |
+| The AI assistant (WBS 4.7.4) | Roadmap R10 / WBS 6.2.4 only ("tóm tắt, giải thích biến động, hỏi đáp số liệu — prototype: giả lập") | BR-KPI-89 — a simulation, a Syntra decision |

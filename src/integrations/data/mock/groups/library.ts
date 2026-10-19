@@ -20,7 +20,7 @@ import { REVERSE_REFS, valuesAt } from '../schema';
 import type { Row, Tx } from '../store';
 
 /**
- * G2 · Thư viện KPI (T2). Every save runs `libraryRules` (BR-KPI-74…76) on what it is about to
+ * G2 · Thư viện KPI (T2). Every save runs `libraryRules` (BR-KPI-74…80) on what it is about to
  * write, inside the transaction, so a refusal rolls the whole save back. The checks that read OTHER
  * tables (codes of the catalogue, rows that use a unit or method, Active templates holding a KPI)
  * become an RPC or a trigger in Phase 5 — the rule functions stay the same.

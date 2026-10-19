@@ -94,10 +94,10 @@ who holds every permission and sees all five groups.
 | `/` | → redirects to `/my/kpi` | — | — |
 | `/my/kpi` | KPI của tôi — **built (T3)**: the own plan's workspace, `?cycle=`, `?goal=&mode=` | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/tasks` | Việc cần xử lý — tabs Cần xử lý · Phiếu của tôi · Ủy quyền (`?tab=`) | Của tôi · — (all) | 4.5.5 (T5) |
-| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-82) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
+| `/my/results` | Kết quả của tôi — **built (T6)**: own results by cycle, figures only once finalised (BR-KPI-82); "KPI của tôi" on top (Phase 3) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 (Phase 3) |
 | `/team/kpi` | KPI đội nhóm — **built (T3)**: reports' plans (default tab), unit plan + cascade (`?tab=unit`), `?plan=` | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` (MANAGER) | 4.5.2–4.5.4 (T5) |
-| `/dashboard` | Dashboard | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 (Phase 3) |
+| `/dashboard` | Dashboard — **built (Phase 3)**: tabs `?tab=` tong-quan · van-hanh; `?cycle=&period=&unit=` (drill-down, Back returns up) | Điều hành · `dashboard.view` (BOD, MANAGER, HR; scope-sensitive) | 4.7.1–4.7.4 (Phase 3) |
 | `/admin/cycles` | Chu kỳ — **built (T3)**: cycles, periods, the cycle's plans with lock / unlock / history, `?cycle=&plan=` | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
 | `/admin/library` | Thư viện KPI — tabs `?tab=` chi-tieu · danh-muc · phuong-phap; filters `q`, `vc`, `tt` in the URL | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 export (T2, built) |
 | `/admin/templates` | Bộ mẫu — master/detail, selection `?bo=<id>` (`moi` = new), filters `q`, `ad` | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.4 (T2, built) |
@@ -284,8 +284,29 @@ permission check of every write (above).
 
 ### AI assistant — `InsightGateway`
 
-`src/integrations/insight/` — same pattern, one deterministic mock, every method takes `tenantId`
-(Phase 3, WBS 4.7.4).
+`src/integrations/insight/` — the same boundary as the data gateway: `getInsightGateway()` (only
+`src/hooks/queries/insight.ts` calls it), one deterministic mock, `tenantId` first on every method
+(Phase 3, WBS 4.7.4, BR-KPI-89).
+
+- **Snapshot in, sentences out.** `summarise / explain / ask(tenantId, snapshot, …)` receive a
+  `DashboardSnapshot` (`src/lib/dashboardRules.ts`, plain JSON): the figures of the unit in focus and its
+  visible children, already in the viewer's scope. The assistant reads nothing else, so it can never
+  cite what the viewer may not see; it phrases snapshot fields through templates (`figureRefs` name
+  them) and never computes. A snapshot of another tenant → ERR-KPI-06. A real model adapter (Phase 5+)
+  would receive the same snapshot, serialised, as its only context.
+- **Caching.** Keys are `[tenantId, 'insight', kind, snapshotDigest, nodeId]`; the `insight` KEY_ROOT
+  depends on no entity — new numbers are a new digest, so an answer never outlives its figures.
+
+### Dashboard data (Phase 3)
+
+`src/hooks/queries/dashboard.ts` composes the hooks other screens use (same keys, one cache):
+results of every period of the cycle (`useResultsOfPeriods`, one query per period), the cycle's plans,
+units, employees (resigned included), assignments, rating levels; forms for the operations tab
+(`useFormList`, all pages); goal lines on demand for the unit in focus (`useResultLines`: details +
+`useGoalRows` for numbers + `useGoals` for names). `src/lib/dashboardRules.ts` turns them into the model
+(`buildDashboard`, `operationsReport`, `dashboardSnapshot`); any failed read is an error with retry, never
+zeros. No `DataGateway` method or fixture changed. The URL state (`?cycle=&period=&unit=`) lives in
+`src/components/dashboard/useDashboardSelection.ts`.
 
 ### Fixtures strategy
 
@@ -334,8 +355,8 @@ delta Phase 5 applies when it writes the SQL schema.
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed (**done 2026-10-19**, rules wired at Gate 1) · **1.3** session
 + permissions (**done 2026-10-19**) · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (**done 2026-10-19**) →
-**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel (T1 and T2 built 2026-10-19 and merged; the rest are being merged in order), each in its own git worktree, merged T1 → T2 → T7 → T3
-→ T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
+**Gate 1 passed 2026-10-19** (fixtures frozen) → **Phase 2** tracks T1–T7 in parallel (all seven built and merged 2026-10-19), each in its own git worktree, merged T1 → T2 → T7 → T3
+→ T4 → T5 → T6 (all merged 2026-10-19) → **Phase 3** dashboard & AI (built 2026-10-19) → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 
 ---
 

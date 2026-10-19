@@ -93,3 +93,13 @@ describe('formTone', () => {
     expect(formTone('Cancelled', true)).toBe('muted');
   });
 });
+
+describe('dashboard attention flags (BR-KPI-86)', () => {
+  it('each flag has its words and a tone; a missing figure is muted, never a warning', async () => {
+    const { ATTENTION_LABEL, ATTENTION_TONE } = await import('./statusTones');
+    expect(Object.keys(ATTENTION_TONE).sort()).toEqual(Object.keys(ATTENTION_LABEL).sort());
+    expect(ATTENTION_TONE.MISSING).toBe('muted');
+    expect(ATTENTION_LABEL.BELOW_THRESHOLD).toBe('Dưới ngưỡng');
+  });
+});
+
