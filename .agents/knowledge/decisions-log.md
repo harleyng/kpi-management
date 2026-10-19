@@ -6,6 +6,138 @@
 
 ---
 
+## 2026-10-19 — Phase 1.1: the DataGateway contract is fixed (gate passed with changes)
+
+**Decision.** `src/integrations/data/types.ts` is the contract for Phase 1.2 and the seven tracks. Every
+method takes `tenantId` first; every id in a write payload must resolve in that tenant (ERR-KPI-06);
+user writes take `actorUserId` second; system writes (notification, audit) are made only by T7 listeners
+and the audit entry is built from the event. One injected `clock` stamps everything (`dev.setNow` moves
+it); `scheduler.runDue(tenantId)` is idempotent. Aggregate children are matched by id; aggregate saves
+return `{ parent, children }`. Forms, notifications and the audit log are paginated. Every write emits
+`entity.changed`. The stub mock rejects with `KpiError` until 1.2; React Query retries only ERR-KPI-01/03.
+
+**Why.** The reviewers (system-architect, cto, workflow-expert) found silent wrong-number failures:
+with two clocks, a launch fired on a simulated 1 Feb plus an `act` stamped with the real date would mark
+the manager's step overdue and auto-forward it; replacing a workflow's steps regenerated their ids and
+orphaned every open form's `currentStepId`; a cross-tenant `perspectiveId` was writable. Each is a
+signature change, cheap now and a Large change after Gate 1.
+
+**Updated alongside.** `architecture.md` (Data layer, ERD deviations), `business-rules.md` §5–§7,
+`hooks/queries/README.md`, `errorCatalog.ts` (02–06, `isRetryable`).
+
+---
+
+## 2026-10-19 — GOAL_CHANGE keeps the plan Locked; the proposal lives in GoalChangeItem rows
+
+**Decision.** An adjustment is a form started by hand (`forms.startForm`), at most one open per plan.
+Its proposal is `GoalChangeItem` rows (ADD/MODIFY/CANCEL + reason + proposed fields). The plan stays
+`Locked`; the final APPROVE applies the items: MODIFY creates a new Active goal with `replacesGoalId`
+(old → Changed), CANCEL → Cancelled, ADD creates. "Đang điều chỉnh" is derived, not a status.
+
+**Why.** Editing a locked plan in place would let the open evaluation read unapproved targets and lose
+BR-KPI-15's Active → Changed history; a sixth "Adjusting" plan status would have to be honoured by every
+screen that reads plan status.
+
+**Updated alongside.** `business-rules.md` BR-KPI-15, §5; `architecture.md` D7; `new-flow.md` §3.
+
+---
+
+## 2026-10-19 — Overdue LOCK freezes the form; unlocking needs a new due date; overdue fires once per step entry
+
+**Decision.** An overdue LOCK records `AUTO_LOCK` (no actor) and leaves the form at its step, frozen.
+`unlockGoalPlan` takes a reason and a `newDueDate` and re-enters the step. `FormInstance.overdueHandledAt`
+makes REMIND/LOCK/AUTO_FORWARD fire once per entry into a step. EDIT is a step permission, never a
+recorded action (BR-KPI-23). RETURN goes to `returnToStepNo` (default: previous step). Delegations are
+revoked, never deleted. Step deadline = min(entered + SLA, form due date).
+
+**Why.** Without a new due date the next scheduler tick re-locked a plan HR had just unlocked; without
+a once-per-entry marker REMIND fired on every tick; deleting a delegation left past actions pointing at
+nothing.
+
+**Updated alongside.** `business-rules.md` BR-KPI-13, 21, 23, §5.
+
+---
+
+## 2026-10-19 — D7: fields the P1 screens need that the ERD lacks; D8: English enum codes
+
+**Decision.** D7 adds the columns listed in `architecture.md` (ERD deviations) — e.g. `Goal.targetType`
+(HR guide p. 23), `Goal.rollUpFromChildren` (Q8), `Employee.leftOn` (left mid-period), `Notification`
+stores its rendered text — plus `GoalChangeItem`, Goal Plan `Returned`, step actions `CANCEL`/`AUTO_LOCK`,
+overdue `LOCK`, notification `STEP_ASSIGNED`; `KPI_ALERT` waits for Phase 3. `GOAL_PLAN.total_weight`
+is not stored. D8: the ERD's Vietnamese enum values become English codes; Vietnamese lives only in the
+`*_LABEL` maps. `Notification` is typed `KpiNotification` (the DOM has a global `Notification`).
+
+**Why.** Each D7 field is read by a P1 screen or rule (plan §5) and would otherwise become a fixture
+change after Gate 1. Codes like `PhongBan` mixed two languages in code and made the label the key.
+
+**Updated alongside.** `architecture.md` (ERD deviations), `business-rules.md` §5.
+
+---
+
+## 2026-10-19 — D6 applied: `canSubmit` is a rule driven by the step's configuration
+
+**Decision.** No table. `WorkflowStep.evaluationColumn` (SELF/MANAGER/FINAL) and `requiresComment` tell
+`formRules.canSubmit()` (Phase 1.5) which column — and comment — every item needs before SUBMIT/APPROVE;
+`EvaluationItem.finalComment` exists so a FINAL step can require one.
+
+**Why.** Hard-coding "self step = self column" in the rule would break the first time HR configures a
+workflow differently; a FINAL step requiring a comment had no column to hold it.
+
+**Updated alongside.** `business-rules.md` BR-KPI-18, §5.
+
+---
+
+## 2026-10-19 — D5 applied: `FormLaunch` + `FormLaunchRule` in P1
+
+**Decision.** `FormLaunch` (timing NOW/SCHEDULED/RECURRING, period, `dueDays`, recipients ALL or a
+`RecipientFilter`) creates many forms; recipients resolve when it fires; subjects with a non-cancelled
+form of the same type and period/cycle are skipped. `FormLaunchRule` (trigger `PERIOD_END` +
+`offsetDays`) fires once per (rule, period). A registration launch creates missing Draft Employee plans.
+
+**Why.** The monthly evaluation must launch itself (HR guide pp. 89–93); resolving recipients at
+scheduling time would miss people hired between scheduling and the launch.
+
+**Updated alongside.** `business-rules.md` BR-KPI-19, §5.
+
+---
+
+## 2026-10-19 — D4 applied: `Goal.kriType` stored and hidden
+
+**Decision.** `KRI_TYPES = KRItc | KRIpt`, nullable on `Goal`, beside (not instead of) the BSC
+perspective; no screen shows it until Q6 is answered.
+
+**Why.** HR guide p. 22 pairs KRItc only with Tài chính and KRIpt with all four perspectives — a second
+axis, not a replacement — but nobody at Syntra has confirmed what it means.
+
+**Updated alongside.** `business-rules.md` BR-KPI-06, §5.
+
+---
+
+## 2026-10-19 — D3 applied: allocation on the alignment, "Tự giao" on the goal, "chưa giao" derived
+
+**Decision.** `GoalAlignment.allocatedValue` (CASCADE) and `Goal.selfAssignedValue` ("Tự giao") are
+stored; "chưa giao" = target − Σ allocated − self-assigned is derived by `alignmentRules`; "tự thực hiện"
+is not tracked in P1 (new `ASSUMPTION Q11`).
+
+**Why.** HR guide p. 24 has the manager enter a self-kept share separately from what is handed down;
+storing "chưa giao" would let it disagree with the allocations.
+
+**Updated alongside.** `business-rules.md` BR-KPI-07, §8 (Q11).
+
+---
+
+## 2026-10-19 — D1, D2 applied: per-goal target levels and goal visibility
+
+**Decision.** D1: `GoalTargetLevel` (L1/L2/L3, numeric or text target, `scorePct`) per assigned goal,
+plus the `LEVELS` calc method; interpolation stays `ASSUMPTION Q1`. D2: `Goal.visibility` PUBLIC/PRIVATE.
+
+**Why.** The levels are set when a goal is assigned (HR guide pp. 23, 28) — putting them on the shared
+calc method would force one threshold set on every goal using it.
+
+**Updated alongside.** `business-rules.md` BR-KPI-08, 09, 30, §5.
+
+---
+
 ## 2026-10-19 — UI design judgement follows impeccable (Operate mode) + Anthropic frontend-design
 
 **Decision.** The `ui-ux` agent works from `.agents/skills/ui-ux-designer/reference/` — condensed,

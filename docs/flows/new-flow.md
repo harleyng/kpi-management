@@ -57,6 +57,13 @@ sequenceDiagram
 Goal Plan đã khóa chỉ thay đổi được qua phiếu điều chỉnh: người đề xuất → quản lý trực tiếp duyệt → HR
 ghi nhận và khóa lại. Chỉ tiêu bị đổi hoặc hủy giữ lịch sử (Đang áp dụng → Đã thay đổi / Đã hủy).
 
+- Người đề xuất **tự mở** phiếu điều chỉnh (không cần HR khởi chạy); mỗi Goal Plan chỉ có **một** phiếu
+  điều chỉnh đang mở.
+- Phiếu ghi **danh sách đề xuất**: thêm / sửa / hủy chỉ tiêu, mỗi dòng kèm lý do. Trong lúc phiếu đang
+  chạy, Goal Plan **vẫn khóa** và số liệu, đánh giá vẫn tính theo chỉ tiêu cũ.
+- Chỉ khi bước cuối duyệt, hệ thống mới áp dụng: chỉ tiêu sửa sinh bản mới (bản cũ chuyển "Đã thay đổi"
+  và vẫn tra lại được), chỉ tiêu hủy chuyển "Đã hủy".
+
 ## 4. Quy trình 3 — Đánh giá KPI tháng (KPI_EVAL)
 
 ```mermaid
@@ -76,6 +83,9 @@ sequenceDiagram
 
 - Số **thực tế** trên phiếu lấy từ dữ liệu đã nhập (tay, Excel, API) và **chỉ đọc**.
 - Phiếu chỉ gửi được khi mọi chỉ tiêu ở bước hiện tại đã có điểm (và nhận xét nếu bắt buộc).
+- Quá hạn chỉ xử lý **một lần mỗi bước**: nhắc hạn không lặp lại liên tục. Nếu bước được cấu hình
+  **khóa** khi quá hạn, phiếu dừng tại bước đó; HR mở khóa Goal Plan phải nhập **hạn mới**, bước chạy lại
+  từ lúc mở khóa.
 - Thao tác thay (HR làm thay) và ủy quyền đều ghi nhận **cả hai người**.
 
 ## 5. Khác biệt so với hiện tại

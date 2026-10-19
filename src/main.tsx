@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary';
 import { SessionProvider } from '@/contexts/SessionContext';
+import { isRetryable } from '@/lib/errorCatalog';
 import App from './App.tsx';
 import './index.css';
 
@@ -12,7 +13,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60 * 1000,
-      retry: 1,
+      // One retry, and only for failures that could pass on a second try (not ERR-KPI-02/04/05/06).
+      retry: (failureCount, error) => failureCount < 1 && isRetryable(error),
       refetchOnWindowFocus: false,
     },
   },

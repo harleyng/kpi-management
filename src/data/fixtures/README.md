@@ -23,3 +23,8 @@ fixtures are frozen: a track that needs a fixture or the `DataGateway` contract 
   forms at every step including an overdue one and a finalised one, three months of actuals with
   manual, Excel and "API" rows.
 - Values that depend on an open question are marked `// ASSUMPTION Qn` (plan §9).
+- Fixtures must satisfy the contract's own invariants (`src/integrations/data/types.ts` header): every
+  id a row points at exists **in the same tenant**; derived values (total weight, "chưa giao") are never
+  seeded; a form's `currentStepId` belongs to its workflow; an auto-locked form has `overdueHandledAt`;
+  delegations are revoked, not missing; at least one GOAL_CHANGE form with `GoalChangeItem`s, one
+  delegation and one staged import batch with row errors exist for Syntra.

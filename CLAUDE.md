@@ -76,8 +76,10 @@ npm run analyze        # Bundle-size report at dist/bundle-analysis.html
    `business-rules.md` together.
 3. **Every data access goes through `getDataGateway()`** — no component, page or hook imports
    `mockGateway` or `supabaseGateway`.
-4. **Every gateway function takes `tenantId` and filters by it.** Never read across tenants. The
-   tenant-isolation tests (tenant B must never see tenant A) are what stands in for RLS.
+4. **Every gateway function takes `tenantId` and filters by it** — and every id inside a write payload
+   must belong to that tenant. Never read or reference across tenants. The tenant-isolation tests
+   (reads and writes) are what stands in for RLS. Writes take `actorUserId` second; time comes from
+   the gateway's `clock`, never `new Date()`.
 5. **Every calculation lives ONLY in `src/lib/*Rules.ts`** — achievement %, weighted score,
    roll-up, rating, payout %. Pure functions with tests. Never compute in JSX, a hook or the mock.
 6. **Error copy comes from `src/lib/errorCatalog.ts`** (ERR-KPI-01…); never retype the strings.

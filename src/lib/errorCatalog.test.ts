@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ERROR_CATALOG, KpiError, errorSpecOf, type ErrorCode } from './errorCatalog';
+import { ERROR_CATALOG, KpiError, errorSpecOf, isRetryable, type ErrorCode } from './errorCatalog';
 
 describe('ERROR_CATALOG', () => {
   const entries = Object.entries(ERROR_CATALOG) as [ErrorCode, (typeof ERROR_CATALOG)[ErrorCode]][];
@@ -44,5 +44,19 @@ describe('KpiError / errorSpecOf', () => {
   it('falls back to ERR-KPI-01 for an unknown thrown value', () => {
     expect(errorSpecOf(new Error('boom'))).toBe(ERROR_CATALOG['ERR-KPI-01']);
     expect(errorSpecOf('a string')).toBe(ERROR_CATALOG['ERR-KPI-01']);
+  });
+});
+
+describe('isRetryable', () => {
+  it('retries a failed read or write and an uncoded error', () => {
+    expect(isRetryable(new KpiError('ERR-KPI-01'))).toBe(true);
+    expect(isRetryable(new KpiError('ERR-KPI-03'))).toBe(true);
+    expect(isRetryable(new Error('network'))).toBe(true);
+  });
+
+  it('does not retry answers that will not change: not found, wrong state, not entitled, invalid', () => {
+    for (const code of ['ERR-KPI-02', 'ERR-KPI-04', 'ERR-KPI-05', 'ERR-KPI-06'] as const) {
+      expect(isRetryable(new KpiError(code))).toBe(false);
+    }
   });
 });

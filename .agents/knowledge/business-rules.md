@@ -5,8 +5,9 @@
 > page numbers). A value that depends on an open question (plan §9) is marked **`ASSUMPTION Qn`** and
 > uses the plan's default until the question is answered.
 >
-> Status on 2026-10-19 (Phase 0): the rules below are **specified, not implemented**. They are
-> implemented in Phase 1.5 (`src/lib/*Rules.ts`) and the state sets in Phase 1.1 (`src/data/types.ts`).
+> Status on 2026-10-19 (Phase 1.1 done): the **state sets are declared** in `src/data/types.ts` and the
+> data contract in `src/integrations/data/types.ts`. The rules are still **specified, not implemented**
+> — they are implemented in Phase 1.5 (`src/lib/*Rules.ts`).
 
 ---
 
@@ -52,14 +53,16 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   "2. KPIs phòng ban".*
 - **BR-KPI-07** — Goals are joined by **cascade** (parent goal allocated down, `allocatedValue`) or
   **link** (child contributes to a parent, `contributionPct`). A goal can never be its own ancestor (no
-  cycles, A → B → A refused). For a cascaded goal the manager sees **assigned to employees / self-held /
-  not yet assigned / self-performed**; "not yet assigned" = parent target − Σ allocated values, always
-  derived, never stored (D3). Allocating more than the parent target is refused. *Source: HR guide p. 24;
-  email template steps 1–2.*
+  cycles, A → B → A refused). For a cascaded goal the manager sees four buckets (D3): **assigned to
+  employees** = Σ `allocatedValue` (derived); **self-assigned / tự giao** = the parent's
+  `selfAssignedValue` (stored); **not yet assigned** = parent target − assigned − self-assigned (derived,
+  never stored); **self-performed / tự thực hiện** is not tracked in P1 (`ASSUMPTION Q11`). Allocating
+  more than the parent target is refused. *Source: HR guide p. 24; email template steps 1–2.*
 - **BR-KPI-08** — A goal is **public or private** (visibility, D2). *Source: HR guide pp. 21–22.*
-- **BR-KPI-09** — A goal may carry **target levels L1/L2/L3**, set per assigned goal (not per method),
-  each with a score (e.g. reaching L1 → 0%, L2 → 100%) and an optional text rule (D1, proposed —
-  confirmed in Phase 1.1). *Source: HR guide pp. 23, 28; import columns P–T p. 63.*
+- **BR-KPI-09** — A goal may carry **target levels L1/L2/L3** (`GoalTargetLevel`), set per assigned goal
+  (not per method). Each level has a numeric or text target (per the goal's `targetType`) and the score
+  earned for reaching it, e.g. L1 → 0%, L2 → 100% ("Nguyên tắc đánh giá") (D1). *Source: HR guide
+  pp. 23, 28; import columns P–T p. 63.*
 - **BR-KPI-10** — A goal's target is either **numeric** or **text** (Đạt / Không đạt). *Source: HR guide p. 23.*
 - **BR-KPI-11** — A goal's target may be **allocated by period** (monthly/quarterly targets). *Source: DATX
   column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
@@ -77,14 +80,21 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-13** — When a step's deadline passes, the step's **overdue behaviour** applies, and it is
   configured per step: **lock** the Goal Plan (registration: "the goal plan will be locked and can not be
   editable after running out of time"), **auto-forward** to the next actor (evaluation: an employee who
-  has not self-assessed in time → the form goes to the direct manager), or **remind**. An auto-forward is
-  recorded as an `AUTO_FORWARD` action. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
+  has not self-assessed in time → the form goes to the direct manager), or **remind**. The step's
+  deadline = min(entered + `slaDays`, the form's due date), in the tenant's time zone. The behaviour
+  applies **once per entry into the step** (`overdueHandledAt`) and is recorded as an `AUTO_FORWARD` or
+  `AUTO_LOCK` action with no actor. An auto-locked form stays at its step, frozen; HR unlocking the plan
+  must give a **new due date**, and the step starts again from the unlock. A step may also send a
+  reminder `remindDaysBefore` its deadline. *Source: email template "Email nhắc Deadline"; SF4C PMGM.09.*
 - **BR-KPI-14** — HR can **lock and unlock** a Goal Plan; every lock/unlock is kept in its history. A
   locked plan cannot be edited except through the adjustment process. *Source: HR guide pp. 47–49;
   SF4C PMGM.03, PMGM.06.*
 - **BR-KPI-15** — **Adjustment** (GOAL_CHANGE) changes an approved, locked Goal Plan through its own
-  approval chain; the changed goals keep their history (`GOAL.status` Active → Changed / Cancelled).
-  *Source: SF4C PMGM.06–07; Manager guide.*
+  approval chain. It is started by hand (`forms.startForm`), at most one open per plan. The proposal is a
+  list of `GoalChangeItem`s (ADD / MODIFY / CANCEL, each with a reason); the plan **stays Locked** and
+  untouched until the final approval, then: MODIFY creates a new Active goal that `replacesGoalId` the old
+  one (→ Changed), CANCEL marks the goal Cancelled, ADD creates a goal. "Đang điều chỉnh" is derived from
+  the open form, never a plan status. *Source: SF4C PMGM.06–07; Manager guide.*
 - **BR-KPI-16** — **Evaluation runs in three steps**: (1) the employee self-assesses each goal (% and
   explanation) with evidence; (2) the direct manager scores each goal (% and comment); (3) HR/C&B records
   the final % per goal. *Source: NoteX minutes §2.3; Manager guide pp. 98–109; SF4C PMGM.12.*
@@ -96,17 +106,29 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   Manager guide p. 26.*
 - **BR-KPI-19** — Forms are created by a **launch**: form type and workflow template; timing — now, on a
   date, or recurring (e.g. day 1 of each month); the evaluation period; a due date rule (e.g. 7 days
-  after launch); recipients — everyone, by org unit, or by filter. One launch creates many forms. The
-  recurring launch (`FORM_LAUNCH_RULE`) moves from P2 into P1 because the monthly evaluation must launch
-  itself (D5). *Source: HR guide pp. 89–93.*
+  after launch); recipients — everyone, or a filter (units ± children, positions, job levels, employment
+  status, named people). One launch creates many forms; recipients are resolved when it fires, and a
+  subject who already has a non-cancelled form of the same type for the same period (or cycle, for
+  registration) is skipped. A registration launch creates the subject's Draft Employee plan when there is
+  none; Company and OrgUnit plans are registered by a form started by hand for the unit head. The
+  recurring launch (`FORM_LAUNCH_RULE`, trigger `PERIOD_END` + `offsetDays` ≥ 0) moves from P2 into P1
+  because the monthly evaluation must launch itself, and fires once per (rule, period) (D5). *Source:
+  HR guide pp. 89–93.*
 - **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
   ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
   is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
   pp. 150–155.*
 - **BR-KPI-21** — An action taken **as proxy or under delegation** records both the person who acted
-  and the person acted for. A delegation is valid only for its form type and between `validFrom` and
-  `validTo`; it stops granting the right the moment it expires. *Source: ERD `FORM_STEP_ACTION`,
-  `DELEGATION`; plan §8.1.*
+  and the person acted for (and the delegation used). A delegation is valid only for its form type,
+  between `validFrom` and `validTo`, and until it is revoked; it stops granting the right the moment it
+  expires. Delegations are revoked, never deleted. Validity is checked against the gateway clock.
+  *Source: ERD `FORM_STEP_ACTION`, `DELEGATION`; plan §8.1.*
+- **BR-KPI-23** — On a form, **EDIT is a permission, not an action**: it lets the step's actor change the
+  subject's plan or scores; those edits are audited, and the form does not move. Only SUBMIT, APPROVE,
+  RETURN and CANCEL are recorded by a person; RETURN goes to the step's `returnToStepNo` (default the
+  previous step). CANCEL is HR/ADMIN only, with a reason; cancelling a registration form puts its plan
+  back to Draft. An action names the step the screen showed — if the form has moved on, it is refused
+  (ERR-KPI-04). *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
@@ -146,28 +168,60 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
 - **BR-KPI-43** — Results move **Draft → Final → Locked**; only finalised results are exported to
   payroll, and the export is recorded. *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
 
-## 5. State sets (proposed — declared in `src/data/types.ts` in Phase 1.1)
+## 5. State sets (declared in `src/data/types.ts`, Phase 1.1)
 
-Every status in the app comes from one of these sets. Labels are Vietnamese.
+Every status in the app comes from one of these sets; each has a Vietnamese `*_LABEL` map beside it
+and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 
 | Set | Values | Source |
 |---|---|---|
+| Record (master data) | Active · Inactive | ERD `status` of org unit, position, account, scale, connection |
 | Tenant | Active · Suspended | ERD |
-| Role | EMPLOYEE · MANAGER · HR · CNB · BOD · ADMIN — **declared** | ERD `ROLE.code` |
-| Scope | Self · DirectReports · OrgUnit · Tenant — **declared** | ERD `USER_ROLE.scope_type` |
+| Org unit type | Company · Division · Department · Team | ERD "Company/Khoi/PhongBan/Nhom" |
+| Job level | Director · DeptHead · TeamLead · Specialist · Staff · Collaborator | ERD "GĐ/TP/TN/CV/NV/CTV" |
+| Employment | Probation · Official · Resigned | ERD "Thử việc/Chính thức/Nghỉ việc" |
+| Auth provider | Local · SSO | ERD |
+| Role | EMPLOYEE · MANAGER · HR · CNB · BOD · ADMIN | ERD `ROLE.code` |
+| Scope | Self · DirectReports · OrgUnit · Tenant | ERD `USER_ROLE.scope_type` |
+| BSC perspective | FIN · CUS · PRO · LNG | ERD |
+| Calc method | RATIO_UP · RATIO_DOWN · TIERED · BINARY · FORMULA · LEVELS | ERD + D1 |
+| KPI frequency | Week · Month · Quarter · Year | ERD "Tuần/Tháng/Quý/Năm" |
+| Aggregation | SUM · AVG · LAST | ERD |
+| Library (KPI, template) | Draft · Active · Archived | ERD |
+| KPI category tag | EFFICIENCY · VOLUME · COST — secondary tag only | DATX, `ASSUMPTION Q5` |
 | Cycle | Planning · Active · Evaluating · Closed | ERD |
 | Period type | Month · Quarter · Half · Year | ERD |
-| Goal Plan | Draft · Submitted · **Returned** · Approved · Locked | ERD + plan §6.4 (*Bị trả lại* is in the plan's seed list but not the ERD — confirm in 1.1) |
+| Plan type | KPI (P2 adds Probation) | ERD |
+| Owner type | Company · OrgUnit · Employee | ERD |
+| Goal Plan | Draft · Submitted · **Returned** · Approved · Locked | ERD + Returned (plan §6.4, BR-KPI-12) |
 | Goal | Active · Changed · Cancelled | ERD |
+| Goal visibility | PUBLIC · PRIVATE | D2 |
+| KRI type | KRItc · KRIpt — stored, hidden | D4, `ASSUMPTION Q6` |
+| Target type | NUMERIC · TEXT | HR guide p. 23 (D7) |
+| Target level | L1 · L2 · L3 | D1 |
 | Alignment | CASCADE · LINK | ERD |
-| Calc method | RATIO_UP · RATIO_DOWN · TIERED · BINARY · FORMULA · LEVELS | ERD + D1 |
-| Actual source | MANUAL · EXCEL · API | ERD |
-| Form type | GOAL_SETTING · GOAL_CHANGE · KPI_EVAL (P2: PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360) | ERD |
-| Form | Open · InProgress · Completed · Cancelled | ERD |
-| Step action | SUBMIT · APPROVE · EDIT · RETURN · AUTO_FORWARD | ERD |
+| Source (data source, actual) | MANUAL · EXCEL · API | ERD |
+| Connection auth | APIKey · OAuth2 · Basic | ERD |
+| Sync run | Running · Succeeded · PartiallyFailed · Failed | D7 |
+| Import type | Actual · GoalPlan · OrgData · Library | ERD |
+| Import batch | Validating · Committed · Rejected | ERD |
+| Form type | GOAL_SETTING · GOAL_CHANGE · KPI_EVAL (P2 adds PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360) | ERD |
 | Actor rule | SELF · DIRECT_MANAGER · MANAGER_L2 · HR · CNB · ROLE | ERD |
-| Overdue behaviour | AUTO_FORWARD · REMIND (+ LOCK, proposed from the email template) | ERD + BR-KPI-13 |
+| Step action | SUBMIT · APPROVE · EDIT · RETURN · CANCEL · AUTO_FORWARD · AUTO_LOCK — EDIT is never recorded (BR-KPI-23) | ERD + CANCEL, AUTO_LOCK (D7) |
+| Overdue behaviour | AUTO_FORWARD · REMIND · LOCK | ERD + LOCK (BR-KPI-13) |
+| Evaluation column | SELF · MANAGER · FINAL | D6 |
+| Form | Open · InProgress · Completed · Cancelled — "overdue" is derived, not a status | ERD |
+| Goal change | ADD · MODIFY · CANCEL | BR-KPI-15 (D7) |
+| Launch timing | NOW · SCHEDULED · RECURRING | D5 |
+| Launch | Scheduled · Launched · Cancelled | D5 |
+| Recipient mode | ALL · FILTER | D5 |
+| Launch trigger | PERIOD_END (P2 adds HIRE_DATE, CONTRACT_END) | D5 |
+| Payout scope | All · OrgUnit · Position | ERD "Tất cả/Khối/Chức danh" |
 | Period result | Draft · Final · Locked | ERD |
+| Notification event | FORM_LAUNCHED · STEP_ASSIGNED · DEADLINE_REMIND · RETURNED (Phase 3 adds KPI_ALERT) | ERD + STEP_ASSIGNED |
+| Notification channel | InApp · Email (P1 sends in-app only) | ERD |
+| Notification | Queued · Sent · Read · Failed | ERD |
+| Audit action | CREATE · UPDATE · DELETE · LOCK · UNLOCK | ERD |
 
 ## 6. Error catalogue
 
@@ -176,11 +230,20 @@ Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
 | Code | Trigger | Surface | Title |
 |---|---|---|---|
 | ERR-KPI-01 | A read through the DataGateway failed | empty-state with retry | Không tải được dữ liệu |
+| ERR-KPI-02 | An id does not exist in the caller's tenant (another tenant's id answers the same) | empty-state | Không tìm thấy dữ liệu |
+| ERR-KPI-03 | A write failed for a reason the user cannot fix | toast with retry | Không lưu được thay đổi |
+| ERR-KPI-04 | The write is not allowed in the record's current state (locked plan, step moved on) | toast with reload | Thao tác không còn hợp lệ |
+| ERR-KPI-05 | The actor is not entitled (not the step's actor, no valid delegation, no permission) | toast | Bạn không có quyền thực hiện thao tác này |
+| ERR-KPI-06 | Invalid input (missing field, unresolved or cross-tenant reference, duplicate) | inline | Dữ liệu chưa hợp lệ |
+
+Only ERR-KPI-01 and 03 are retried automatically (`isRetryable`). A failed write shows as a toast
+whatever the entry's surface. Rule-specific codes are added beside their rule in Phase 1.5.
 
 ## 7. Tenancy and data
 
 - **BR-KPI-50** — **Tenant isolation.** Every read and write is scoped to one tenant; a user of tenant B
-  never sees, by any path, data of tenant A. *Source: plan §3.2.*
+  never sees, by any path, data of tenant A, and no write can store a reference to another tenant's row
+  (ERR-KPI-06). *Source: plan §3.2; Phase 1.1 review.*
 - **BR-KPI-51** — The prototype holds **no real personnel data**. The "Dữ liệu giả lập" banner is shown
   on every screen. *Source: plan §10.*
 - **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync) and when it was
@@ -201,3 +264,4 @@ Copy lives in `src/lib/errorCatalog.ts`; never retype it on a screen.
 | Q8 | Parent KPI actual independent or summed? | Independent; summed only when flagged | BR-KPI-36 |
 | Q9 | Does a KGI have a numeric target? | Optional field, not scored | BR-KPI-02 |
 | Q10 | CMC's monthly work plan in P1? | No | BR-KPI-22 |
+| Q11 | Does P1 track "tự thực hiện" (what a manager personally achieved on a cascaded goal)? | No — shown as "—" | BR-KPI-07 |

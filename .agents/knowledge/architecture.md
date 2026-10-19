@@ -54,12 +54,12 @@ src/
 │   ├── useSession.ts       # session contract + hook (a file with NO JSX)
 │   └── SessionContext.tsx  # the provider (Phase 0 placeholder; real switcher in 1.3)
 ├── data/
-│   ├── types.ts            # domain types + FIXED STATE SETS (Phase 1.1 fills the 47 P1 tables)
+│   ├── types.ts            # domain types (47 P1 tables + D1–D8) + FIXED STATE SETS with label maps
 │   └── fixtures/           # seed data — the CONTRACT between tracks (Phase 1.2)
 ├── hooks/
 │   └── queries/            # React Query hooks per domain — the only callers of getDataGateway()
 ├── integrations/
-│   ├── data/               # DataGateway: types.ts (contract), index.ts, mockGateway.ts, supabaseGateway.ts (stub)
+│   ├── data/               # DataGateway: types.ts (contract), index.ts, mockGateway.ts (stub until 1.2), supabaseGateway.ts (stub)
 │   └── insight/            # InsightGateway: the simulated AI assistant (Phase 3)
 ├── lib/                    # *Rules.ts (pure, tested), *Store.ts (Zustand), errorCatalog, utils, pagination
 ├── pages/                  # one placeholder page per menu item (Phase 0)
@@ -107,23 +107,48 @@ The `e2e/specs/smoke.spec.ts` list mirrors this table — keep them in step.
 
 ```
 components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway()
-                                                              ├── mockGateway      (now)
+                                                              ├── mockGateway      (Phase 1.2; a stub that rejects until then)
                                                               └── supabaseGateway  (Phase 5 — throws until then)
 ```
 
-- **Contract** — `src/integrations/data/types.ts`. One group of async methods per ERD group (Phase 1.1).
+- **Contract** — `src/integrations/data/types.ts`, fixed in Phase 1.1 (reviewed by system-architect,
+  cto and workflow-expert). Groups: `clock` · `platform` (tenants) · `org` (G1) · `library` (G2) ·
+  `goals` (G3) · `actuals` (G4) · `forms` (G5 + D5 launches + GOAL_CHANGE items) · `results` (G6) ·
+  `system` (G7) · `scheduler` · `events` · optional `dev` (mock only).
 - **Selection** — `getDataGateway()` in `index.ts` reads `VITE_DATA_ADAPTER` (build-time): unset/`mock` →
   mock, `supabase` → the stub (throws "not implemented"), anything else → throws. Tested in
   `index.test.ts`.
-- **Tenant boundary** — every method takes `tenantId` first and filters by it. With no RLS, this is the
-  isolation; the tenant-isolation tests become the RLS integration tests in Phase 5.
-- **Mock adapter** (Phase 1.2) — in-memory + localStorage partitioned per tenant, `resetSeed()`,
-  simulated latency, an error-injection switch for testing failure UI. It **reuses** `src/lib/*Rules.ts`.
-- **Events** — writes other tracks react to (launch, step change, lock) emit on a gateway event bus; T7
-  (notifications, audit log) only listens.
+- **Tenant boundary** — every method takes `tenantId` first and filters by it; an id from another tenant
+  answers ERR-KPI-02 like a missing one; every id inside a write payload must resolve in the tenant
+  (else ERR-KPI-06). With no RLS, this is the isolation; the tenant-isolation tests (reads AND writes)
+  become the RLS integration tests in Phase 5. Only `platform.*` is not tenant-filtered.
+- **Actor** — every user write takes `actorUserId` second; "who did it" never comes from the payload.
+  System writes (`system.recordNotification`, `system.recordAudit`) are made only by T7's listeners in
+  `src/integrations/`, and the audit entry is built from the event.
+- **One clock** — the adapter reads every "now" from `clock.now()`; screens read it too (deadline badges).
+  The mock's dev toolbar moves it (`dev.setNow`). `scheduler.runDue(tenantId)` runs due launches,
+  recurring rules, reminders and overdue steps as of that clock, idempotently.
+- **Writes** — `Upsert<T, Managed>` omits `id`/`tenantId` and the columns the gateway owns (status
+  transitions, timestamps, authors). Aggregates (method + tiers, template + items, workflow + steps,
+  scale + levels) save together with `ChildInput` children **matched by id**, so references to a step
+  or a rating level survive a save; they return `Aggregate<Parent, Child>`.
+- **Lists** — filters are AND-ed; an omitted field does not filter, an empty id list matches nothing.
+  Lists that grow without bound (`listForms`, `listNotifications`, `listAuditLog`) return `Page<T>`.
+- **Events** — every successful write emits `entity.changed` (with before/after), plus domain events
+  (`goalPlan.statusChanged`, `form.launched`, `form.stepActed` with `assigneeUserIds`, `form.dueSoon`,
+  `form.overdue`, `actuals.recorded`, `results.finalized`, `payroll.exported`). T7 and the query-cache
+  invalidation listen; listeners are idempotent by `event.id`, registered once at gateway construction,
+  and a rejected listener is reported, never swallowed.
+- **Imports** — the client parses Excel (exceljs) into typed rows; `actuals.stageImport` validates and
+  stores rows + row errors on the `ImportBatch`; `commitImport` applies all rows or none.
+- **Mock adapter** (Phase 1.2) — in-memory + localStorage partitioned per tenant, `dev.resetSeed()`,
+  simulated latency, an error-injection switch. It **reuses** `src/lib/*Rules.ts`.
 - **IDs** — strings (`crypto.randomUUID()` at runtime; literal UUIDs in fixtures). The ERD's `bigint`
   keys are for the future database.
-- **Errors** — methods throw `KpiError` (`src/lib/errorCatalog.ts`); hooks surface the catalogue copy.
+- **Errors** — methods reject with `KpiError` (ERR-KPI-01…06 are the contract's generic codes); hooks
+  surface the catalogue copy. React Query retries only `isRetryable` failures (01, 03).
+- **Naming** — gateway methods use the short domain noun (`listPositions` for `JobPosition`,
+  `listWorkflows` for `WorkflowTemplate`); the types keep the ERD names.
 
 ### AI assistant — `InsightGateway`
 
@@ -144,14 +169,28 @@ three months of actuals (manual, Excel, "API"), a sample rating scale and payout
 
 `docs/erd/kpi_erd.mermaid` — 67 tables across P1–P3 (47 in P1, groups G1–G7). It is the same file the
 visual editor at `/Users/m116gb/Downloads/Tool/erd_editor.html` opens; edit it there or as text, and keep
-this copy in sync. Proposed deltas D1–D6 (plan §4) are applied to `src/data/types.ts` in Phase 1.1 and
-logged in `decisions-log.md`.
+this copy in sync. The ERD file itself is **not** edited for the deviations below — this table is the
+delta Phase 5 applies when it writes the SQL schema.
 
----
+### ERD deviations (decided in Phase 1.1, `src/data/types.ts`)
+
+| # | Deviation | Why |
+|---|---|---|
+| — | Every business row carries `tenantId`, also child tables the ERD draws without it (KGI, GOAL, CALC_TIER…); only `PERMISSION` has none | ERD convention "every table has tenant_id"; the mock filters on it |
+| — | `GOAL_PLAN.total_weight` not stored | Derived (`goalPlanRules`); a stored total drifts |
+| — | No generic `created_at`/`updated_at` on rows | The audit log holds history; timestamps exist where the domain reads them |
+| D1 | New `GOAL_TARGET_LEVEL` (goalId, L1/L2/L3, targetValue/targetText, scorePct); `LEVELS` calc method | HR guide pp. 23, 28, 63 |
+| D2 | `GOAL.visibility` PUBLIC/PRIVATE | HR guide pp. 21–22 |
+| D3 | `GOAL_ALIGNMENT.allocated_value`; `GOAL.self_assigned_value` ("Tự giao"); "chưa giao" derived | HR guide p. 24 |
+| D4 | `GOAL.kri_type` KRItc/KRIpt — stored, hidden (Q6) | HR guide p. 22 |
+| D5 | New `FORM_LAUNCH`; `FORM_LAUNCH_RULE` moved P2 → P1 (+ name, period_type, due_days, recipients); `FORM_INSTANCE.launch_id` | HR guide pp. 89–93 |
+| D6 | `WORKFLOW_STEP.evaluation_column`, `requires_comment` feed `formRules.canSubmit()` — a rule, no table | Manager guide p. 26 |
+| D7 | Columns the P1 screens or the review needed: `EMPLOYEE.left_on`; `USER_ACCOUNT.display_name`; `CALC_METHOD.name`; `KPI_DEFINITION.category_tag` (Q5); `KGI.target_value/unit_id` (Q9); `GOAL.description/formula_text/target_type/roll_up_from_children (Q8)/replaces_goal_id/sort_order`; `SYNC_RUN.period_id`; `IMPORT_BATCH.cycle_id/rows/errors` (json); `GOAL_ACTUAL.note`; `WORKFLOW_STEP.name/return_to_step_no/remind_days_before`; `FORM_INSTANCE.form_type/current_step_entered_at/overdue_handled_at`; `FORM_STEP_ACTION.delegation_id`; `EVALUATION_ITEM.actual_text_snapshot/final_comment`; `DELEGATION.revoked_at`; `NOTIFICATION.event_code/subject/body/created_at/read_at`; `AUDIT_LOG.on_behalf_of_user_id/reason`. New table `GOAL_CHANGE_ITEM`. New enum values: Goal Plan `Returned`, step actions `CANCEL`/`AUTO_LOCK`, overdue `LOCK`, notification `STEP_ASSIGNED`; `KPI_ALERT` deferred to Phase 3 | Plan §5 screens; Phase 1.1 reviews |
+| D8 | ERD Vietnamese enum values become English codes with Vietnamese label maps (Khoi → Division, Thử việc → Probation, GĐ → Director…) | Code is English; the screen reads only the label maps |
 
 ## Phases (plan §6)
 
-Phase 0 bootstrap → **1.1** domain types + contract (sequential) → **1.2** mock + seed · **1.3** session
+Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed · **1.3** session
 + permissions · **1.4** app shell + UI kit · **1.5** rule engines (parallel) → **Gate 1** (fixtures
 frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
