@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-19 — Phase 1.4 dev toolbar: "Công cụ demo"
+
+**Decision.** The mock's `dev` controls live in a popover beside the "Dữ liệu giả lập" banner, shown
+whenever the gateway has `dev` (every build — the Vercel prototype is a demo). What it switched on is
+mirrored in `devStore`, NOT persisted (a remembered failure mode would break the next demo). Clock,
+latency and failure changes invalidate every query without awaiting it; the scheduler invalidates its
+tenant; a reseed restores latency/failure defaults and drops the cache with `resetQueries()` (a bare
+`clear()` leaves mounted queries showing old rows). `SessionProvider` now replaces the app only when the
+tenants' FIRST load fails — a failed background refetch keeps the session, so "fail every call" cannot
+unmount the toolbar that would switch it off.
+
+**Why.** Approved Phase 2 design; the two cache/session points were found while building it.
+
+**Updated alongside.** `component-registry.md`, `common-pitfalls.md`, `src/hooks/queries/README.md`.
+
+---
+
 ## 2026-10-19 — Phase 1.5: the rule engines and their edge answers
 
 **Decision.** `src/lib/` holds the rules as pure functions with tests: `calcRules`, `scoreRules`,
