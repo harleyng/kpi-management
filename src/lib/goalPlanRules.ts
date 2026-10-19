@@ -172,13 +172,20 @@ export function canUnlock(
 
 // ─── Adjustment (GOAL_CHANGE, BR-KPI-15) ──────────────────────────────────────────────────────
 
-/** Problems with a GOAL_CHANGE proposal itself (ERR-KPI-06, `ref` = the change item). */
-export function changeItemIssues(goals: readonly Pick<Goal, 'id' | 'status'>[], items: readonly GoalChangeItem[]): RuleIssue[] {
+/**
+ * Problems with a GOAL_CHANGE proposal itself (ERR-KPI-06, `ref` = the change item). `draft: true`
+ * is "Lưu nháp" (`saveGoalChangeItems`): a reason may still be missing — the submit requires it.
+ */
+export function changeItemIssues(
+  goals: readonly Pick<Goal, 'id' | 'status'>[],
+  items: readonly GoalChangeItem[],
+  options: { draft?: boolean } = {},
+): RuleIssue[] {
   const issues: RuleIssue[] = [];
   const touched = new Set<Id>();
   for (const item of items) {
     const invalid = (detail: string) => issues.push(ruleIssue('ERR-KPI-06', item.id, detail));
-    if (blank(item.reason)) invalid('REASON_REQUIRED');
+    if (!options.draft && blank(item.reason)) invalid('REASON_REQUIRED');
     if (item.changeType === 'ADD') {
       if (item.goalId !== null) invalid('ADD_HAS_GOAL');
     } else {

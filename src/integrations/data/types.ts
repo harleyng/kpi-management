@@ -405,7 +405,19 @@ export type DomainEvent =
       assigneeUserIds: Id[];
       formStatus: FormStatus;
     })
-  | (EventBase & { type: 'form.dueSoon'; formId: Id; stepId: Id; assigneeUserIds: Id[]; deadline: IsoDate })
+  | (EventBase & {
+      type: 'form.dueSoon';
+      formId: Id;
+      stepId: Id;
+      assigneeUserIds: Id[];
+      deadline: IsoDate;
+      /**
+       * `workflowRules.reminderKey(form)` — the same for every tick inside the reminder window of one
+       * step entry. The scheduler does not deduplicate reminders: T7's listener uses this as the
+       * notification's `sourceEventId`, so the reminder is written once per recipient.
+       */
+      reminderKey: string;
+    })
   | (EventBase & { type: 'form.overdue'; formId: Id; stepId: Id; behaviour: OverdueBehaviour; assigneeUserIds: Id[] })
   | (EventBase & {
       type: 'actuals.recorded';

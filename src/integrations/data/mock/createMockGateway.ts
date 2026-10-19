@@ -11,6 +11,7 @@ import { libraryGroup } from './groups/library';
 import { orgGroup } from './groups/org';
 import { platformGroup } from './groups/platform';
 import { resultsGroup } from './groups/results';
+import { schedulerGroup } from './groups/scheduler';
 import { systemGroup } from './groups/system';
 import type { StorageLike } from './persistence';
 import { Runtime, type Registry } from './runtime';
@@ -58,9 +59,7 @@ export function createMockGateway(options: MockGatewayOptions = {}): MockDataGat
     forms: formsGroup(rt),
     results: resultsGroup(rt),
     system: systemGroup(rt),
-    scheduler: {
-      runDue: rt.deferred('scheduler.runDue', 'write', 'Phase 1.5 workflowRules (SLA, overdue, recurring launches)'),
-    },
+    scheduler: schedulerGroup(rt),
     events: {
       subscribe(tenantId, listener) {
         rt.tenantData(tenantId); // an unknown tenant fails loudly (ERR-KPI-02), synchronously

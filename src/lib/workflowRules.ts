@@ -42,8 +42,9 @@ import type {
 } from '@/data/types';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { canSubmit, type CanSubmitInput } from './formRules';
-import { PLAN_STATUS_ON_CANCEL, PLAN_STATUS_ON_COMPLETE, planStatusOnEnterStep } from './goalPlanRules';
-import { addDays, isWithin, minDate, todayOf, toZonedDate, type Clock } from './isoDate';
+import { cycleAllowsLaunch } from './cycleRules';
+import { PLAN_STATUS_ON_CANCEL, PLAN_STATUS_ON_COMPLETE, planStatusOnEnterStep, type Decision } from './goalPlanRules';
+import { addDays, isIsoDate, isWithin, minDate, todayOf, toZonedDate, type Clock } from './isoDate';
 import { descendantUnitIds, isEmployedDuring, isEmployedOn, managerOf, primaryAssignmentOn, scopeCoversEmployee, scopeSubjectOn } from './orgRules';
 
 export type Refusal = { ok: false; code: ErrorCode; detail: string; issues: RuleIssue[] };
@@ -421,6 +422,27 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
   };
 }
 
+/**
+ * Why the actor may NOT EDIT the subject's plan or scores at the current step now (BR-KPI-23), or
+ * `null` when they may: the form is closed, the step does not allow EDIT, or it is frozen →
+ * ERR-KPI-04 (the state is wrong for anyone); the actor is not entitled → ERR-KPI-05.
+ */
+export function editRefusal(
+  form: FormInstance,
+  steps: readonly WorkflowStep[],
+  plan: Pick<GoalPlan, 'status'> | null,
+  actor: ActorInput,
+  ctx: EntitlementContext,
+): Refusal | null {
+  if (isTerminal(form)) return refuse('ERR-KPI-04', 'FORM_CLOSED');
+  const step = steps.find((s) => s.id === form.currentStepId && s.workflowId === form.workflowId);
+  if (!step) return refuse('ERR-KPI-04', 'STEP_UNKNOWN');
+  if (!step.allowedActions.includes('EDIT')) return refuse('ERR-KPI-04', 'EDIT_NOT_ALLOWED');
+  if (isFrozen(form, step, plan)) return refuse('ERR-KPI-04', 'FROZEN');
+  const who = entitlement(form, step, 'EDIT', actor, ctx);
+  return who.ok ? null : who;
+}
+
 /** Whether the actor may EDIT the subject's plan or scores at the current step now (BR-KPI-23). */
 export function mayEditAtCurrentStep(
   form: FormInstance,
@@ -429,10 +451,26 @@ export function mayEditAtCurrentStep(
   actor: ActorInput,
   ctx: EntitlementContext,
 ): boolean {
-  if (isTerminal(form)) return false;
-  const step = steps.find((s) => s.id === form.currentStepId);
-  if (!step || !step.allowedActions.includes('EDIT') || isFrozen(form, step, plan)) return false;
-  return entitlement(form, step, 'EDIT', actor, ctx).ok;
+  return editRefusal(form, steps, plan, actor, ctx) === null;
+}
+
+/**
+ * The standing a user EDITs with when the call names nobody else ("Lưu nháp", `saveGoal` — their
+ * contracts carry no `onBehalfOfUserId`): as themself when they are a step actor; else as the delegate
+ * of a step actor under a delegation valid now; else, with the proxy right, on behalf of the first
+ * step actor; else as themself (which `entitlement` then refuses). Both people end up recorded.
+ */
+export function editStanding(form: Pick<FormInstance, 'formType'>, userId: Id, ctx: EntitlementContext): ActorInput {
+  const self: ActorInput = { actorUserId: userId, onBehalfOfUserId: null, delegationId: null };
+  if (ctx.stepActors.includes(userId)) return self;
+  const delegation = ctx.delegations.find(
+    (d) => d.toUserId === userId && ctx.stepActors.includes(d.fromUserId) && isDelegationValid(d, form.formType, ctx.clock),
+  );
+  if (delegation) return { actorUserId: userId, onBehalfOfUserId: delegation.fromUserId, delegationId: delegation.id };
+  if (ctx.actorMayProxy && ctx.stepActors.length > 0 && ctx.subjectUserId !== userId) {
+    return { actorUserId: userId, onBehalfOfUserId: ctx.stepActors[0], delegationId: null };
+  }
+  return self;
 }
 
 /** The evaluation column the current step fills, i.e. what "Lưu nháp" may write (D6). */
@@ -519,6 +557,21 @@ export function onUnlock(
 ): Pick<FormInstance, 'dueDate' | 'currentStepEnteredAt' | 'overdueHandledAt'> | null {
   if (isTerminal(form)) return null;
   return { dueDate: newDueDate, currentStepEnteredAt: clock.now, overdueHandledAt: null };
+}
+
+/** REMIND: the scheduler handled the step's overdue once — no move, no history row (BR-KPI-13). `null` for a closed form. */
+export function markHandled(form: Pick<FormInstance, 'status'>, clock: Clock): Pick<FormInstance, 'overdueHandledAt'> | null {
+  return isTerminal(form) ? null : { overdueHandledAt: clock.now };
+}
+
+/**
+ * Who must act on the current step now — its actors, plus anyone holding a valid delegation from one
+ * of them (what `form.stepActed` / `form.dueSoon` / `form.overdue` carry as `assigneeUserIds`).
+ */
+export function assigneesOf(form: Pick<FormInstance, 'formType' | 'status'>, stepActors: readonly Id[], delegations: readonly Delegation[], clock: Clock): Id[] {
+  if (isTerminal(form)) return [];
+  const delegates = delegations.filter((d) => stepActors.includes(d.fromUserId) && isDelegationValid(d, form.formType, clock)).map((d) => d.toUserId);
+  return [...new Set([...stepActors, ...delegates])];
 }
 
 /** Whether `userId` should see the form in their inbox: a current step actor, or their valid delegate. */
@@ -658,7 +711,8 @@ export interface RuleFiring {
 }
 
 /**
- * The recurring launches due now (D5): for each active rule, each period of its type in an ACTIVE cycle
+ * The recurring launches due now (D5): for each active rule, each period of its type in an Active or
+ * Evaluating cycle
  * that ended `offsetDays` ago or more, and has no launch from this rule yet (a cancelled one counts —
  * HR cancelled it on purpose). Missed periods catch up, in order; never twice per (rule, period).
  */
@@ -670,7 +724,8 @@ export function launchRuleFirings(
   clock: Clock,
 ): RuleFiring[] {
   const today = todayOf(clock);
-  const activeCycles = new Set(cycles.filter((c) => c.status === 'Active').map((c) => c.id));
+  // Evaluating too: the last period of a cycle ends after the cycle has moved to Evaluating.
+  const activeCycles = new Set(cycles.filter((c) => c.status === 'Active' || c.status === 'Evaluating').map((c) => c.id));
   const done = new Set(existingLaunches.filter((l) => l.launchRuleId !== null).map((l) => `${l.launchRuleId}:${l.periodId}`));
   const firings: RuleFiring[] = [];
   for (const rule of rules) {
@@ -683,4 +738,145 @@ export function launchRuleFirings(
     }
   }
   return firings.sort((a, b) => (a.fireDate === b.fireDate ? a.ruleId.localeCompare(b.ruleId) : a.fireDate < b.fireDate ? -1 : 1));
+}
+
+/** What `createLaunch` refuses about WHEN (ERR-KPI-06): RECURRING comes only from a rule; SCHEDULED is in the future. */
+export function launchTimingIssues(launch: Pick<FormLaunch, 'timing' | 'scheduledAt'>, clock: Clock): RuleIssue[] {
+  if (launch.timing === 'RECURRING') return [ruleIssue('ERR-KPI-06', 'timing', 'RECURRING_BY_RULE_ONLY')];
+  if (launch.timing === 'SCHEDULED') {
+    const at = Date.parse(launch.scheduledAt);
+    if (!Number.isFinite(at)) return [ruleIssue('ERR-KPI-06', 'scheduledAt', 'SCHEDULE_INVALID')];
+    if (at <= Date.parse(clock.now)) return [ruleIssue('ERR-KPI-06', 'scheduledAt', 'SCHEDULE_IN_PAST')];
+  }
+  return [];
+}
+
+/** Only a `Scheduled` launch (which has no forms yet) can be cancelled (ERR-KPI-04). */
+export function canCancelLaunch(launch: Pick<FormLaunch, 'status'>): Decision {
+  return launch.status === 'Scheduled' ? { ok: true } : { ok: false, code: 'ERR-KPI-04' };
+}
+
+/**
+ * What `saveLaunchRule` refuses (ERR-KPI-06): a recurring rule launches the evaluation only
+ * (registration is launched once, an adjustment is started by hand); whole days ≥ 0; a FILTER rule
+ * names its filter.
+ */
+export function validateLaunchRule(
+  rule: Pick<FormLaunchRule, 'offsetDays' | 'dueDays' | 'recipientMode' | 'recipientFilter'>,
+  formType: FormType,
+): RuleIssue[] {
+  const issues: RuleIssue[] = [];
+  const bad = (ref: string | null, detail: string) => issues.push(ruleIssue('ERR-KPI-06', ref, detail));
+  if (formType !== 'KPI_EVAL') bad('workflowId', 'RULE_KPI_EVAL_ONLY');
+  if (!Number.isInteger(rule.offsetDays) || rule.offsetDays < 0) bad('offsetDays', 'OFFSET_DAYS_INVALID');
+  if (!Number.isInteger(rule.dueDays) || rule.dueDays < 0) bad('dueDays', 'DUE_DAYS_INVALID');
+  if (rule.recipientMode === 'FILTER' && rule.recipientFilter === null) bad('recipientFilter', 'FILTER_REQUIRED');
+  return issues;
+}
+
+// ─── Starting a form by hand (BR-KPI-15, 19) ───────────────────────────────────────────────────
+
+export interface StartFormContext {
+  /** The workflow's form type (a form's type is its workflow's). */
+  formType: FormType;
+  plan: GoalPlan | null;
+  /** Who a form on `plan` is about: its employee, or the head of its unit (Company / OrgUnit plans). */
+  planOwnerEmployeeId: Id | null;
+  /** The plan's cycle. */
+  cycle: Pick<PerformanceCycle, 'status'> | null;
+  /** The tenant's forms (only open ones matter). */
+  forms: readonly Pick<FormInstance, 'formType' | 'goalPlanId' | 'status'>[];
+  clock: Clock;
+}
+
+/**
+ * What `forms.startForm` refuses. A form started by hand is either an adjustment (GOAL_CHANGE) of a
+ * Locked plan — at most one open per plan (ERR-KPI-04 `CHANGE_ALREADY_OPEN`) — or the registration
+ * (GOAL_SETTING) of a Company / OrgUnit plan, which no launch reaches. An evaluation is never started
+ * by hand (`NOT_STARTABLE`). The subject is the plan's owner (its unit's head); the cycle must accept
+ * the form type; the due date is a real date, not in the past. Validation (06) before state (04).
+ */
+export function canStartForm(input: Pick<FormInstance, 'subjectEmployeeId' | 'goalPlanId' | 'periodId' | 'dueDate'>, ctx: StartFormContext): RuleIssue[] {
+  const issues: RuleIssue[] = [];
+  const bad = (ref: string | null, detail: string) => issues.push(ruleIssue('ERR-KPI-06', ref, detail));
+  const { formType, plan } = ctx;
+  if (formType === 'KPI_EVAL') return [ruleIssue('ERR-KPI-06', 'workflowId', 'NOT_STARTABLE')];
+  if (plan === null || input.goalPlanId !== plan.id) bad('goalPlanId', 'PLAN_REQUIRED');
+  if (input.periodId !== null) bad('periodId', 'PERIOD_NOT_ALLOWED');
+  if (!isIsoDate(input.dueDate) || input.dueDate < todayOf(ctx.clock)) bad('dueDate', 'DUE_DATE_INVALID');
+  if (plan !== null) {
+    if (formType === 'GOAL_SETTING' && plan.ownerType === 'Employee') bad('goalPlanId', 'EMPLOYEE_PLAN_BY_LAUNCH');
+    if (ctx.planOwnerEmployeeId === null || input.subjectEmployeeId !== ctx.planOwnerEmployeeId) bad('subjectEmployeeId', 'SUBJECT_NOT_OWNER');
+  }
+  if (issues.length || plan === null) return issues;
+
+  const open = ctx.forms.some((f) => f.goalPlanId === plan.id && f.formType === formType && !isTerminal(f));
+  if (formType === 'GOAL_CHANGE') {
+    if (plan.status !== 'Locked') return [ruleIssue('ERR-KPI-04', 'goalPlanId', 'PLAN_NOT_LOCKED')];
+    if (open) return [ruleIssue('ERR-KPI-04', 'goalPlanId', 'CHANGE_ALREADY_OPEN')];
+  } else {
+    // A locked plan changes only through GOAL_CHANGE (BR-KPI-14): registering it again would unlock it unaudited.
+    if (plan.status === 'Locked') return [ruleIssue('ERR-KPI-04', 'goalPlanId', 'PLAN_LOCKED')];
+    if (open) return [ruleIssue('ERR-KPI-04', 'goalPlanId', 'REGISTRATION_ALREADY_OPEN')];
+  }
+  if (ctx.cycle === null || !cycleAllowsLaunch(ctx.cycle, formType).ok) return [ruleIssue('ERR-KPI-04', 'goalPlanId', 'CYCLE_NOT_OPEN')];
+  return [];
+}
+
+// ─── Delegations (BR-KPI-21) ───────────────────────────────────────────────────────────────────
+
+export interface DelegationContext {
+  /** The tenant's delegations. */
+  existing: readonly Delegation[];
+  /** The tenant's accounts. */
+  users: readonly UserAccount[];
+  /** The delegation being edited (ignored in the overlap checks), or `null` for a new one. */
+  editingId: Id | null;
+  clock: Clock;
+}
+
+const overlaps = (a: Pick<Delegation, 'validFrom' | 'validTo'>, b: Pick<Delegation, 'validFrom' | 'validTo'>) =>
+  a.validFrom <= b.validTo && b.validFrom <= a.validTo;
+
+/**
+ * What `saveDelegation` refuses (ERR-KPI-06): delegating to oneself; to anyone but an Active account
+ * of the tenant; dates that are not real or run backwards; a delegation already over; a CHAIN — the
+ * delegate already delegates, or the delegator is someone's delegate, for the same form type over
+ * overlapping dates (a delegate acts for the delegator only, never passes it on); and an overlapping
+ * duplicate of the same pair and form type. Revoked delegations no longer count.
+ */
+export function delegationIssues(
+  d: Pick<Delegation, 'fromUserId' | 'toUserId' | 'formType' | 'validFrom' | 'validTo'>,
+  ctx: DelegationContext,
+): RuleIssue[] {
+  const issues: RuleIssue[] = [];
+  const bad = (ref: string, detail: string) => issues.push(ruleIssue('ERR-KPI-06', ref, detail));
+  if (d.fromUserId === d.toUserId) bad('toUserId', 'SELF_DELEGATION');
+  else if (!ctx.users.some((u) => u.id === d.toUserId && u.status === 'Active')) bad('toUserId', 'TO_USER_INVALID');
+  if (!isIsoDate(d.validFrom) || !isIsoDate(d.validTo) || d.validTo < d.validFrom) {
+    bad('validTo', 'DATES_INVALID');
+    return issues;
+  }
+  if (d.validTo < todayOf(ctx.clock)) bad('validTo', 'VALID_TO_PAST');
+  if (issues.length) return issues;
+
+  const live = ctx.existing.filter((e) => e.id !== ctx.editingId && e.revokedAt === null && e.formType === d.formType && overlaps(e, d));
+  if (live.some((e) => e.fromUserId === d.toUserId || e.toUserId === d.fromUserId)) bad('toUserId', 'DELEGATION_CHAIN');
+  else if (live.some((e) => e.fromUserId === d.fromUserId && e.toUserId === d.toUserId)) bad('toUserId', 'DELEGATION_DUPLICATE');
+  return issues;
+}
+
+/**
+ * Who may revoke a delegation: the delegator, or someone who manages delegations for the whole
+ * tenant (HR — `delegation.manage` with a Tenant scope), else ERR-KPI-05; one already revoked is
+ * ERR-KPI-04. An expired one may still be revoked (it changes nothing but the record).
+ */
+export function canRevokeDelegation(
+  d: Pick<Delegation, 'fromUserId' | 'revokedAt'>,
+  actor: { actorUserId: Id; actorMayManage: boolean },
+  clock: Clock,
+): Decision {
+  if (actor.actorUserId !== d.fromUserId && !actor.actorMayManage) return { ok: false, code: 'ERR-KPI-05' };
+  if (d.revokedAt !== null && Date.parse(d.revokedAt) <= Date.parse(clock.now)) return { ok: false, code: 'ERR-KPI-04' };
+  return { ok: true };
 }

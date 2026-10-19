@@ -45,6 +45,26 @@ describe('mock runtime — the contract surface', () => {
     }
   });
 
+  it('Gate 1, workflow lane: forms, launches, the scheduler, lock/unlock, cycles and plan edits are wired', () => {
+    const { gateway } = newGateway();
+    const wired = [
+      'forms.startForm', 'forms.act', 'forms.listInbox', 'forms.saveEvaluationItems', 'forms.createLaunch', 'forms.cancelLaunch',
+      'scheduler.runDue', 'goals.lockGoalPlan', 'goals.unlockGoalPlan', 'goals.setCycleStatus',
+    ];
+    const guarded = [
+      'forms.saveWorkflow', 'forms.saveLaunchRule', 'forms.saveGoalChangeItems', 'forms.saveDelegation', 'forms.revokeDelegation',
+      'goals.saveCycle', 'goals.savePeriods', 'goals.saveKgi', 'goals.deleteKgi', 'goals.saveGoal', 'goals.deleteGoal',
+      'goals.setTargetLevels', 'goals.setPeriodTargets', 'goals.saveAlignment', 'goals.deleteAlignment',
+    ];
+    for (const name of [...wired, ...guarded]) {
+      expect(gateway.registry.methods.has(name), name).toBe(true);
+      expect(gateway.registry.deferred.has(name), name).toBe(false);
+      expect(gateway.registry.pendingGuards.has(name), name).toBe(false);
+    }
+    // The scheduler is a system write: no actor (`runDue(tenantId)`).
+    expect(gateway.registry.methods.get('scheduler.runDue')).toBe('system');
+  });
+
   // Gate 1 (plan §6.2): every rule wired. Un-skip in the wiring change; it must pass before Phase 2.
   it.skip('Gate 1: nothing is deferred and no guard is pending', () => {
     const { gateway } = newGateway();
