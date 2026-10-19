@@ -1,5 +1,6 @@
 import type { Goal, Id, RoleCode, Tenant } from '@/data/types';
 import { idsFor, seedId } from './ids';
+import { ResultScript } from './results';
 import { addLibrary, addNotificationTemplates, addRating, addRoles, addWorkflows, goalFromKpi, SeedRows } from './shared';
 import { vn } from './timeline';
 import type { TenantSeed } from './types';
@@ -131,6 +132,11 @@ export function buildDemoCo(): TenantSeed {
   // ─── System ─────────────────────────────────────────────────────────────────────────────────
   s.add('Notification', { id: id('Notification', 1), templateId: templateOf('FORM_LAUNCHED'), eventCode: 'FORM_LAUNCHED', recipientUserId: user('D003'), refType: 'Launch', refId: launch.id, subject: 'Đợt Đánh giá KPI tháng 01/2027 đã bắt đầu', body: 'Hạn hoàn thành: 13/02/2027.', status: 'Read', createdAt: vn('2027-02-01 09:00'), sentAt: vn('2027-02-01 09:00'), readAt: vn('2027-02-01 10:00') });
   s.add('AuditLog', { id: id('AuditLog', 1), userId: user('D004'), onBehalfOfUserId: null, entityName: 'GoalPlan', entityId: staffPlan.id, action: 'LOCK', beforeData: { status: 'Approved' }, afterData: { status: 'Locked' }, reason: null, createdAt: vn('2027-01-11 15:00') });
+
+  // ─── Results (through resultRules, like Syntra's): T01 calculated and finalised on its deadline ─
+  const results = new ResultScript(s, id);
+  results.calculate(t01.id);
+  results.finalizeAll(t01.id, vn('2027-02-13 09:00'));
 
   return { tenant, rows: s.rows };
 }

@@ -1,15 +1,14 @@
 import type { GoalActual, Id, ImportType } from '@/data/types';
 import type { ActualFilter, ActualsGateway, EvidenceFilter, RecordActualInput } from '../../types';
+import { actualIssues, isResultFinalised } from '@/lib/actualRules';
+import { toKpiError } from '@/lib/errorCatalog';
+import { todayOf } from '@/lib/isoDate';
 import { removeRow } from '../integrity';
 import { eqOpt, inList, newId, upsert } from '../rows';
-import { goalResource } from '../authorize';
+import { clockOf, goalResource } from '../authorize';
 import type { Runtime } from '../runtime';
 
 export function actualsGroup(rt: Runtime): ActualsGateway {
-  rt.pendingGuard(
-    'actuals.recordActual',
-    'T4 / Phase 1.5 actual rules: period not locked, goal Active and in the period\'s cycle, value vs text per the goal\'s target type',
-  );
   rt.pendingGuard('actuals.rejectImport', 'T4 4.4.3 importRules: only a Validating batch can be rejected', 'T4');
 
   return {
@@ -56,8 +55,19 @@ export function actualsGroup(rt: Runtime): ActualsGateway {
         .sort((a, b) => (a.recordedAt < b.recordedAt ? -1 : 1));
     }),
     recordActual: rt.write('actuals.recordActual', { permission: 'actual.enter', resource: (tx, input) => goalResource(tx, input.goalId) }, (tx, input: RecordActualInput) => {
-      tx.get('Goal', input.goalId);
-      tx.get('CyclePeriod', input.periodId);
+      const goal = tx.get('Goal', input.goalId);
+      const period = tx.get('CyclePeriod', input.periodId);
+      const plan = tx.get('GoalPlan', goal.goalPlanId);
+      // The same rule checks every row of an Excel import (T4).
+      const issues = actualIssues({
+        actual: { actualValue: input.actualValue, actualText: input.actualText },
+        goal,
+        goalCycleId: plan.cycleId,
+        period,
+        resultsFinalised: isResultFinalised(tx.all('PeriodResult'), plan.id, period.id),
+        asOf: todayOf(clockOf(tx)),
+      });
+      if (issues.length > 0) throw toKpiError(issues);
       // BR-KPI-52: a new snapshot; the previous current one is kept as history.
       for (const previous of tx.all('GoalActual')) {
         if (previous.goalId === input.goalId && previous.periodId === input.periodId && previous.isCurrent) {

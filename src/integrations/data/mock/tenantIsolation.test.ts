@@ -219,6 +219,7 @@ describe('tenant isolation — coverage', () => {
       ...Object.keys(ID_READS),
       ...Object.keys(ID_WRITES),
       ...Object.values(SAVES).map(([m]) => m as string),
+      ...Object.keys(SCORING_ID_WRITES),
       ...gateway.registry.deferred.keys(),
       ...OTHER,
     ]);
@@ -231,7 +232,7 @@ describe('tenant isolation — coverage', () => {
     for (const [name, read] of Object.entries(LIST_READS)) {
       const result = await read(gateway);
       const size = Array.isArray(result) ? result.length : (result as { items: unknown[] }).items.length;
-      if (['results.listPeriodResults', 'results.listPayrollExports'].includes(name)) continue; // empty until Phase 1.5
+      if (name === 'results.listPayrollExports') continue; // empty until T6 wires exportPayroll
       expect(size, name).toBeGreaterThan(0);
     }
   });
@@ -355,5 +356,37 @@ describe('tenant isolation — writes', () => {
     const { gateway } = newGateway();
     const call = gateway.forms.act as unknown as (...args: unknown[]) => Promise<unknown>;
     expect(await rejection(call(D, demoActor, {}))).toBeInstanceOf(KpiDeferredError);
+  });
+});
+
+// ═══ Scoring lane (Gate 1): the result lifecycle — results.calculate / adjust / finalize / lock ═══
+
+const SCORING_ID_WRITES: Record<string, [CollectionName, ById]> = {
+  'results.calculateResults': ['CyclePeriod', (gw, id) => gw.results.calculateResults(D, demoActor, id)],
+  'results.setAdjustment': ['PeriodResult', (gw, id) => gw.results.setAdjustment(D, demoActor, id, 1)],
+  'results.finalizeResults': ['CyclePeriod', (gw, id) => gw.results.finalizeResults(D, demoActor, id)],
+  'results.lockResults': ['CyclePeriod', (gw, id) => gw.results.lockResults(D, demoActor, id)],
+};
+
+describe('tenant isolation — the result lifecycle (scoring lane)', () => {
+  it.each(Object.entries(SCORING_ID_WRITES))('%s on a Syntra row answers like a missing id (ERR-KPI-02)', async (_, [c, write]) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => write(gateway, id), sId(c), 'ERR-KPI-02');
+  });
+
+  it('finalizeResults naming a Syntra result in a Demo period answers like a missing id', async () => {
+    const { gateway } = newGateway();
+    const demoPeriod = DEMO.id('CyclePeriod', 'T01');
+    await expectSameAsMissing((id) => gateway.results.finalizeResults(D, demoActor, demoPeriod, [id]), sId('PeriodResult'), 'ERR-KPI-02');
+  });
+
+  it('Demo Co calculates from its own rows only, and Syntra\'s results stay as they were', async () => {
+    const { gateway } = newGateway();
+    const syntraBefore = await gateway.results.listPeriodResults(S);
+    const results = await gateway.results.calculateResults(D, demoActor, DEMO.id('CyclePeriod', 'T01'));
+    expect(results.length).toBeGreaterThan(0);
+    expect(foreignIdsIn(results)).toEqual([]);
+    for (const r of results) expect(foreignIdsIn(await gateway.results.listResultDetails(D, r.id))).toEqual([]);
+    expect(await gateway.results.listPeriodResults(S)).toEqual(syntraBefore);
   });
 });
