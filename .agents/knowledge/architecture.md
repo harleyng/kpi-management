@@ -165,8 +165,15 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
   `sourceEventId` (the scheduler does not dedupe reminders, BR-KPI-13). T7 and the query-cache
   invalidation listen; listeners are idempotent by `event.id`, registered once at gateway construction,
   and a rejected listener is reported, never swallowed.
-- **Imports** — the client parses Excel (exceljs) into typed rows; `actuals.stageImport` validates and
-  stores rows + row errors on the `ImportBatch`; `commitImport` applies all rows or none.
+- **Imports** (T4, WBS 4.4.3 — the shared framework) — the import screen reads the `.xlsx` in the browser
+  (`src/lib/excel.ts`, exceljs loaded lazily inside its functions — `excel.test.ts` fails on a static
+  import) into a cell matrix, `importRules.parseSheet(spec, matrix)` turns it into typed rows (a file
+  with header / size / cell errors is shown locally and never staged); `actuals.stageImport` uploads →
+  validates through the type's handler (`mock/imports.ts`: `IMPORT_HANDLERS` — `Actual` wired; GoalPlan
+  T3, OrgData T1, Library T2 throw `KpiDeferredError('actuals.stageImport:<Type>')` from inside the wired
+  method) and stores rows + row errors on the `ImportBatch`; `commitImport` re-validates and applies all
+  rows or none. A track adding its type writes: a spec + row validator in `src/lib/import<Thing>Rules.ts`,
+  a handler in `mock/imports.ts`, and reuses `ImportUploadCard` / `ImportPreview` (`/add-import-template`).
 - **IDs** — strings (`crypto.randomUUID()` at runtime; deterministic UUID-shaped `seedId(...)` in
   fixtures; `perm.<code>` for the global permission catalogue). The ERD's `bigint` keys are for the
   future database.
@@ -195,6 +202,9 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 | `workflowContext.ts` | The workflow methods' shared plumbing: `throwRefusal` / `throwIssues` / `throwDecision` (a rule's answer → `KpiError`), `refOrInvalid` (a payload id → ERR-KPI-06 worded like the integrity check), `directoryOf`, `entitlementCtx`, `assigneesFor`, `assertMayEdit` (EDIT standing + `editRefusal`), `assertPlanEditable` (`canEditPlan` with its context from the rows), `setPlanStatus` (the one plan-status write: LOCK / UNLOCK audit + `goalPlan.statusChanged`), `fireLaunch` (recipients → Draft plans → forms → evaluation items with actual snapshots → Launched → `form.launched`). Decides nothing |
 | `audit.ts` | The audit trail: the runtime writes one `AuditLog` row per `entity.changed` IN the write's transaction (not for notifications), so a change and its audit entry are saved together or not at all; the row's id is the event's, so `system.recordAudit` of the same event is a no-op. Notification rendering (T7) registers its system listener in `createMockGateway` |
 | `groups/*.ts` | One file per contract group — WHAT each method does, nothing else |
+| `imports.ts` (T4) | The batch-import framework's per-type handlers (`validate` at stage, `apply` at commit) and `actualImportContext(tx, cycleId)` — a lookup table, the decisions are `src/lib` rules |
+| `actualWrites.ts` (T4) | `writeActualSnapshot` — THE way an actual is written (manual, Excel, API: new current snapshot, previous one retired) — and `writeImportEvidence` |
+| `erpSaleSimulator.ts` (T4) | `simulatedErpReading` — the simulated ERP Sale's answer for (goal, month): deterministic data, not a calculation (BR-KPI-56) |
 | `groups/scheduler.ts` | `scheduler.runDue` — one system transaction: due launches → rule firings → overdue (snapshot of the forms at tick start) → reminders; returns the `SchedulerReport` |
 
 `groups/results.ts` loads the rows with `tx.all`, calls `resultRules`' orchestrators
@@ -209,9 +219,9 @@ the integrity check, so a foreign id still answers like a missing one.
 is pending, bar a Phase 2 track's own work package (`registry.trackOwned`, pinned by the Gate 1 test in
 `src/integrations/data/mock/runtime.test.ts`; adding to it is a Large change):
 - *Deferred* (rejects `KpiDeferredError` until the track wires it; its `auth` is already declared) —
-  T4: `actuals.stageImport`, `commitImport` (4.4.3), `runSync` (4.4.5); T6: `results.exportPayroll` (4.6.4).
-- *Pending guard* — none. (`actuals.rejectImport` was wired at Gate 1 QA: only a Validating batch,
-  `actualRules.canRejectImport`; T4's import framework builds the rest of the batch lifecycle.)
+  T6: `results.exportPayroll` (4.6.4). (T4 wired `actuals.stageImport`, `commitImport` and `runSync` on
+  2026-10-19; the import TYPES of T1/T2/T3 are deferred inside `stageImport`, not as methods.)
+- *Pending guard* — none.
 
 Wired at Gate 1 — workflow lane: `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `createLaunch`,
 `cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`, `scheduler.runDue` (now

@@ -31,6 +31,9 @@ const ROUTES: [path: string, title: string][] = [
   ['/system/audit-log', 'Nhật ký'],
 ];
 
+/** Routes whose track has built the page — no longer the "Chưa xây dựng" placeholder. Each track adds its own. */
+const BUILT = new Set(['/admin/actuals', '/system/data-sources']); // T4
+
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
@@ -89,7 +92,7 @@ test.describe('@smoke app shell', () => {
 
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}$`));
       await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
-      await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
+      if (!BUILT.has(path)) await expect(page.getByText('Chưa xây dựng', { exact: true })).toBeVisible();
       expect(errors).toEqual([]);
     });
   }

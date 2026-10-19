@@ -146,6 +146,33 @@ Sau khi phiếu đánh giá hoàn thành:
 4. **Khóa kết quả (C&B/HR).** Kết quả đã chốt được khóa để chuyển lương; bản nháp giữ nguyên.
 5. Khi kết quả của kỳ đã chốt, không nhập thêm số thực tế cho Goal Plan đó trong kỳ đó.
 
+## 4C. Số liệu thực hiện hằng tháng (Track T4)
+
+Sau khi tháng kết thúc (ngày 1 tháng sau), số thực tế của từng chỉ tiêu được ghi vào hệ thống theo ba
+đường. Màn hình "Số liệu & import" mở sẵn tháng vừa kết thúc.
+
+```mermaid
+flowchart LR
+  ERP[ERP Sale<br/>kết nối API] -- HR bấm Chạy đồng bộ --> S{Kiểm tra<br/>từng chỉ tiêu}
+  X[Tệp Excel<br/>theo mẫu] -- HR tải lên --> P[Xem trước<br/>lỗi từng dòng] -- Ghi nhận cả lô --> S
+  M[Nhập tay<br/>QL / HR / C&B] --> S
+  S -- hợp lệ --> A[Số thực tế hiện tại<br/>+ lịch sử]
+  A --> F[Phiếu đánh giá<br/>chụp số lúc khởi chạy]
+```
+
+1. **Nhập tay.** Quản lý (đơn vị của mình), HR, C&B nhập số cho từng chỉ tiêu; nhân viên không nhập số
+   (giả định Q19) mà tự đánh giá kèm bằng chứng trên phiếu.
+2. **Nhập từ Excel.** HR tải mẫu đã điền sẵn chỉ tiêu của tháng, điền số, tải lên. Tệp sai mẫu bị chặn
+   ngay, không tạo lô. Tệp đúng mẫu tạo một lô "Đang kiểm tra" với lỗi từng dòng; còn một dòng lỗi thì
+   không ghi nhận được, sửa tệp và tải lên thành lô mới. Ghi nhận là ghi cả lô hoặc không ghi gì.
+3. **Đồng bộ API.** HR chạy đồng bộ cho một tháng. Số do người nhập (tay, Excel) không bị ghi đè
+   (giả định Q23); số bị từ chối được ghi vào nhật ký lần chạy.
+4. Mọi đường đều qua cùng một kiểm tra: kế hoạch đã duyệt/khóa (Q21), kỳ chưa khóa, kết quả chưa chốt,
+   chỉ tiêu còn hiệu lực, **chỉ nhập theo tháng** (quý, năm tự cộng từ các tháng — Q22), kỳ đã bắt đầu,
+   đúng kiểu số/chữ. Số mới thay số hiện tại, số cũ vẫn giữ trong lịch sử.
+5. **Bằng chứng** (tệp hoặc đường dẫn) gắn vào chỉ tiêu theo tháng; link trong tệp Excel thành bằng chứng
+   của số vừa ghi.
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -174,6 +201,10 @@ trực tiếp đến quy trình:
 | Q13 | % lương KPI có chia theo số ngày làm việc khi nhân viên vào hoặc nghỉ giữa kỳ? | Không chia | HR + C&B |
 | Q17 | Nhân viên có kết quả kỳ khi chưa hoàn thành phiếu đánh giá không (ví dụ lấy từ số thực tế, hoặc cột quản lý)? | Không — chỉ lấy cột cuối của phiếu đánh giá đã hoàn thành | Product owner + HR / C&B |
 | Q18 | Có nhập số thực tế cho kỳ chưa bắt đầu được không? | Không | Product owner + HR / C&B |
+| Q19 | Ai nhập số thực tế bằng tay — nhân viên có nhập không? | Không: quản lý, HR, C&B nhập; nhân viên tự đánh giá kèm bằng chứng | Product owner + HR |
+| Q21 | Có nhập số cho chỉ tiêu khi Goal Plan chưa duyệt/khóa không? | Không | Product owner + HR |
+| Q22 | Quý, nửa năm, năm có số thực tế riêng không? | Không: chỉ nhập theo tháng, kỳ dài hơn tự cộng | HR |
+| Q23 | Đồng bộ API có ghi đè số người đã nhập (tay, Excel) không? | Không: bỏ qua và ghi nhật ký | HR |
 
 ## 7. Quyết định đã chốt
 
@@ -211,3 +242,10 @@ trực tiếp đến quy trình:
 - Chốt kết quả theo nguyên tắc "tất cả hoặc không": còn một kết quả vướng thì không chốt kết quả nào.
 - Phòng ban/công ty được xếp loại nhưng không có % lương.
 - Kỳ đã chốt kết quả thì không nhập thêm số thực tế; chưa đến kỳ thì cũng chưa nhập được (giả định Q18).
+
+**19/10/2026 — Track T4, số liệu thực hiện (product owner duyệt).**
+
+- Nhân viên không nhập số thực tế; quản lý, HR, C&B nhập (giả định Q19).
+- Chỉ nhập số cho chỉ tiêu của Goal Plan đã duyệt hoặc đã khóa (Q21); chỉ nhập theo tháng (Q22).
+- Đồng bộ API không ghi đè số do người nhập (Q23); import Excel thì ghi đè, có cảnh báo trước khi ghi nhận.
+- Import Excel ghi cả lô hoặc không ghi gì; tệp sửa lại được tải lên thành lô mới.

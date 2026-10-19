@@ -40,3 +40,26 @@ export function useEmployees(filter: EmployeeFilter = {}) {
     staleTime: ORG_STALE_MS,
   });
 }
+
+export const assignmentsKey = (tenantId: string) => queryKey(tenantId, 'assignments');
+
+/** Every assignment of the tenant — who sits in which unit on a date (`orgRules.primaryAssignmentOn`). */
+export function useAssignments() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: assignmentsKey(tenantId),
+    queryFn: () => getDataGateway().org.listAssignments(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}
+
+export const userAccountsKey = (tenantId: string) => queryKey(tenantId, 'userAccounts');
+
+export function useUserAccounts() {
+  const { tenantId } = useSession();
+  return useQuery({
+    queryKey: userAccountsKey(tenantId),
+    queryFn: () => getDataGateway().org.listUserAccounts(tenantId),
+    staleTime: ORG_STALE_MS,
+  });
+}

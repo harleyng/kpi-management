@@ -9,6 +9,23 @@
 
 ---
 
+## 2026-10-19 — The simulated clock keeps moving: never assert `x === gateway.clock.now()` after a write
+
+The mock clock flows with real time and is strictly increasing, so a timestamp stamped inside a write is
+already in the past when the test reads `clock.now()` again. Take `t0 = clock.now()` before the call and
+assert `t0 <= x <= clock.now()` (or compare two stamps of the same write: `finishedAt === startedAt`).
+
+## 2026-10-19 — "Today" is not the period: a person who left mid-month has no assignment today
+
+E024 resigned on 03-10; on the seed's today (04-06) `primaryAssignmentOn(…, today)` is null, so his T03
+goals showed no unit. For anything ABOUT a period (the unit a goal belonged to, who was employed), ask on
+the period's dates, falling back to today — `actualEntryRules` uses the month's start.
+
+## 2026-10-19 — A "\u00a0" typed into a regex can land as a literal non-breaking space
+
+ESLint then fails `no-irregular-whitespace`. JavaScript's `\s` already matches U+00A0 — write `/\s/`, not
+a character class with the escape.
+
 ## 2026-10-19 — `queryClient.clear()` does not refetch what is on screen
 
 `clear()` empties the cache but a mounted `useQuery` keeps its observer's last result and does not

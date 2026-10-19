@@ -16,6 +16,8 @@
 > `src/lib/cycleRules.ts` (cycles and periods), `src/lib/resultRules.ts` (the period-result pipeline
 > shared by the mock and the seed) and `src/lib/actualRules.ts` (the actual-entry rule, reused by T4's
 > import).
+> **Track T4 (2026-10-19)** added BR-KPI-53…57 and Q19–Q23: `src/lib/importRules.ts` (the shared import
+> framework), `actualImportRules.ts`, `actualEntryRules.ts`, and the sync / evidence rules in `actualRules.ts`.
 
 ---
 
@@ -407,14 +409,69 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   on every screen. *Source: plan §10.*
 - **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync) and when it was
   recorded; actuals are snapshots, and only the current one per goal and period counts. Recording an
-  actual is refused (`actualRules.actualIssues`, the same rule checks every import row): the period is
-  locked → ERR-KPI-04 `PERIOD_LOCKED`; the plan's result for the period is already Final / Locked → 04
+  actual is refused by ONE rule (`actualRules.actualIssues` = `entryBlockers` + `valueIssues`) that
+  manual entry, every import row and every API reading pass through, most important first: the goal's
+  plan is not **Approved / Locked** → ERR-KPI-04 `PLAN_NOT_APPROVED` (`ASSUMPTION Q21`); the period is
+  locked → 04 `PERIOD_LOCKED`; the plan's result for the period is already Final / Locked → 04
   `RESULT_FINAL`; the goal is not Active → 06 `GOAL_NOT_ACTIVE`; the period belongs to another cycle →
-  06 `PERIOD_NOT_IN_CYCLE`; nothing entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number
-  and no text, a TEXT goal non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`; the period has not
-  started (its start date after today in the tenant zone) → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`).
-  A negative number is accepted. Only a batch still **Validating** can be rejected — a Committed batch
-  has written its actuals (`actualRules.canRejectImport`, ERR-KPI-04). *Source: ERD `GOAL_ACTUAL`.*
+  06 `PERIOD_NOT_IN_CYCLE`; the period is a Quarter / Half / Year → 06 `PERIOD_NOT_MONTH` (actuals are
+  **monthly**; a longer period adds its months up, so an own quarter actual can never override them —
+  `ASSUMPTION Q22`); the period has not started → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`); nothing
+  entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number and no text, a TEXT goal
+  non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`. A negative number is accepted. Who may
+  enter by hand follows §9: `actual.enter` = MANAGER (their units) · HR · C&B · ADMIN — **an employee
+  does not enter actuals** in P1; they self-score with evidence on the evaluation form (`ASSUMPTION
+  Q19`). The detail codes' Vietnamese copy is `errorCatalog.ISSUE_DETAIL_COPY`. *Source: ERD
+  `GOAL_ACTUAL`; T4 Phase 1 (product owner, 2026-10-19).*
+- **BR-KPI-53** — **The actuals import** (WBS 4.4.3, `actualImportRules`). Template columns:
+  `Mã chỉ tiêu được giao` · `Tên đăng nhập` · `Nhân viên` (reference) · `Mã KPI` · `Tên chỉ tiêu`,
+  `Đơn vị đo`, `Mục tiêu kỳ` (reference) · `Kỳ`* · `Giá trị thực tế` · `Giá trị dạng chữ` · `Ghi chú` ·
+  `Link bằng chứng`. The key is the **assigned goal id** (CMC exports the goal list and imports it
+  back, HR guide pp. 77–80); `Tên đăng nhập` + `Mã KPI` is a Syntra fallback; `Kỳ`, `Ghi chú` and
+  `Link bằng chứng` are Syntra additions. The downloaded template is pre-filled with the month's goals
+  (Active goals of Approved / Locked plans). Reading the file never guesses: headers match ignoring
+  case and tone marks; a number in text form is read only when unambiguous (`1.234,5`, `1234.5`,
+  `85%` → 85; `1.234` and `1,234` are refused; a fraction is never rescaled); a blank cell is blank,
+  never 0; header, size and cell problems stop the file in the browser (nothing is staged). Per row,
+  every problem is listed, nothing is guessed: no key → `GOAL_KEY_REQUIRED`; unknown goal id (another
+  tenant's answers the same) → `GOAL_NOT_FOUND`; goal of another cycle → `GOAL_NOT_IN_CYCLE`; unknown
+  login → `USER_NOT_FOUND`; unknown code → `KPI_NOT_FOUND`; login + code matching two Active goals →
+  `GOAL_AMBIGUOUS`; the two keys naming different goals → `GOAL_KEY_CONFLICT`; `Kỳ` outside the
+  batch's cycle → `PERIOD_NOT_FOUND`; then BR-KPI-52 on the cell it concerns; a non-http(s) link →
+  `EVIDENCE_URL_INVALID`; two rows for the same goal and month → `DUPLICATE_ROW` on each. A resigned
+  owner is accepted while the goal is Active. The preview also WARNS (never blocks) when a row replaces
+  a current number (shows the old one) and when a % goal with a target above 1 gets a value in (0, 1].
+- **BR-KPI-54** — **The batch lifecycle** (shared by every import type, `importRules`): stage →
+  `Validating` with the rows and row errors stored on the batch → **Committed whole or not at all**
+  (`canCommitImport`: Validating, has rows, no row error) or `Rejected` (only while Validating). The
+  commit re-validates every row against the data as it is then (a month locked since staging) and, if
+  any fails, refuses with ERR-KPI-04 and the row issues and writes nothing — the batch is unchanged. A
+  corrected file is uploaded as a **new batch**; the old one is rejected by hand. Each committed row is
+  an `EXCEL` snapshot with its batch id and the committer; a `Link bằng chứng` becomes a URL evidence
+  tied to that actual. An import type whose track has not landed (GoalPlan T3, OrgData T1, Library T2)
+  is refused with `KpiDeferredError`.
+- **BR-KPI-55** — **Data sources** (WBS 4.4.1): a per-tenant catalogue (unique code, name, type
+  MANUAL / EXCEL / API, an owning unit); every goal names one (BR-KPI-05). Admin maintains it
+  (`datasource.manage`). API connections and their KPI mappings are seeded and read-only in P1; Admin
+  can only switch a connection on or off. The schedule (`0 6 1 * *` = 06:00 on day 1) is documentation —
+  no cron runs in P1.
+- **BR-KPI-56** — **The API sync** (WBS 4.4.5, simulated ERP Sale): started by hand (`actual.import`)
+  for one **month**. An Inactive connection is refused (04) and records no run. For every Active goal of
+  the month's cycle whose KPI the connection maps AND whose source is that connection's: if the current
+  number came from a person (manual or Excel) it is **kept and the goal skipped** (`ASSUMPTION Q23`);
+  a goal with no numeric month target is skipped; otherwise the reading passes BR-KPI-52 and is
+  recorded (`API`, no author) or logged as an error. Run status (`syncRunStatus`): loaded and no error →
+  Succeeded; loaded and errors → PartiallyFailed; nothing loaded and errors, or nothing to load at all →
+  Failed (all skipped → Succeeded). The simulated reading is deterministic per (goal, month), 85–115% of
+  the month's target, never below 1 on a RATIO_DOWN goal. Over its own earlier reading the latest wins;
+  an Excel import over anything is HR's deliberate act and also wins (with the preview warning).
+- **BR-KPI-57** — **Evidence** (WBS 4.4.6): a file or an http(s) link (stored, never fetched) on a goal,
+  optionally for a month and an actual; the month must be in the goal's cycle. Added and removed with
+  `evidence.upload` on the goal's owner (EMPLOYEE own, MANAGER their units, HR, ADMIN — not C&B's role,
+  though a C&B account with an employee record uploads FILES through its EMPLOYEE role, BR-KPI-62).
+  An `actualId` must be an actual of the same goal (06). Evidence is NOT frozen by a Final result — it
+  documents the number, it does not change a score. Shown wherever the actual is (the entry sheet; T5's
+  evaluation form reuses the panel).
 
 ## 8. Open assumptions (plan §9)
 
@@ -438,6 +495,11 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q16 | Which system feeds each KPI? | Sorama, My Result, CMS, MHTC as the workbook names them; ERP Sale, ERP Kho vận, CRM CSKH, HRIS and "Nhập tay" are invented samples | Seed, BR-KPI-05 |
 | Q17 | Does an employee get a period result without a completed evaluation form (e.g. from the actuals, or the manager's column)? | No — an Employee plan is scored only from a COMPLETED KPI_EVAL form's FINAL column; no completed form, no result | BR-KPI-44, seed |
 | Q18 | May an actual be recorded for a period that has not started yet? | No — refused (ERR-KPI-06 `PERIOD_NOT_STARTED`) | BR-KPI-52 |
+| Q19 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) | BR-KPI-52 |
+| Q20 | Can C&B upload the import file (`system.uploadFile` needs `evidence.upload`)? | Resolved: yes — a C&B account with an employee record holds EMPLOYEE (BR-KPI-62), whose `evidence.upload` covers a file upload. A C&B system account without an employee could not; none exists | BR-KPI-54, 57 |
+| Q21 | May actuals be recorded for a goal whose plan is not yet Approved / Locked? | No — refused (ERR-KPI-04 `PLAN_NOT_APPROVED`). A plan HR reopens takes no new actual until re-approved | BR-KPI-52 |
+| Q22 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
+| Q23 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 

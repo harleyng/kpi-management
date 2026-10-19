@@ -73,10 +73,9 @@ describe('mock runtime — the contract surface', () => {
     const open = (names: Iterable<string>) => [...names].filter((n) => !trackOwned.has(n));
     expect(open(deferred.keys())).toEqual([]);
     expect(open(pendingGuards.keys())).toEqual([]);
+    // T4 wired stageImport / commitImport (4.4.3) and runSync (4.4.5); the import TYPES other tracks
+    // own (GoalPlan, OrgData, Library) are deferred inside stageImport, not as methods (mock/imports.ts).
     expect(Object.fromEntries([...trackOwned].sort(([a], [b]) => (a < b ? -1 : 1)))).toEqual({
-      'actuals.commitImport': 'T4', // WBS 4.4.3 importRules
-      'actuals.runSync': 'T4', // WBS 4.4.5 the simulated ERP Sale connector
-      'actuals.stageImport': 'T4', // WBS 4.4.3
       'results.exportPayroll': 'T6', // WBS 4.6.4
     });
     // Every user write declares its authorization (authorize.ts), deferred ones included.

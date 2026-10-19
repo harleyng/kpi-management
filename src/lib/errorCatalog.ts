@@ -156,6 +156,79 @@ export const ERROR_CATALOG: Record<ErrorCode, ErrorSpec> = {
 };
 
 /**
+ * The detail codes Track T4 raises (actual entry, imports, the API sync). A `RuleIssue.detail`, an
+ * `ImportRowError.detail` and a sync-run log line carry the CODE; the screen renders the sentence
+ * below with `issueText` — the copy lives here, never in a rule, the mock or a screen (rule 6).
+ */
+export const ISSUE_DETAILS = [
+  // actualRules.actualIssues (BR-KPI-52)
+  'PLAN_NOT_APPROVED', 'PERIOD_LOCKED', 'RESULT_FINAL', 'GOAL_NOT_ACTIVE', 'PERIOD_NOT_IN_CYCLE',
+  'PERIOD_NOT_MONTH', 'PERIOD_NOT_STARTED', 'ACTUAL_REQUIRED', 'ACTUAL_TYPE_MISMATCH',
+  // importRules — reading the file (BR-KPI-53)
+  'FILE_EMPTY', 'FILE_TOO_LARGE', 'FILE_UNREADABLE', 'HEADER_MISSING', 'HEADER_DUPLICATE',
+  'CELL_REQUIRED', 'CELL_NOT_NUMBER', 'CELL_NOT_DATE',
+  // actualImportRules — one actuals row (BR-KPI-53)
+  'GOAL_KEY_REQUIRED', 'GOAL_NOT_FOUND', 'GOAL_NOT_IN_CYCLE', 'USER_NOT_FOUND', 'KPI_NOT_FOUND',
+  'GOAL_AMBIGUOUS', 'GOAL_KEY_CONFLICT', 'PERIOD_NOT_FOUND', 'DUPLICATE_ROW', 'EVIDENCE_URL_INVALID',
+  // preview warnings — shown, never blocking (BR-KPI-53)
+  'OVERWRITES_ACTUAL', 'PERCENT_SUSPECT',
+  // the API sync (BR-KPI-56)
+  'CONNECTION_INACTIVE', 'NO_MAPPED_GOAL', 'NO_PERIOD_TARGET', 'HUMAN_ACTUAL_KEPT',
+  // the data-source catalogue form (WBS 4.4.1)
+  'FIELD_REQUIRED', 'SOURCE_CODE_TAKEN',
+] as const;
+export type IssueDetail = (typeof ISSUE_DETAILS)[number];
+
+export const ISSUE_DETAIL_COPY: Readonly<Record<IssueDetail, string>> = {
+  PLAN_NOT_APPROVED: 'Kế hoạch mục tiêu chưa được duyệt hoặc khóa, chưa nhập số được.',
+  PERIOD_LOCKED: 'Kỳ đã khóa số liệu.',
+  RESULT_FINAL: 'Kết quả của kỳ đã chốt, không nhập thêm số thực tế.',
+  GOAL_NOT_ACTIVE: 'Chỉ tiêu đã được điều chỉnh hoặc đã hủy.',
+  PERIOD_NOT_IN_CYCLE: 'Kỳ không thuộc chu kỳ của chỉ tiêu.',
+  PERIOD_NOT_MONTH: 'Chỉ nhập số theo tháng; quý, nửa năm và năm tự cộng từ các tháng.',
+  PERIOD_NOT_STARTED: 'Kỳ chưa bắt đầu.',
+  ACTUAL_REQUIRED: 'Thiếu giá trị thực tế.',
+  ACTUAL_TYPE_MISMATCH: 'Sai kiểu giá trị: chỉ tiêu dạng số nhận một số, chỉ tiêu dạng chữ nhận chữ (ví dụ Đạt).',
+  FILE_EMPTY: 'Tệp không có dòng dữ liệu nào.',
+  FILE_TOO_LARGE: 'Tệp có quá nhiều dòng. Hãy chia thành nhiều tệp nhỏ hơn.',
+  FILE_UNREADABLE: 'Không đọc được tệp. Hãy dùng tệp .xlsx tạo từ mẫu.',
+  HEADER_MISSING: 'Thiếu cột bắt buộc ở dòng tiêu đề.',
+  HEADER_DUPLICATE: 'Cột này xuất hiện hai lần ở dòng tiêu đề.',
+  CELL_REQUIRED: 'Ô bắt buộc đang để trống.',
+  CELL_NOT_NUMBER: 'Không phải số hợp lệ. Viết số không có dấu phân cách hàng nghìn, hoặc dạng 1.234,5.',
+  CELL_NOT_DATE: 'Không phải ngày hợp lệ (dd/mm/yyyy).',
+  GOAL_KEY_REQUIRED: 'Cần mã chỉ tiêu được giao, hoặc tên đăng nhập cùng mã KPI.',
+  GOAL_NOT_FOUND: 'Không tìm thấy chỉ tiêu được giao.',
+  GOAL_NOT_IN_CYCLE: 'Chỉ tiêu không thuộc chu kỳ của lô import.',
+  USER_NOT_FOUND: 'Không tìm thấy người dùng.',
+  KPI_NOT_FOUND: 'Không tìm thấy mã KPI trong thư viện.',
+  GOAL_AMBIGUOUS: 'Người này có nhiều chỉ tiêu cùng mã KPI. Hãy ghi mã chỉ tiêu được giao.',
+  GOAL_KEY_CONFLICT: 'Mã chỉ tiêu được giao và tên đăng nhập + mã KPI trỏ tới hai chỉ tiêu khác nhau.',
+  PERIOD_NOT_FOUND: 'Kỳ không có trong chu kỳ của lô import.',
+  DUPLICATE_ROW: 'Chỉ tiêu và kỳ này xuất hiện ở nhiều dòng.',
+  EVIDENCE_URL_INVALID: 'Link bằng chứng phải bắt đầu bằng http:// hoặc https://.',
+  OVERWRITES_ACTUAL: 'Sẽ thay số thực tế hiện có của chỉ tiêu trong kỳ.',
+  PERCENT_SUSPECT: 'Đơn vị là %, giá trị nhỏ hơn 1. Có phải bạn định nhập dạng 85 cho 85%?',
+  CONNECTION_INACTIVE: 'Kết nối đang ngừng hoạt động.',
+  NO_MAPPED_GOAL: 'Không có chỉ tiêu nào khớp ánh xạ của kết nối trong kỳ này.',
+  NO_PERIOD_TARGET: 'Chỉ tiêu không có mục tiêu số cho kỳ, bỏ qua.',
+  HUMAN_ACTUAL_KEPT: 'Đã có số nhập tay hoặc Excel, giữ nguyên và bỏ qua.',
+  FIELD_REQUIRED: 'Hãy nhập trường này.',
+  SOURCE_CODE_TAKEN: 'Mã nguồn này đã có. Hãy dùng mã khác.',
+};
+
+const isIssueDetail = (value: string): value is IssueDetail => Object.prototype.hasOwnProperty.call(ISSUE_DETAIL_COPY, value);
+
+/**
+ * The sentence for a detail code. A detail that is not a code (an older stored sentence, e.g. the
+ * seed's import errors) is shown as it is; no detail falls back to the code's catalogue title.
+ */
+export function issueText(detail: string | null | undefined, code: ErrorCode = 'ERR-KPI-06'): string {
+  if (!detail) return ERROR_CATALOG[code].title;
+  return isIssueDetail(detail) ? ISSUE_DETAIL_COPY[detail] : detail;
+}
+
+/**
  * One problem a rule found — what every `src/lib/*Rules.ts` check returns instead of throwing.
  * `ref` points at the row it is about (a goal, an evaluation item, a tier, a level) so a screen can
  * mark it inline; `data` carries the numbers shown beside the copy (`{ totalWeight: 90 }`).
