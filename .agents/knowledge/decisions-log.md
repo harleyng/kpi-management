@@ -6,6 +6,52 @@
 
 ---
 
+## 2026-10-19 — Phase 1.3: permissions are data, a person's access is the union of their roles, and approving is never a permission
+
+**Decision.** `src/lib/permissionRules.ts` declares 28 `module.action` codes (ids `perm.<code>`, the same in
+every tenant) and the DEFAULT role → permission matrix the seed builds its rows from; `can(profile, code,
+resource?)` evaluates the LOADED ROLE_PERMISSION / USER_ROLE rows, so T1's edits take effect. Access is the
+union of a person's roles — the switcher picks tenant and person, never a role. There is no `goal.approve`:
+SUBMIT / APPROVE / RETURN are the step's actor rule (BR-KPI-61); only `form.proxy` and `form.cancel` gate
+forms, and both are scope-sensitive. Defaults: MANAGER = OrgUnit (the unit they head) + children; HR, CNB,
+BOD, ADMIN = Tenant; **ADMIN holds every code** (product owner — plan §7.1 showed ADMIN only "Hệ thống").
+Everything fails closed. All of it is `ASSUMPTION Q12`: no source describes roles or scopes.
+
+**Why.** A hard-coded matrix would make T1's "Người dùng & quyền" screen a lie the moment HR edited a
+mapping. An approval permission would sooner or later disagree with the actor rule — a manager holding
+`goal.approve` who is not the plan's direct manager would see an Approve button that the workflow refuses.
+An "active role" picker adds a second concept to every demo and an impossible state (a manager viewing as
+EMPLOYEE while holding a task at their step). DirectReports for managers would hide a department head's
+sub-teams and their unit plan.
+
+**Updated alongside.** `business-rules.md` §0 glossary, BR-KPI-20/23 cross-references, §8 Q12, new §9
+(BR-KPI-60…64 + the catalogue table); `docs/flows/new-flow.md` §4A, §6, §7; `src/data/fixtures/README.md`
+(seed requirements for 1.2); `src/data/types.ts` (`Permission` comment).
+
+---
+
+## 2026-10-19 — Phase 1.3: the menu and the route guard read the same permission; the session is one query and stays referentially stable
+
+**Decision.** Each `NavItem` names a `permission` (`null` = any signed-in user); `NavGroup.roles` and 1.4's
+role-only `navRules.ts` are gone. The sidebar shows `visibleNavGroups(NAV_GROUPS, access)`; AppShell renders
+ERR-KPI-05 for a path `canOpenPath` refuses (longest url-segment match); `navConfig.test.ts` fails if a route
+in `App.tsx` is neither a menu item nor in `PUBLIC_PATHS`. The session loads ONE directory query per tenant
+(`[tenantId, 'sessionDirectory']`, `Promise.all`), renders children only once resolved, rebuilds the profile
+when "today" (gateway clock, tenant zone) changes, keeps a background-refetch failure on screen as a toast,
+and validates the stored `kpi.session.v1` ids against what it loaded. Switch handlers read `navigate` from a ref.
+
+**Why.** Seven tracks guarding their own routes would miss one, and a missed route is a silent leak; a route
+with no menu item would have been open to everyone. A partial directory (roles without their permissions)
+fails open or closed at random. React Router v6's `navigate` changes on every navigation, so a handler
+depending on it re-created the session value and re-rendered every consumer per route change (the stability
+test caught it).
+
+**Updated alongside.** `architecture.md` (route table, Client state, phases), `component-registry.md`,
+`common-pitfalls.md` (navigate identity, Node `localStorage` in Vitest, session hooks' explicit tenant),
+`src/hooks/queries/README.md`.
+
+---
+
 ## 2026-10-19 — Phase 1.4: the UI kit never shows a stale or dropped value, and a badge marks the exception
 
 **Decision.** Tones for every state set live in `statusTones.ts`; a set's ordinary state is `muted`

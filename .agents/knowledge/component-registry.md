@@ -17,12 +17,16 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 
 | Component | Purpose |
 |---|---|
-| `AppShell` | The frame: sidebar + top bar + `<Outlet/>` inside `RouteErrorBoundary` + `Suspense` |
-| `AppSidebar` | Left navigation from `navConfig` filtered by `visibleNavGroups(roles)`, collapsible to an icon rail (⌘B), state in `sidebarStore` |
-| `SidebarAccount` | The account block at the foot of the sidebar (user, roles, sign-out placeholder) |
-| `TopBar` | Tenant name + the permanent **"Dữ liệu giả lập"** banner; the session switcher arrives in 1.3 |
+| `AppShell` | The frame: sidebar + top bar + `<Outlet/>` inside `RouteErrorBoundary` + `Suspense`; the **route guard** (`canOpenPath` → `AccessDenied`) |
+| `AppSidebar` | Left navigation from `navConfig` filtered by `visibleNavGroups(NAV_GROUPS, access)` (permissions), collapsible to an icon rail (⌘B), state in `sidebarStore` |
+| `SidebarAccount` | The account block at the foot of the sidebar — DISPLAYS the identity (user, email, roles); no switcher here |
+| `TopBar` | `SessionSwitcher` + the permanent **"Dữ liệu giả lập"** banner |
+| `SessionSwitcher` | Tenant dropdown + searchable person picker (grouped by primary role, `matchesSearch` on name/unit/roles, roles as muted text, polite live-region announcement) |
+| `SimulatedDataBadge` | The "Dữ liệu giả lập" banner (short "Giả lập" below `lg`, full accessible name) — also on the session screens |
+| `SessionScreens` | `SessionLoading` (shell skeleton) · `SessionError` (`errorSpecOf` + retry) · `SessionEmpty` ("Chưa có dữ liệu mẫu", reseed, other tenants) — rendered before a session exists, never call `useSession()` |
+| `AccessDenied` | The route guard's panel inside the shell: ERR-KPI-05 title + "Về trang chủ" |
 | `RouteErrorBoundary` | Catches render errors; reloads once on a stale chunk |
-| `navConfig.ts` | `NAV_GROUPS` (5 groups, roles per group, 17 items), `HOME_URL` |
+| `navConfig.ts` | `NAV_GROUPS` (5 groups, 17 items, a `permission` per item), `HOME_URL`, `PUBLIC_PATHS` — `navConfig.test.ts` pins plan §7.1 and route coverage |
 
 ## `src/components/shared/`
 
@@ -50,8 +54,8 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 
 | File | Purpose |
 |---|---|
-| `useSession.ts` | `useSession()` → `tenantId`, `tenantName`, `user`, `roles`, `hasRole`, `isSimulated` |
-| `SessionContext.tsx` | Provider — Phase 0 placeholder identity holding every role |
+| `useSession.ts` | `useSession()` → `tenantId`, `tenant`, `user` (`id`, `employeeId`, name, email), `roles`, `hasRole`, **`can(code, resource?)`**, `access`, `today`, `tenants`, `people`, `switchTenant`, `switchUser`, `isSimulated` — all referentially stable |
+| `SessionContext.tsx` | Provider — loads tenants and one session directory, resolves the stored selection, builds the access profile; renders children only once a session exists — tested |
 
 ## `src/lib/`
 
@@ -61,8 +65,9 @@ separator · skeleton · slider · sonner (top-right toaster) · switch · table
 | `pagination.ts` | `paginate()`, `serverPageSlice()`, `DEFAULT_PAGE_SIZE`, `PAGE_SIZE_OPTIONS` — tested |
 | `utils.ts` | `cn`, `formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `foldDiacritics`, `downloadBlob` (vi-VN, Asia/Ho_Chi_Minh) |
 | `sidebarStore.ts` | Zustand: sidebar collapsed (persisted as `kpi.sidebar`) |
-| `permissionRules.ts` | Stub — `can()` in Phase 1.3 |
-| `navRules.ts` | `visibleNavGroups(groups, roles)` — role-based menu filter (1.4); Phase 1.3's permission-based menu replaces it |
+| `permissionRules.ts` | `PERMISSION_CODES` / `PERMISSION_CATALOGUE`, `DEFAULT_ROLE_PERMISSIONS`, `DEFAULT_ROLE_SCOPE`, `permissionId`, `permissionRows`, `defaultRolePermissionRows`, `buildAccessProfile`, **`can`**, `resourceOfOwner`, `resourceOfSubject`, `roleCodesOf`, `visibleNavGroups`, `canOpenPath` — tested (`permissionFixtures.test-util.ts`) |
+| `sessionRules.ts` | `pickTenant`, `pickAccount`, `primaryRole`, `tenantToday`, `sessionPeople`, `groupPeopleByRole`, `SessionDirectory` — tested |
+| `sessionStore.ts` | Zustand: the stored tenant + person per tenant (`kpi.session.v1`, shape-validated) — tested |
 | `search.ts` | `matchesSearch(query, fields)` — diacritic-insensitive, every word must match — tested |
 | `tableSort.ts` | `sortRows`, `compareSortValues` (`vi` collation, missing last), `nextSortDirection` — tested |
 | `queryState.ts` | `loadPhase`, `isRefreshing`, `combineQueries` — what a list shows for a query result — tested |
@@ -85,3 +90,4 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 |---|---|
 | `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`) |
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
+| `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed`, `readGatewayNow`, `canResetSeed` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |

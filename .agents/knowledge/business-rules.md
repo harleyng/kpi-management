@@ -7,7 +7,8 @@
 >
 > Status on 2026-10-19 (Phase 1.1 done): the **state sets are declared** in `src/data/types.ts` and the
 > data contract in `src/integrations/data/types.ts`. The rules are still **specified, not implemented**
-> — they are implemented in Phase 1.5 (`src/lib/*Rules.ts`).
+> — they are implemented in Phase 1.5 (`src/lib/*Rules.ts`). Phase 1.3 (2026-10-19) implemented §9 — roles,
+> permissions and data scope — in `src/lib/permissionRules.ts`.
 
 ---
 
@@ -32,6 +33,9 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 | **Phiếu (form)** | One workflow instance (registration, adjustment or evaluation) for one subject and period |
 | **Đợt khởi chạy** | One launch that creates many forms, now, on a date or on a schedule (D5) |
 | **Proxy / ủy quyền** | Acting on someone else's step (HR as proxy) / a dated delegation of one's own step |
+| **Vai trò (role)** | EMPLOYEE · MANAGER · HR · CNB · BOD · ADMIN — a bundle of permissions, assigned to an account with a scope |
+| **Quyền (permission)** | One capability, `module.action` (`goalplan.lock`, `form.launch`) — §9. Never "who approves this step": that is the step's **actor** (người xử lý bước) |
+| **Phạm vi dữ liệu (scope)** | Whose data a role's permissions reach: Self · DirectReports · OrgUnit (+ children) · Tenant |
 
 ---
 
@@ -117,7 +121,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
   ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
   is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
-  pp. 150–155.*
+  pp. 150–155.* Being a step's actor is never a permission (BR-KPI-61).
 - **BR-KPI-21** — An action taken **as proxy or under delegation** records both the person who acted
   and the person acted for (and the delegation used). A delegation is valid only for its form type,
   between `validFrom` and `validTo`, and until it is revoked; it stops granting the right the moment it
@@ -128,7 +132,8 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   RETURN and CANCEL are recorded by a person; RETURN goes to the step's `returnToStepNo` (default the
   previous step). CANCEL is HR/ADMIN only, with a reason; cancelling a registration form puts its plan
   back to Draft. An action names the step the screen showed — if the form has moved on, it is refused
-  (ERR-KPI-04). *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
+  (ERR-KPI-04). CANCEL and acting as proxy are the `form.cancel` / `form.proxy` permissions (§9). *Source:
+  Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
@@ -265,3 +270,61 @@ whatever the entry's surface. Rule-specific codes are added beside their rule in
 | Q9 | Does a KGI have a numeric target? | Optional field, not scored | BR-KPI-02 |
 | Q10 | CMC's monthly work plan in P1? | No | BR-KPI-22 |
 | Q11 | Does P1 track "tự thực hiện" (what a manager personally achieved on a cascaded goal)? | No — shown as "—" | BR-KPI-07 |
+| Q12 | The permission catalogue, the default role → permission matrix and the default scopes? The sources are silent | §9 as written: union of roles, MANAGER = OrgUnit + children, company plan readable by all, BOD read-only, ADMIN holds everything | BR-KPI-60…64 |
+
+## 9. Roles, permissions and data scope (Phase 1.3)
+
+Implemented in `src/lib/permissionRules.ts` (catalogue, default matrix, `can`, the menu filter and the route
+guard); the session exposes it as `useSession().can(code, resource?)`. **None of the sources describes roles,
+permissions or scopes** (`docs/source-map.md` has no entry): everything in this section is a Syntra decision
+or `ASSUMPTION Q12`, except the six roles and four scopes themselves (ERD `ROLE`, `USER_ROLE`).
+
+- **BR-KPI-60** — A person's access is the **union** of their role assignments (USER_ROLE rows): every role
+  contributes its permissions over its own scope. There is no "active role" to pick. *Source: product owner,
+  2026-10-19.*
+- **BR-KPI-61** — **A permission is never a workflow decision.** `can` answers "may this person use this
+  capability on this data at all"; whether they may SUBMIT / APPROVE / RETURN a form is decided only by the
+  step's actor rule or a valid delegation (BR-KPI-20, 21). There is no `goal.approve` permission (the ERD's
+  example code is not adopted). Either refusal is ERR-KPI-05. *Source: Phase 1.3 analysis.*
+- **BR-KPI-62** — **Every account with an employee record also holds EMPLOYEE / Self**, so "Của tôi" works for
+  a manager, HR or BOD. A system account (no employee) does not, and its "Của tôi" screens are empty, not
+  failed. *Source: plan §7.1 ("Của tôi" — every role).*
+- **BR-KPI-63** — **The company plan is readable by the whole tenant** (`goalplan.view` on the Company owner
+  needs no scope): every cascade starts from it. Editing it needs a Tenant scope or an OrgUnit scope on the
+  root unit. *ASSUMPTION Q12.*
+- **BR-KPI-64** — **Scopes resolve on "today" in the tenant's zone** (the gateway clock), over every
+  assignment effective that day (both ends inclusive; a concurrent assignment counts too):
+  Self = the account's own employee · DirectReports = people whose effective assignment names me as manager,
+  one level, never me · OrgUnit = the unit, its subtree when `includeChildren` (Inactive units included), the
+  people assigned there, and the Company owner when the subtree holds the tenant's single root · Tenant =
+  everything. Someone whose last day (`leftOn`) has passed — or who is Resigned with none recorded — is out of
+  every scope. A scope that cannot resolve (no unit, an unknown one) covers nothing. *ASSUMPTION Q12.*
+- **Fail closed.** An unknown code, a row pointing at an unknown role or permission, a row of another tenant,
+  an Inactive account and an owner that cannot be resolved all deny (BR-KPI-50).
+- **The menu and the route guard follow the same permission.** Each menu item names one; a group is shown
+  when any of its items is; a route nobody may open shows ERR-KPI-05 inside the shell. A detail page still
+  checks its own record with `can(code, resource)`. Under the default matrix the menu reproduces plan §7.1,
+  except ADMIN, who sees every group.
+
+**The catalogue (28 codes).** S = checked against the data's owner through the scope; T = tenant-wide
+capability. Default holders (✓):
+
+| Code | S/T | EMP | MGR | HR | CNB | BOD | ADMIN |
+|---|---|---|---|---|---|---|---|
+| org.view · library.view · goalplan.view · actual.view · result.view · delegation.manage | T/S | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| org.manage · user.manage · datasource.manage · notification.manage · audit.view | T | | | | | | ✓ |
+| library.manage · cycle.manage · actual.import · form.launch · result.finalize · rating.config | T | | | ✓ | ✓ | | ✓ |
+| team.view | T | | ✓ | | | | ✓ |
+| goalplan.edit · evidence.upload | S | ✓ | ✓ | ✓ | | | ✓ |
+| goalplan.lock · goalplan.import | T | | | ✓ | | | ✓ |
+| form.proxy · form.cancel — only over subjects in scope | S | | | ✓ | | | ✓ |
+| actual.enter | S | | ✓ | ✓ | ✓ | | ✓ |
+| form.start | S | | ✓ | ✓ | | | ✓ |
+| result.export | T | | | | ✓ | | ✓ |
+| dashboard.view | S | | ✓ | ✓ | | ✓ | ✓ |
+
+The view codes and `delegation.manage` are scope-sensitive (S); `org.view` and `library.view` are tenant-wide.
+**Default scopes:** EMPLOYEE Self · MANAGER OrgUnit (the unit they head) + children · HR, CNB, BOD, ADMIN
+Tenant. **ADMIN holds every code** (product owner, 2026-10-19 — a deviation from plan §7.1, where ADMIN saw only
+"Hệ thống"). Permission ids are `perm.<code>`, the same in every tenant. Adding a code after Gate 1 is a Large
+change.

@@ -192,9 +192,10 @@ export interface Role extends TenantScoped {
 }
 
 /**
- * ERD `PERMISSION` — the system-wide catalogue (`goal.approve`, `result.view_all`…). The only
- * entity without `tenantId`: it is the same list for every tenant. The codes themselves are
- * declared in `src/lib/permissionRules.ts` (Phase 1.3).
+ * ERD `PERMISSION` — the system-wide catalogue (`goalplan.lock`, `form.launch`…). The only entity
+ * without `tenantId`: it is the same list for every tenant. The codes, and the ids derived from them
+ * (`perm.<code>`), are declared in `src/lib/permissionRules.ts`. The ERD's example `goal.approve` is
+ * not adopted: approving is the workflow step's actor rule, never a permission (BR-KPI-61).
  */
 export interface Permission {
   id: Id;

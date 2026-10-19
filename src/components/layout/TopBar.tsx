@@ -1,52 +1,21 @@
-import { Building2, FlaskConical } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSession } from '@/contexts/useSession';
+import { SessionSwitcher } from './SessionSwitcher';
+import { SimulatedDataBadge } from './SimulatedDataBadge';
 
 /**
- * Top bar — the tenant the user is working in, and the "Dữ liệu giả lập" banner.
+ * Top bar — the session switcher (which company, who you are) and the "Dữ liệu giả lập" banner.
  *
- * The banner is permanent and deliberately loud (plan §10): this prototype must never be mistaken
- * for the real system, and nobody should type real personnel data into it. It stays visible on
- * every route, including the production deployment.
- *
- * TODO Phase 1.3 — the tenant / user / role switcher sits here, so a demo can walk NV → QL → HR
- * without signing in again.
+ * The banner never leaves the bar: below `lg` it shortens rather than wrapping or dropping, and the
+ * switchers truncate first (plan §10, BR-KPI-51).
  */
 export function TopBar() {
-  const { tenantName, isSimulated } = useSession();
+  const { isSimulated } = useSession();
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-6">
-      {/* No caption above the name: an eyebrow is template chrome. The icon says "company" to the
-          eye, the visually hidden prefix says it to assistive tech. */}
-      <div className="flex min-w-0 items-center gap-2">
-        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="truncate text-sm font-semibold">
-          <span className="sr-only">Công ty: </span>
-          {tenantName}
-        </span>
-      </div>
-
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4 md:px-6">
+      <SessionSwitcher />
       <div className="flex-1" />
-
-      {isSimulated && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              role="status"
-              tabIndex={0}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-support-warning/40 bg-support-warning-subtle px-3 py-1.5 text-xs font-semibold text-support-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <FlaskConical className="h-3.5 w-3.5" aria-hidden />
-              Dữ liệu giả lập
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            Bản prototype: dữ liệu và đăng nhập đều giả lập, lưu trong trình duyệt này. Không nhập
-            dữ liệu nhân sự thật.
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {isSimulated && <SimulatedDataBadge />}
     </header>
   );
 }

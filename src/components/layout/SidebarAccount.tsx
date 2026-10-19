@@ -20,8 +20,8 @@ import { cn } from '@/lib/utils';
  * automatically in a short viewport. On the collapsed rail only the initial survives, with the name
  * in a tooltip — nothing about the account becomes unreachable by folding the navigation away.
  *
- * TODO Phase 1.3 — the tenant / user / role switcher (plan §3.3) lives in the top bar; this menu
- * keeps the account's own entries.
+ * This block DISPLAYS the identity (name, email, roles); the control that changes it — tenant and
+ * person — is `SessionSwitcher` in the top bar. There is deliberately no second switcher here.
  */
 export function SidebarAccount({ collapsed = false }: { collapsed?: boolean }) {
   const { user, roles } = useSession();

@@ -4,7 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/contexts/useSession';
-import { visibleNavGroups } from '@/lib/navRules';
+import { visibleNavGroups } from '@/lib/permissionRules';
 import { sidebarActions, useSidebarStore } from '@/lib/sidebarStore';
 import { NAV_GROUPS, PRODUCT_ICON, type NavGroup, type NavItem } from './navConfig';
 import { SidebarAccount } from './SidebarAccount';
@@ -20,13 +20,14 @@ import { SidebarAccount } from './SidebarAccount';
  * Collapsed, the rail keeps every link in the tree with its label only visually hidden, so it still
  * reads as named destinations to a screen reader; the tooltips are for the eye.
  *
- * The groups shown are the session's roles filtered through `visibleNavGroups` (plan §7.1) — never
- * a role check here.
+ * The items shown are the ones the session's permissions allow (`visibleNavGroups`); a group with
+ * none left disappears. Never a role check here — and hiding a link is not protection: the AppShell
+ * route guard (`canOpenPath`) is.
  */
 export function AppSidebar() {
   const collapsed = useSidebarStore((s) => s.collapsed);
-  const { roles } = useSession();
-  const groups = useMemo(() => visibleNavGroups(NAV_GROUPS, roles), [roles]);
+  const { access } = useSession();
+  const groups = useMemo(() => visibleNavGroups(NAV_GROUPS, access), [access]);
 
   /**
    * ⌘B / Ctrl-B, the shortcut every editor with a side panel already uses. Bound on the window
