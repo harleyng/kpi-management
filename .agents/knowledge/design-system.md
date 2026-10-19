@@ -66,11 +66,12 @@ emphasis (table row hover, placeholders).
 ## Status → tone mapping (MANDATORY)
 
 If "Đã duyệt" renders green on one screen and grey on another, users stop trusting the interface. The
-mapping lives in **exactly one place**: `src/components/shared/StatusBadge.tsx` — one badge per state set
-(Phase 1.4). Never pick a tone at the call site.
+mapping lives in **exactly one place**: `src/components/shared/statusTones.ts` (pinned by
+`statusTones.test.ts`), rendered by one badge per state set in `StatusBadge.tsx` (`GoalPlanStatusBadge`,
+`FormStatusBadge`, `CycleStatusBadge`…). A screen passes only the status. Never pick a tone at the call site.
 
-The tones follow one principle: **muted** = nothing happening yet · **info** = waiting on someone else /
-the system · **warning** = waiting on the person looking at it, or needs attention · **positive** =
+The tones follow one principle: **muted** = nothing happening yet, or the set's normal running
+state · **info** = waiting on someone else / the system · **warning** = waiting on the person looking at it, or needs attention · **positive** =
 settled and good · **negative** = refused or failed. A **locked** thing is settled, so it is not red.
 
 ### Goal Plan
@@ -91,7 +92,9 @@ settled and good · **negative** = refused or failed. A **locked** thing is sett
 | InProgress | Đang xử lý | `info` — `warning` when it is at **my** step | the inbox highlights my turn |
 | Completed | Hoàn thành | `positive` | |
 | Cancelled | Đã hủy | `muted` | |
-| *Overdue* (derived) | Quá hạn | `negative` | a flag next to the status, not a status |
+| *Overdue* (derived) | Quá hạn | `negative` | a flag next to the status, not a status — `<OverdueBadge>` |
+
+"My step" is `formTone(status, atMyStep)`; whether it IS my step comes from `workflowRules`.
 
 ### Cycle and period result
 
@@ -99,6 +102,22 @@ settled and good · **negative** = refused or failed. A **locked** thing is sett
 |---|---|
 | Cycle | Planning `muted` · Active `info` · Evaluating `warning` · Closed `positive` |
 | Period result | Draft `muted` · Final `info` · Locked `positive` |
+
+### The other state sets (Phase 1.4)
+
+A badge marks the exception: a set's ordinary state (an Active goal, a KPI in use) stays muted, never
+green on every row.
+
+| Set | Value → tone |
+|---|---|
+| Goal | Active `muted` · Changed `info` (superseded; read the replacement) · Cancelled `muted` |
+| Library (KPI, template) | Draft `muted` · Active `muted` · Archived `muted` — the label carries it |
+| Launch | Scheduled `info` (waiting on the system's date) · Launched `positive` · Cancelled `muted` |
+| Import batch | Validating `info` · Committed `positive` · Rejected `negative` |
+| Sync run | Running `info` · Succeeded `positive` · PartiallyFailed `warning` (+ a row count via `detail`) · Failed `negative` |
+| Notification | Queued `muted` · Sent `info` (waiting on the reader) · Read `muted` · Failed `negative` |
+| Employment | every value `muted` — an attribute, not a workflow |
+| Record (Active/Inactive) | Active → **no badge** · Inactive `muted` |
 
 ---
 
@@ -150,14 +169,22 @@ of several statuses.
 - **Page heading**: `<PageHeader title description actions>` on every route-level screen. The title is
   the same string as the menu item.
 - **Unbuilt blocks**: `<PlaceholderPanel spec items>` naming the WBS work package and track.
-- **Tables** (most screens): wrap in `<Card><CardContent className="p-0">`; header `text-xs font-medium
+- **Tables** (most screens): use `<DataTable>` — it already wraps in `<Card><CardContent className="p-0">`, takes
+  the `useQuery` result, and settles error → first load → empty (first-use vs "Không có dòng nào khớp bộ lọc.")
+  → rows, sort headers with `aria-sort` (missing values last), `—` for a missing cell, client or server paging; header `text-xs font-medium
   text-muted-foreground` in sentence case; rows `hover:bg-surface-alt`. **Numeric columns right-aligned,
   `tabular`, unit in the header.** Editable cells look editable; values computed by the rules (score,
   "chưa giao", weight total) look computed (muted background, no input border).
 - **Totals and blockers** sit where the decision is made: the weight total and the computed score at the
   bottom of a Goal Plan or form, with the reason a Submit is disabled spelled out next to it.
 - **Empty states**: `<EmptyStateCard>` with a sentence naming the next step — never just "Không có dữ liệu".
-- **Failed reads**: `<ErrorStateCard spec={errorSpecOf(error)} onAction={refetch}>` — never an empty table.
+- **Failed reads**: `<ErrorStateCard spec={errorSpecOf(error)} onAction={refetch}>` for a page, `<ErrorState>` inside a
+  panel or popover — never an empty table.
+- **Form fields**: `<FormField label required hint error>{(control) => <Input {...control} />}</FormField>` — `*`
+  for required (with `RequiredLegend` "* Bắt buộc" atop long forms), the error beneath the control, announced.
+- **Pickers**: `KpiPicker`, `EmployeePicker` (search ignores diacritics; archived KPIs and resigned people show
+  disabled but still display as a current value) and `OrgUnitTree` (an ARIA tree, one tab stop). A selected value
+  never vanishes: "Đang tải…" while loading, a warning "Không còn trong danh sách" once loaded without it.
 
 ## Message placement
 

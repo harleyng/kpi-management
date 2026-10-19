@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-10-19 — Phase 1.4: the UI kit never shows a stale or dropped value, and a badge marks the exception
+
+**Decision.** Tones for every state set live in `statusTones.ts`; a set's ordinary state is `muted`
+(Goal Active, Library Active, Employment), Record Active gets no badge, and `formTone(status, atMyStep)`
+turns my step amber. `DataTable` and the pickers take the `useQuery` result and go through `loadPhase`:
+an error replaces cached rows, a disabled query is `idle` (never an endless skeleton), a refetch dims
+rows. Pickers read the WHOLE list (archived KPIs, resigned people listed disabled) and the trigger says
+"Đang tải…" / "Không tải được danh sách" / "Không còn trong danh sách" rather than going blank. Picker
+search is client-side (`matchesSearch`), never a hook filter. Query keys are `[tenantId, root, ...params]`.
+The menu filter `navRules.visibleNavGroups(roles)` is role-based and temporary: Phase 1.3's
+permission-based menu and route guard replace it.
+
+**Why.** Reviews (cto, ui-ux) found the silent failures: an Active-only KPI list made every goal on an
+archived KPI show an empty picker that would still submit the old id; reading `isPending` alone hung a
+disabled query on skeletons; a green "Đang áp dụng" on every library row drowned the one row that
+mattered; `search` in the employees key flashed pending on every keystroke. Root-first keys broke 1.2's
+`[tenantId, root]` event invalidation.
+
+**Updated alongside.** `design-system.md` (Status → tone, other state sets, tables, fields, pickers),
+`component-registry.md`, `architecture.md` (directory, route-table note on menu filtering, phases).
+
+---
+
 ## 2026-10-19 — Phase 1.1: the DataGateway contract is fixed (gate passed with changes)
 
 **Decision.** `src/integrations/data/types.ts` is the contract for Phase 1.2 and the seven tracks. Every

@@ -48,8 +48,10 @@ src/
 │   ├── ui/                 # shadcn primitives — NEVER edited directly; wrap or compose instead
 │   ├── layout/             # AppShell, AppSidebar, TopBar (+ "Dữ liệu giả lập" banner), SidebarAccount,
 │   │                       #   RouteErrorBoundary, navConfig (5 groups by role)
-│   └── shared/             # PageHeader, PlaceholderPanel, EmptyState, ErrorStateCard, ConfirmDialog,
-│                           #   StatusBadge, Pagination, SearchInput, SectionTitle, CopyButton
+│   └── shared/             # PageHeader, PlaceholderPanel, EmptyState, ErrorState(Card), ConfirmDialog,
+│                           #   StatusBadge (+ per-set badges, statusTones), DataTable, FormField,
+│                           #   EntityCombobox, KpiPicker, EmployeePicker, OrgUnitTree, Pagination,
+│                           #   SearchInput, SectionTitle, CopyButton
 ├── contexts/
 │   ├── useSession.ts       # session contract + hook (a file with NO JSX)
 │   └── SessionContext.tsx  # the provider (Phase 0 placeholder; real switcher in 1.3)
@@ -75,7 +77,9 @@ in `components/shared/`.
 
 Every route lives in `src/App.tsx` under a single `<AppShell>`, each page its own `React.lazy` chunk.
 Navigation is defined in `src/components/layout/navConfig.ts` — **5 groups, 17 items** (plan §7.1).
-Menu filtering by role arrives in Phase 1.3 (`permissionRules`); in Phase 0 every group is shown.
+The sidebar shows `visibleNavGroups(NAV_GROUPS, roles)` (`src/lib/navRules.ts`, Phase 1.4); the placeholder
+session holds every role, so every group shows until Phase 1.3's session and permission-based menu (and route
+guard) replace it. Hiding a group does not protect its route.
 
 | Route | Page | Menu group · roles | WBS / phase |
 |---|---|---|---|
@@ -191,7 +195,7 @@ delta Phase 5 applies when it writes the SQL schema.
 ## Phases (plan §6)
 
 Phase 0 bootstrap → **1.1** domain types + contract (sequential, **done 2026-10-19**) → **1.2** mock + seed · **1.3** session
-+ permissions · **1.4** app shell + UI kit · **1.5** rule engines (parallel) → **Gate 1** (fixtures
++ permissions · **1.4** app shell + UI kit (**done 2026-10-19**) · **1.5** rule engines (parallel) → **Gate 1** (fixtures
 frozen) → **Phase 2** tracks T1–T7 in parallel, each in its own git worktree, merged T1 → T2 → T7 → T3
 → T4 → T5 → T6 → **Phase 3** dashboard & AI → **Phase 4** E2E & UAT → **Phase 5** database preparation.
 

@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { NavLink, useMatch } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/contexts/useSession';
+import { visibleNavGroups } from '@/lib/navRules';
 import { sidebarActions, useSidebarStore } from '@/lib/sidebarStore';
 import { NAV_GROUPS, PRODUCT_ICON, type NavGroup, type NavItem } from './navConfig';
 import { SidebarAccount } from './SidebarAccount';
@@ -18,10 +20,13 @@ import { SidebarAccount } from './SidebarAccount';
  * Collapsed, the rail keeps every link in the tree with its label only visually hidden, so it still
  * reads as named destinations to a screen reader; the tooltips are for the eye.
  *
- * TODO Phase 1.3 — render `visibleNavGroups(roles)` instead of every group.
+ * The groups shown are the session's roles filtered through `visibleNavGroups` (plan §7.1) — never
+ * a role check here.
  */
 export function AppSidebar() {
   const collapsed = useSidebarStore((s) => s.collapsed);
+  const { roles } = useSession();
+  const groups = useMemo(() => visibleNavGroups(NAV_GROUPS, roles), [roles]);
 
   /**
    * ⌘B / Ctrl-B, the shortcut every editor with a side panel already uses. Bound on the window
@@ -48,7 +53,7 @@ export function AppSidebar() {
       <SidebarHeader collapsed={collapsed} />
 
       <nav aria-label="Điều hướng chính" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {NAV_GROUPS.map((group, index) => (
+        {groups.map((group, index) => (
           <SidebarGroup key={group.label} group={group} index={index} collapsed={collapsed} />
         ))}
       </nav>
