@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ERROR_CATALOG, KpiDeferredError, KpiError, errorSpecOf, isRetryable, ruleIssue, toKpiError, type ErrorCode } from './errorCatalog';
+import { ERROR_CATALOG, ISSUE_DETAIL_COPY, ISSUE_DETAILS, KpiDeferredError, KpiError, errorSpecOf, issueText, isRetryable, ruleIssue, toKpiError, type ErrorCode } from './errorCatalog';
 
 describe('ERROR_CATALOG', () => {
   const entries = Object.entries(ERROR_CATALOG) as [ErrorCode, (typeof ERROR_CATALOG)[ErrorCode]][];
@@ -107,5 +107,18 @@ describe('toKpiError', () => {
 
   it('gives a plain KpiError an empty issue list', () => {
     expect(new KpiError('ERR-KPI-04').issues).toEqual([]);
+  });
+});
+
+describe('ISSUE_DETAIL_COPY / issueText (rule 6 — detail codes rendered from the catalogue)', () => {
+  it('gives every detail code a non-empty Vietnamese sentence', () => {
+    expect(Object.keys(ISSUE_DETAIL_COPY).sort()).toEqual([...ISSUE_DETAILS].sort());
+    for (const detail of ISSUE_DETAILS) expect(ISSUE_DETAIL_COPY[detail].trim(), detail).not.toBe('');
+  });
+
+  it('renders a code, shows an older stored sentence as it is, and falls back to the code title', () => {
+    expect(issueText('PERIOD_LOCKED')).toBe('Kỳ đã khóa số liệu.');
+    expect(issueText('Không tìm thấy người dùng nam.hv2')).toBe('Không tìm thấy người dùng nam.hv2');
+    expect(issueText(null, 'ERR-KPI-04')).toBe(ERROR_CATALOG['ERR-KPI-04'].title);
   });
 });

@@ -126,7 +126,9 @@ Liệt kê tối thiểu cho từng form. Cột "Nguồn" để đối chiếu k
 Theo HR tr. 61–63, giản lược: `username`, `loại chỉ tiêu`, `tên chỉ tiêu`, `đơn vị đo`, `trọng số`, `mô tả`, `ngày bắt đầu`, `ngày kết thúc`, `kiểu định mức (số/chữ)`, `L1`, `L2`, `L3`, `điểm mỗi mức`, `mã KPI thư viện` (thêm mới, để nối thư viện). Mỗi chỉ tiêu một dòng. CMC dùng 3 dòng cho một mục tiêu, prototype không cần.
 
 ### 5.3 Mẫu import số thực tế (T4)
-`mã chỉ tiêu được giao` hoặc `username + mã KPI thư viện`, `kỳ`, `giá trị thực tế`, `giá trị dạng chữ`, `ghi chú`, `link bằng chứng`. Nguồn: HR tr. 75–76 (CMC xuất báo cáo danh sách mục tiêu rồi import lại).
+`mã chỉ tiêu được giao` hoặc `username + mã KPI thư viện`, `kỳ`, `giá trị thực tế`, `giá trị dạng chữ`, `ghi chú`, `link bằng chứng`. Nguồn: HR tr. 75–80 (CMC xuất báo cáo danh sách mục tiêu rồi import lại).
+
+> Ghi chú T4 (19/10/2026): CMC dùng **ID chỉ tiêu** làm khóa; `username + mã KPI`, `kỳ`, `ghi chú`, `link bằng chứng` là phần Syntra thêm. Mẫu đầy đủ và quy tắc từng dòng: `business-rules.md` BR-KPI-53.
 
 ### 5.4 Khởi chạy phiếu (T5)
 | Field | Nguồn |

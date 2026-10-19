@@ -292,6 +292,28 @@ const WORKFLOW_COVERED = new Set([
   'scheduler.runDue', // its own case below: a tick of one tenant touches nothing of another
 ]);
 
+// ═══ Track T4 — the import framework (4.4.3) and the API sync (4.4.5) ══════════════════════════
+const demoCycle = DEMO.id('PerformanceCycle', '2027');
+const demoT02 = DEMO.id('CyclePeriod', 'T02');
+const demoUpload = async (gw: DataGateway) => (await gw.system.uploadFile(D, demoActor, { fileName: 'so-lieu.xlsx', mimeType: 'application/octet-stream', data: new Blob(['x']) })).id;
+const actualRow = (o: Record<string, unknown> = {}) => ({
+  rowNo: 2, goalId: DEMO.id('Goal', 'D003', 1), login: null, kpiCode: null, periodLabel: 'T02', actualValue: 1, actualText: null, note: null, evidenceUrl: null, ...o,
+});
+
+/** Methods that name a row by id: another tenant's row answers ERR-KPI-02 like a missing one. */
+const T4_ID_CALLS: [string, CollectionName, ById][] = [
+  ['actuals.commitImport batchId', 'ImportBatch', (gw, id) => gw.actuals.commitImport(D, demoActor, id)],
+  // The period is resolved before the (Inactive) connection is judged, so both answer like a missing id.
+  ['actuals.runSync connectionId', 'IntegrationConnection', (gw, id) => gw.actuals.runSync(D, demoActor, id, demoT02)],
+  ['actuals.runSync periodId', 'CyclePeriod', (gw, id) => gw.actuals.runSync(D, demoActor, dId('IntegrationConnection'), id)],
+];
+/** Payload references of stageImport: a Syntra id → ERR-KPI-06 like a missing one. */
+const T4_PAYLOAD_REFS: [string, CollectionName, ById][] = [
+  ['actuals.stageImport fileId', 'FileObject', (gw, id) => gw.actuals.stageImport(D, demoActor, { importType: 'Actual', fileId: id, cycleId: demoCycle, rows: [actualRow()] })],
+  ['actuals.stageImport cycleId', 'PerformanceCycle', async (gw, id) => gw.actuals.stageImport(D, demoActor, { importType: 'Actual', fileId: await demoUpload(gw), cycleId: id, rows: [actualRow()] })],
+];
+const T4_COVERED = new Set([...T4_ID_CALLS, ...T4_PAYLOAD_REFS].map(([name]) => name.split(' ')[0]));
+
 describe('tenant isolation — coverage', () => {
   it('covers every method of the contract', () => {
     const { gateway } = newGateway();
@@ -304,6 +326,7 @@ describe('tenant isolation — coverage', () => {
       ...gateway.registry.deferred.keys(),
       ...OTHER,
       ...WORKFLOW_COVERED,
+      ...T4_COVERED,
     ]);
     const missing = [...gateway.registry.methods.keys()].filter((m) => !covered.has(m));
     expect(missing).toEqual([]);
@@ -520,5 +543,51 @@ describe('tenant isolation — the result lifecycle (scoring lane)', () => {
     expect(foreignIdsIn(results)).toEqual([]);
     for (const r of results) expect(foreignIdsIn(await gateway.results.listResultDetails(D, r.id))).toEqual([]);
     expect(await gateway.results.listPeriodResults(S)).toEqual(syntraBefore);
+  });
+});
+
+describe('tenant isolation — Track T4 (the import framework and the API sync)', () => {
+  it.each(T4_ID_CALLS)('%s = a Syntra id answers like a missing id (ERR-KPI-02)', async (_, c, call) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-02');
+  });
+
+  it.each(T4_PAYLOAD_REFS)('%s = a Syntra id is refused like a missing id (ERR-KPI-06)', async (_, c, call) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-06');
+  });
+
+  it('a row naming a Syntra goal id or a Syntra login is a row error worded exactly like an unknown one', async () => {
+    const { gateway } = newGateway();
+    const stage = async (row: Record<string, unknown>) =>
+      (await gateway.actuals.stageImport(D, demoActor, { importType: 'Actual', fileId: await demoUpload(gateway), cycleId: demoCycle, rows: [actualRow(row)] as never })).errors;
+    const syntraLogin = syntra.rows.UserAccount.find((u) => u.employeeId !== null)?.login as string;
+    expect(await stage({ goalId: sId('Goal') })).toEqual(await stage({ goalId: NOWHERE }));
+    expect(await stage({ goalId: null, login: syntraLogin, kpiCode: 'KPI-DOANH-THU' })).toEqual(await stage({ goalId: null, login: 'khong.ton.tai', kpiCode: 'KPI-DOANH-THU' }));
+    expect((await stage({ goalId: sId('Goal') })).map((e) => e.detail)).toEqual(['GOAL_NOT_FOUND']);
+  });
+
+  it('a Syntra actor cannot stage, commit, reject or sync in Demo Co (ERR-KPI-05)', async () => {
+    const { gateway } = newGateway();
+    const syntraHr = SYNTRA.user(SYNTRA.personas.hr);
+    const fileId = await demoUpload(gateway);
+    const calls = [
+      gateway.actuals.stageImport(D, syntraHr, { importType: 'Actual', fileId, cycleId: demoCycle, rows: [actualRow()] as never }),
+      gateway.actuals.commitImport(D, syntraHr, dId('ImportBatch')),
+      gateway.actuals.rejectImport(D, syntraHr, dId('ImportBatch')),
+      gateway.actuals.runSync(D, syntraHr, dId('IntegrationConnection'), demoT02),
+    ];
+    for (const call of calls) expect((await rejection(call)).code).toBe('ERR-KPI-05');
+  });
+
+  it('a Demo Co sync of a Syntra-looking setup writes nothing to Syntra, and its run carries no Syntra id', async () => {
+    const { gateway } = newGateway();
+    const connection = (await gateway.actuals.listConnections(D))[0];
+    await gateway.actuals.saveConnection(D, demoActor, { ...connection, status: 'Active' });
+    const syntraBefore = await gateway.actuals.listActuals(S, { currentOnly: false });
+    const run = await gateway.actuals.runSync(D, demoActor, connection.id, demoT02);
+    expect(foreignIdsIn(run)).toEqual([]);
+    expect(foreignIdsIn(await gateway.actuals.listActuals(D, { currentOnly: false }))).toEqual([]);
+    expect(await gateway.actuals.listActuals(S, { currentOnly: false })).toEqual(syntraBefore);
   });
 });

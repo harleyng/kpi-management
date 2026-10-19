@@ -45,6 +45,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `KpiPicker` | Library KPI picker grouped by BSC perspective; Draft/Archived disabled; `excludeIds` |
 | `EmployeePicker` | Person picker with an `EmployeeFilter` (direct reports, unit); resigned shown disabled |
 | `OrgUnitTree` / `OrgUnitTreeView` | ARIA tree of the org (roving tabindex, ↑↓←→ Home End Enter/Space), single or multiple, search above >10 units |
+| `InlineNotice` (T4) | A short tinted notice inside a panel (`info` / `warning` / `negative`, 1px border, icon + title + body) — why an action is blocked, what a preview means; `alert` only for something that just failed |
 | `ConfirmDialog` | Confirmation before an irreversible action (lock, finalise, delete); `destructive` for removals |
 | `StatusBadge` | The `Tone` primitive, plus one badge per state set (`GoalPlanStatusBadge`, `FormStatusBadge` with `atMyStep`, `OverdueBadge`, `CycleStatusBadge`, `PeriodResultStatusBadge`, `GoalStatusBadge`, `LibraryStatusBadge`, `LaunchStatusBadge`, `ImportBatchStatusBadge`, `SyncRunStatusBadge`, `NotificationStatusBadge`, `EmploymentStatusBadge`, `RecordStatusBadge`); tones in `statusTones.ts` |
 | `Pagination` | Footer of a paged table; pairs with `paginate()` |
@@ -128,6 +129,18 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `CyclePicker` + `useSelectedCycle` | `?cycle=` with `cycleRules.defaultCycleId` |
 | `goalCopy.ts` | `EDIT_REASON_COPY`, `issueText` (catalogue title + the detail's words), `formatTarget`, `formatWeight`, `planOwnerName` |
 
+## `src/components/actuals/` (Track T4)
+
+| Component | Purpose |
+|---|---|
+| `ImportUploadCard` | Stages 1–2 of ANY import: "Tải mẫu" (+ controls such as the month) and "Tải tệp lên" → `readSheet` + `parseSheet`; a non-workbook comes back as FILE_UNREADABLE. T1/T2/T3 reuse it with their spec |
+| `ImportPreview` | The preview of ANY import: `source: 'local'` (not sent — banner, no actions) or `'batch'`; file errors replace the table; rows with errors first, "Chỉ dòng lỗi", each error = column + catalogue sentence; warnings; sticky footer for the actions |
+| `ActualEntrySheet` | The side sheet to enter one goal's month: blockers before typing, value (number or Đạt/Không đạt), note, "Lưu và sang chỉ tiêu kế tiếp", snapshot history, `EvidencePanel` |
+| `EvidencePanel` | Evidence of a goal for a month: list (file / link, who, when), add a link or a file, remove. T5's evaluation form reuses it |
+| `ActualValue` / `SourceTypeTag` | A value (`—` when none, never 0) / where it came from (icon + label, muted — a category, not a status) |
+| `CycleSelect` / `MonthSelect` | The shared pickers (default: the Active cycle; the latest month ended) |
+| `ActualEntryTab` · `ActualImportTab` · `SyncTab` (+ `ScheduleText`) · `useCycleGoalData` | The three tabs of `/admin/actuals` and the composite read of a cycle's goals with one combined state |
+
 ## `src/contexts/`
 
 | File | Purpose |
@@ -174,12 +187,16 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `workflowRules.ts` | (T7: `effectiveOverdueBehaviour` — what the scheduler will really do, shared by `overdueActions` and the reminder) `validateWorkflow`, `resolveStepActors`, `entitlement`, `TRANSITIONS` / `transition`, **`checkAction`** (the gateway's only entry for `forms.act`), `isFrozen`, `mayEditAtCurrentStep`, `stepDeadline`, `isOverdue`, `overdueActions`, `remindersDue` / `reminderKey`, `onUnlock`, `isInInbox`, `launchDueDate`, `validateLaunch`, `dueScheduledLaunches`, `resolveRecipients`, `launchRuleFirings`; Gate 1: `canStartForm`, `canCancelLaunch`, `validateLaunchRule`, `launchTimingIssues`, `delegationIssues`, `canRevokeDelegation`, `editRefusal`, `editStanding`, `markHandled`, `assigneesOf` |
 | `cycleRules.ts` (Gate 1) | `CYCLE_NEXT`, `cycleIssues`, `periodIssues`, `canEditCycle`, `statusChangeIssues`, `canLockPeriod`, `cycleAllowsLaunch` (BR-KPI-25); T3: `generatePeriods`, `mergeGeneratedPeriods`, `periodInput`, `nextCycleStatus`, `defaultCycleId` |
 | `resultRules.ts` (Gate 1) | The period-result pipeline the mock and the seed share: `buildPeriodResults`, `applyAdjustment`, `finalizePeriodResults`, `lockPeriodResults` → `ResultChanges`; `computeResult`, `finalizeCheck`, `RESULT_TRANSITIONS`, `canRecalculate` / `canAdjust` / `canTransition`, `evaluationLines` / `actualLines` / `planLines`, `currentLinesOf` (BR-KPI-40, 43, 44) |
-| `actualRules.ts` (Gate 1) | `actualIssues` (`recordActual` and T4's import rows), `isResultFinalised` (BR-KPI-52) |
 | `orgAdminRules.ts` (T1) | `unitIssues`, `unitEndIssues`, `unitUsage`, `headIssues`, `positionIssues`, `positionUsage`, `employeeIssues`, `resignationPlan` (B3), `resignationImpact`, `assignmentIssues`, `managerOutsideUnit`, `transferPlan` (B1), `tenantIssues`, `isValidTimeZone`, `Draft<T>` — transition-based, `RuleIssue[]` — tested + `fixtures/orgGuards.test.ts` |
 | `accessAdminRules.ts` (T1) | `accountIssues`, `accountPlan` (B2), `userRoleIssues`, `userRoleRemovalIssues`, `isProtectedUserRole`, `accessIssues` (BR-KPI-72), `tenantAdmins`, `ADMIN_LOCKED_PERMISSIONS`, `scopeCoverage`, `widestScope` — tested |
 | `orgImportRules.ts` / `importColumns.ts` (T1) | `ORG_DATA_COLUMNS` (`ImportColumn<Row>` — the template and T4's parser share it), `orgDataRowErrors` (file + tenant, a manager later in the file is valid, loops across both) — tested |
 | `excel/workbook.ts` / `excel/orgDataTemplate.ts` (T1) | `buildTemplateWorkbook` (exceljs imported on call only), `orgDataTemplateSpec` — tested |
 | `orgIssueCopy.ts` (T1) | `ORG_ISSUE_COPY` (sentence per rule sub-code), `orgIssueText`, `fieldIssues`, `otherIssues` — completeness tested against the rule sources |
+| `actualRules.ts` (Gate 1, T4) | `actualIssues` = `entryBlockers` (plan / period / result / goal — what the entry screen shows before typing) + `valueIssues`; `isResultFinalised`, `currentActual`, `syncKeepsHumanActual`, `syncRunStatus`, `isEvidenceUrl`, `monthlySchedule` (BR-KPI-52, 56, 57) |
+| `importRules.ts` (T4) | THE shared import framework: `ImportColumn` / `ImportTemplateSpec`, `parseSheet(spec, matrix)`, `normaliseCell`, `parseNumberCell` / `parseDateCell` / `parseTextCell`, `importError`, `batchCounts`, `canCommitImport`, `canRejectImport`, `errorsByRow`, `previewOrder` (BR-KPI-53, 54) — shared by T1/T2/T3, changing it is Large |
+| `actualImportRules.ts` (T4) | `ACTUAL_IMPORT_SPEC` / `ACTUAL_COLUMNS`, `resolveActualRow`, `validateActualRows`, `actualImportWarnings`, `actualTemplateRows` (BR-KPI-53) |
+| `actualEntryRules.ts` (T4) | `buildActualEntryRows` (the manual-entry table, decided whole), `actualEntrySummary`, `filterActualEntryRows`, `defaultCycle` / `monthsOf` / `defaultMonth` (the shared pickers) |
+| `excel.ts` (T4) | `writeTemplate(spec, rows, lists)` → Blob, `readSheet(buffer)` → cell matrix — exceljs, loaded lazily; imported only by lazy screens |
 | `orgRules.ts` | `isEffectiveOn`, `primaryAssignmentOn`, `managerOf`, `unitAncestry`, `descendantUnitIds`, `wouldCreateUnitCycle`, `isEmployedOn` / `isEmployedDuring` / `employedFraction`, `scopeSubjectOn`, `scopeCoversEmployee` (the scope semantics 1.3 shares) |
 | `notificationRules.ts` (T7) | `NOTIFICATION_VARIABLES`, `VARIABLES_BY_EVENT`, `templateVariables`, `templateIssues`, `renderTemplate` (never a raw `{{…}}`), `formatViDate`, `periodPhrase`, `deadlineConsequence`, `notificationRecipients`, `stepActedNotification`, `notificationRef`, `notificationSourceKey`, `inAppTemplateFor`, `isInAppNotification` (BR-KPI-45…47) |
 | `auditRules.ts` (T7) | `auditChanges` (field diff; `null` = unreadable), `auditSubjectName` (name column, else the person it is about), `dayRangeToInstants` (BR-KPI-49) |
@@ -208,10 +225,13 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 |---|---|
 | `org.ts` | Reads: `useOrgUnits`, `useEmployees(filter)`, `usePositions`, `useAssignments(filter)`, `useUserAccounts`, `useRoles`, `useRolePermissions`, `useUserRoles`, `usePermissions` (each with its `*Key`); `useOrgDirectory` / `useAccessDirectory` (data only when EVERY list loaded — pre-checks never run on a partial list). Writes (T1, one `useOrgMutation` shape: catalogue toast, `issuesOf(error)` for the form, roots invalidated on settle): `useSaveOrgUnit`, `useSavePosition`, `useSaveEmployee`, `useSaveAssignment`, `useSaveUserAccount`, `useSaveUserRole`, `useDeleteUserRole`, `useSetRolePermissions`, `useSaveTenant` (+ tenants), `useResignEmployee` (`ResignError.stage`) — tested |
 | `library.ts` | Reads `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits`, `useCalcMethods`, `useCalcTiers`, `useKpiTemplates`, `useKpiTemplateItems`, `useDataSources` (G4 read kept here until T4), `useLibraryGoalUsage` (root `goals`); writes `useSavePerspective`, `useSaveMeasureUnit`, `useSaveCalcMethod`, `useSaveKpiDefinition`, `useSaveKpiTemplate` — reject to the caller (`mutateAsync`), invalidate their root (+ `*Key`) |
-| `org.ts` | `useOrgUnits` (`orgUnitsKey`), `useEmployees(filter)` (`employeesKey`), `useUserAccounts` (`userAccountsKey`, T7) |
 | `system.ts` (T7) | `useNotificationTemplates` / `useSaveNotificationTemplate`; `useNotifications(unreadOnly)` and `useAuditLog(filter, enabled)` (`useInfiniteQuery` over keyset pages); `useUnreadNotificationCount` (in-app only, `capped` past 500); `useMarkNotificationRead`, `useMarkAllNotificationsRead` (each on its own, rejects with the first failure); `useFile`, `useUploadFile`, `useOpenFile` |
 | `workflows.ts` (T7, read-only) | `useWorkflows(formType?)`, `useWorkflowSteps(workflowId?)` — T5 adds the writes |
 | `library.ts` | `useKpiDefinitions(filter)`, `usePerspectives`, `useMeasureUnits` (+ `*Key`) |
+| `actuals.ts` (T4) | Reads: `useDataSources`, `useConnections`, `useMappings`, `useSyncRuns`, `useActuals(filter)`, `useImportBatches`, `useImportBatch`, `useEvidence`, `useFileObject`. Writes: `useSaveDataSource`, `useSaveConnection`, `useRecordActual`, `useStageImport` (upload → stage, the file id kept per `File` for a retry, the failing step named), `useCommitImport`, `useRejectImport`, `useRunSync`, `useAddEvidence` (link or file), `useDeleteEvidence`, `useOpenFile` |
+| `goals.ts` (T4 reads; T3 owns) | `useCycles`, `usePeriods`, `useGoalPlans`, `useGoals`, `usePeriodTargets(goalIds)`, `usePeriodTargetsOfPlan` |
+| `results.ts` (T4 read; T6 owns) | `usePeriodResults(filter)` |
+| `writeFeedback.ts` | `toastWriteError(error, step?)` — catalogue title + the rule's own reason (`issueText`) |
 | `session.ts` | `useTenants` (`tenantsKey` = `['platform','tenants']`), `useSessionDirectory(tenantId)` (`sessionDirectoryKey`), `useResetSeed` (reseed + latency/failure defaults + `resetQueries()` + `devStore` reset), `readGatewayNow`, `hasDevControls` — the ONE place hooks take `tenantId` explicitly (they run before a session exists) |
 | `keys.ts` | `queryKey(tenantId, root, ...params)` (tenant first — every `*Key` above uses it), `KEY_ROOTS` (root → the entities it reads), `rootsAffectedBy(entity)`, `TENANTS_KEY`, `DEV_NOW_KEY` (`['dev','now']`, the one clock is not tenant data) — tested |
 | `goals.ts` (T3) | G3 reads with `*Key` (cycles, periods, plans, KGIs, goals, levels, splits, alignments); `useGoals` = VISIBLE goals (D2), `useGoalRows` = every row for aggregates; writes via `useGatewayWrite` (catalogue toast, refresh on every outcome); `useSaveGoal` (+ `PartialGoalSaveError`), `useCascadeGoal` (+ `CascadeOrphanError`), `useSubmitPlanForm`; composites `usePlanWorkspace`, `usePlanSummaries`, `usePlansEditability`, `useGoalLookups` |

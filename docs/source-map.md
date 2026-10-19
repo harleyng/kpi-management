@@ -39,7 +39,8 @@ They live in the product owner's folder:
 | 20–28 | Goal fields: visibility, type (BSC + KRI), name, unit, weight, description, dates, numeric/text target, levels L1–L3 and their scoring rules, cascade tracking (assigned / self-held / not assigned) | Plan §5.1; BR-KPI-04, 06, 07, 08, 09, 10; D1–D4 |
 | 47–49 | Locking and unlocking Goal Plans | BR-KPI-14 |
 | 61–63 | Goal Plan import template (columns P–T = levels) | Plan §5.2; `/add-import-template` |
-| 75–76 | Actuals import (export the goal list, fill, re-import) | Plan §5.3 |
+| 24 | Goal in result mode: "Thực hiện", attached document (name + upload) and URL — evidence at goal level | BR-KPI-57 |
+| 75–80 | Actuals import: pp. 75–76 export "Báo cáo danh sách mục tiêu"; pp. 77–80 the template — the key is the goal ID (col L of the export → col C "ID"), numeric (N) and text (O) results, one value per goal row; no period and no note column | Plan §5.3; BR-KPI-53 |
 | 88–95 | Launching forms: type, template, timing (now / date / recurring), period, due date, recipients | Plan §5.4; BR-KPI-19; D5 |
 | 150–155 | Workflow routing: steps, actors | BR-KPI-20 |
 

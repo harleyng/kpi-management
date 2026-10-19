@@ -37,7 +37,7 @@ const ROUTES: [path: string, title: string, built?: Landmark][] = [
 ];
 
 /** Routes whose page is built (no "Chưa xây dựng" placeholder any more) — add a track's routes as it lands. */
-const BUILT = new Set(['/system/org', '/system/users', '/my/kpi', '/team/kpi', '/admin/cycles']);
+const BUILT = new Set(['/system/org', '/system/users', '/my/kpi', '/team/kpi', '/admin/cycles', '/admin/actuals', '/system/data-sources']);
 
 /**
  * Once the Phase 1.2 seed exists (its entry file is in the repo), a session MUST load: a broken gateway
