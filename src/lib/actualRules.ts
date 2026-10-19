@@ -3,7 +3,8 @@
  * Excel import (T4, WBS 4.4.3) checks on every row: the same rule answers both.
  */
 
-import type { CyclePeriod, Goal, Id, IsoDate, PeriodResult } from '@/data/types';
+import type { CyclePeriod, Goal, Id, ImportBatch, IsoDate, PeriodResult } from '@/data/types';
+import type { Decision } from './goalPlanRules';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 
 export interface ActualEntryInput {
@@ -56,6 +57,15 @@ export function actualIssues(input: ActualEntryInput): RuleIssue[] {
 
   if (period.startDate > input.asOf) issues.push(ruleIssue('ERR-KPI-06', 'periodId', 'PERIOD_NOT_STARTED'));
   return issues;
+}
+
+/**
+ * Only a batch still being checked can be rejected (BR-KPI-52): a Committed batch has written its
+ * actuals, and rejecting it would leave them in place under a "Rejected" label (ERR-KPI-04).
+ * T4's import framework (WBS 4.4.3) adds the rest of the batch lifecycle next to it.
+ */
+export function canRejectImport(batch: Pick<ImportBatch, 'status'>): Decision {
+  return batch.status === 'Validating' ? { ok: true } : { ok: false, code: 'ERR-KPI-04' };
 }
 
 /** Whether the plan's result for the period is Final or Locked (input 2 of `actualIssues`). */

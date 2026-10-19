@@ -210,7 +210,8 @@ is pending, bar a Phase 2 track's own work package (`registry.trackOwned`, pinne
 `src/integrations/data/mock/runtime.test.ts`; adding to it is a Large change):
 - *Deferred* (rejects `KpiDeferredError` until the track wires it; its `auth` is already declared) —
   T4: `actuals.stageImport`, `commitImport` (4.4.3), `runSync` (4.4.5); T6: `results.exportPayroll` (4.6.4).
-- *Pending guard* (works, its refusal not wired) — T4: `actuals.rejectImport` (only a Validating batch).
+- *Pending guard* — none. (`actuals.rejectImport` was wired at Gate 1 QA: only a Validating batch,
+  `actualRules.canRejectImport`; T4's import framework builds the rest of the batch lifecycle.)
 
 Wired at Gate 1 — workflow lane: `setCycleStatus`, `lockGoalPlan`, `unlockGoalPlan`, `createLaunch`,
 `cancelLaunch`, `startForm`, `listInbox`, `saveEvaluationItems`, `act`, `scheduler.runDue` (now

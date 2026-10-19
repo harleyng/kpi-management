@@ -43,6 +43,7 @@ import type {
 import { achievement, goalAchievementInput, type NotComputableReason } from './calcRules';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { columnPct } from './formRules';
+import { weightIssue } from './goalPlanRules';
 import { primaryAssignmentOn, unitAncestry } from './orgRules';
 import { payoutPctFor, ratingFor, type PayoutSubject } from './ratingRules';
 import {
@@ -226,7 +227,8 @@ export function computeResult(
   const score = weightedScore(lines);
   const adjusted = adjustedScore(score.score, adjustmentPct);
   const rated = ratedScore(score.score, adjustmentPct);
-  const rating = score.complete ? ratingFor(rated, levels) : null;
+  // A provisional score is never rated: every goal scored AND the weights total 100% (BR-KPI-07).
+  const rating = score.complete && weightIssue(lines) === null ? ratingFor(rated, levels) : null;
   const payoutPct = rating && subject ? payoutPctFor(rating, payoutRules, subject, asOf) : null;
   return {
     score,
@@ -468,6 +470,7 @@ export function applyAdjustment(data: ResultData, resultId: Id, adjustmentPct: n
   if (typeof adjustmentPct !== 'number' || !Number.isFinite(adjustmentPct)) return refuse('ERR-KPI-06', resultId, 'ADJUSTMENT_INVALID');
   const ctx = resultContext(result, data);
   if (!ctx) return refuse('ERR-KPI-02', resultId, 'RESULT_NOT_FOUND');
+  if (ctx.cycle.status === 'Closed') return refuse('ERR-KPI-04', ctx.cycle.id, 'CYCLE_CLOSED');
   const lines: ResultLine[] = data.ResultDetail.filter((d) => d.resultId === resultId).map((d) => ({
     goalId: d.goalId,
     weight: d.weight,
@@ -495,6 +498,7 @@ export function finalizePeriodResults(
 ): ResultOutcome {
   const ctx = periodContext(data, periodId);
   if (!ctx) return refuse('ERR-KPI-06', periodId, 'PERIOD_NOT_FOUND');
+  if (ctx.cycle.status === 'Closed') return refuse('ERR-KPI-04', ctx.cycle.id, 'CYCLE_CLOSED');
   let selected: PeriodResult[];
   if (resultIds === undefined) {
     selected = data.PeriodResult.filter((r) => r.periodId === periodId && r.status === 'Draft');
@@ -515,7 +519,8 @@ export function finalizePeriodResults(
   const changes = emptyChanges();
   for (const result of selected) {
     const plan = data.GoalPlan.find((p) => p.id === result.goalPlanId) as GoalPlan;
-    const lines = planLines(plan, ctx.period, data);
+    // A plan sent back to Draft since the Draft result was calculated is no longer eligible.
+    const lines = ELIGIBLE_PLAN.has(plan.status) ? planLines(plan, ctx.period, data) : null;
     if (lines === null) {
       issues.push(ruleIssue('ERR-KPI-04', plan.id, 'NOT_ELIGIBLE', { resultId: result.id }));
       continue;

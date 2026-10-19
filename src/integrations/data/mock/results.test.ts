@@ -182,3 +182,13 @@ describe('scoring configuration guards (ERR-KPI-13 / 06)', () => {
     await expect(gateway.results.savePayoutRule(S, admin, base)).resolves.toMatchObject({ payoutPct: 90 });
   });
 });
+
+describe('actuals.rejectImport — only a batch still being checked (QA, Gate 1)', () => {
+  it('rejects a Validating batch; refuses a Committed one (04), whose actuals are already written', async () => {
+    const { gateway } = newGateway();
+    const committed = await rejection(gateway.actuals.rejectImport(S, admin, SYNTRA.id('ImportBatch', 'T01')));
+    expect(committed.code).toBe('ERR-KPI-04');
+    expect((await gateway.actuals.getImportBatch(S, SYNTRA.id('ImportBatch', 'T01'))).status).toBe('Committed');
+    await expect(gateway.actuals.rejectImport(S, admin, SYNTRA.id('ImportBatch', 'T03-crm'))).resolves.toMatchObject({ status: 'Rejected' });
+  });
+});

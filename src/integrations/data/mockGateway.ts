@@ -9,7 +9,8 @@ import { createMockGateway } from './mock/createMockGateway';
  * per-call runtime (latency, failure injection, tenant check, transaction, integrity, save,
  * events), the schema the integrity check enforces, and one file per contract group. Business
  * decisions are `src/lib/*Rules.ts`; a method whose rule is not wired yet rejects with
- * `KpiDeferredError` (see `mockGateway.registry.deferred`) — the list must be empty at Gate 1.
+ * `KpiDeferredError` (see `mockGateway.registry.deferred`) — after Gate 1 only a Phase 2 track's own
+ * work package (`registry.trackOwned`, pinned by the Gate 1 test in `mock/runtime.test.ts`).
  *
  * Nothing is read from storage until the first call, so importing this module is free.
  */

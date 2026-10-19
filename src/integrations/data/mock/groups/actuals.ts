@@ -1,7 +1,7 @@
 import type { GoalActual, Id, ImportType } from '@/data/types';
 import type { ActualFilter, ActualsGateway, EvidenceFilter, RecordActualInput } from '../../types';
-import { actualIssues, isResultFinalised } from '@/lib/actualRules';
-import { toKpiError } from '@/lib/errorCatalog';
+import { actualIssues, canRejectImport, isResultFinalised } from '@/lib/actualRules';
+import { KpiError, toKpiError } from '@/lib/errorCatalog';
 import { todayOf } from '@/lib/isoDate';
 import { removeRow } from '../integrity';
 import { eqOpt, inList, newId, upsert } from '../rows';
@@ -9,8 +9,6 @@ import { clockOf, goalResource } from '../authorize';
 import type { Runtime } from '../runtime';
 
 export function actualsGroup(rt: Runtime): ActualsGateway {
-  rt.pendingGuard('actuals.rejectImport', 'T4 4.4.3 importRules: only a Validating batch can be rejected', 'T4');
-
   return {
     listDataSources: rt.read('actuals.listDataSources', (tx) => tx.all('DataSource')),
     saveDataSource: rt.write('actuals.saveDataSource', { permission: 'datasource.manage' }, (tx, input: Parameters<ActualsGateway['saveDataSource']>[2]) =>
@@ -115,9 +113,12 @@ export function actualsGroup(rt: Runtime): ActualsGateway {
       track: 'T4',
       auth: { permission: 'actual.import' },
     }),
-    rejectImport: rt.write('actuals.rejectImport', { permission: 'actual.import' }, (tx, batchId: Id) =>
-      tx.update('ImportBatch', { ...tx.get('ImportBatch', batchId), status: 'Rejected' }),
-    ),
+    rejectImport: rt.write('actuals.rejectImport', { permission: 'actual.import' }, (tx, batchId: Id) => {
+      const batch = tx.get('ImportBatch', batchId);
+      const decision = canRejectImport(batch);
+      if (!decision.ok) throw new KpiError(decision.code, `import batch ${batchId} is ${batch.status}`);
+      return tx.update('ImportBatch', { ...batch, status: 'Rejected' });
+    }),
 
     listEvidence: rt.read('actuals.listEvidence', (tx, filter: EvidenceFilter = {}) =>
       tx

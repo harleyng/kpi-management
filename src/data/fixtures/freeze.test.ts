@@ -16,7 +16,7 @@ import { buildSeed, SEED_VERSION } from './index';
  */
 const FROZEN = {
   seedVersion: '2027-04-06.G1',
-  seedHash: '1388ec6f4e7c7d',
+  seedHash: '13f3d1c73192c7',
   entityCount: 49,
 } as const;
 

@@ -75,7 +75,6 @@ describe('mock runtime — the contract surface', () => {
     expect(open(pendingGuards.keys())).toEqual([]);
     expect(Object.fromEntries([...trackOwned].sort(([a], [b]) => (a < b ? -1 : 1)))).toEqual({
       'actuals.commitImport': 'T4', // WBS 4.4.3 importRules
-      'actuals.rejectImport': 'T4', // WBS 4.4.3
       'actuals.runSync': 'T4', // WBS 4.4.5 the simulated ERP Sale connector
       'actuals.stageImport': 'T4', // WBS 4.4.3
       'results.exportPayroll': 'T6', // WBS 4.6.4

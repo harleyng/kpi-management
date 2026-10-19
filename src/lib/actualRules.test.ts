@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actualIssues, isResultFinalised, type ActualEntryInput } from './actualRules';
+import { actualIssues, canRejectImport, isResultFinalised, type ActualEntryInput } from './actualRules';
 
 const input = (o: Partial<ActualEntryInput> = {}): ActualEntryInput => ({
   actual: { actualValue: 42, actualText: null },
@@ -86,5 +86,13 @@ describe('isResultFinalised', () => {
     expect(isResultFinalised(results, 'p1', 'T02')).toBe(false);
     expect(isResultFinalised(results, 'p2', 'T02')).toBe(true);
     expect(isResultFinalised(results, 'p2', 'T01')).toBe(false);
+  });
+});
+
+describe('canRejectImport — only a Validating batch (BR-KPI-52)', () => {
+  it('allows Validating; refuses Committed and Rejected with ERR-KPI-04', () => {
+    expect(canRejectImport({ status: 'Validating' })).toEqual({ ok: true });
+    expect(canRejectImport({ status: 'Committed' })).toEqual({ ok: false, code: 'ERR-KPI-04' });
+    expect(canRejectImport({ status: 'Rejected' })).toEqual({ ok: false, code: 'ERR-KPI-04' });
   });
 });

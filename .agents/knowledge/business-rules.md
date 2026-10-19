@@ -268,7 +268,8 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   Final / Locked result stores it **rounded once at finalisation** (`ratedScore`); `adjustmentPct` is
   stored on its own. `ResultDetail.achievementPct` is the per-goal % (floor and cap already applied, or
   the FINAL column of the form); `weightedScore` = achievement × weight / 100. Rating and payout are
-  **null while the score is incomplete**. **Payout only for Employee plans** — a Company / OrgUnit plan
+  **null while the score is provisional** — a goal not scored, or weights that do not total 100% (within
+  the BR-KPI-07 tolerance; Gate 1 QA). **Payout only for Employee plans** — a Company / OrgUnit plan
   is rated but has no payout figure. The payout is read as of the **period's end date**, for the
   employee's unit chain and position on their last working day in the period (BR-KPI-24). The scale is
   the cycle's `ratingScaleId`. An adjustment is set on a **Draft** only and re-scores from the result's
@@ -300,7 +301,9 @@ All calculation is a pure function in `src/lib/*Rules.ts` with tests (CLAUDE.md,
   Final, `finalizedAt` = the gateway clock, the score rounded once; emits `results.finalized`. A listed
   result that is not Draft → 04 (`NOT_DRAFT`), of another period → 06, no Draft → 04. **Locking**
   (`lockPeriodResults`) turns the period's Final results Locked (audit action LOCK); Drafts stay; no
-  Final result → 04. It does not touch `CyclePeriod.isLocked`. Only finalised results are exported to
+  Final result → 04. It does not touch `CyclePeriod.isLocked`. Once the cycle is **Closed**, nothing is
+  calculated, adjusted or finalised (04 `CYCLE_CLOSED`), and finalising re-checks that the plan is still
+  Approved / Locked (04 `NOT_ELIGIBLE`). Only finalised results are exported to
   payroll, and the export is recorded (T6). *Source: ERD `PERIOD_RESULT.status`, `PAYROLL_EXPORT`.*
 - **BR-KPI-44** — `calculateResults` computes a **Draft** per Approved / Locked plan of the period's
   cycle (`resultRules.buildPeriodResults`); a Final or Locked result is never recomputed (returned
@@ -410,7 +413,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   06 `PERIOD_NOT_IN_CYCLE`; nothing entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number
   and no text, a TEXT goal non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`; the period has not
   started (its start date after today in the tenant zone) → 06 `PERIOD_NOT_STARTED` (`ASSUMPTION Q18`).
-  A negative number is accepted. *Source: ERD `GOAL_ACTUAL`.*
+  A negative number is accepted. Only a batch still **Validating** can be rejected — a Committed batch
+  has written its actuals (`actualRules.canRejectImport`, ERR-KPI-04). *Source: ERD `GOAL_ACTUAL`.*
 
 ## 8. Open assumptions (plan §9)
 

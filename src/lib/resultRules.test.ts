@@ -162,6 +162,15 @@ describe('computeResult — score, adjustment, rating, payout (BR-KPI-35, 40–4
     expect(calc).toMatchObject({ adjusted: 100, ratingLevelId: null, payoutPct: null });
   });
 
+  it('weights that do not total 100% are provisional too: scored, never rated (QA, Gate 1)', () => {
+    const short = computeResult([line('a', 50, 100), line('b', 25, 80)], 0, scale, rules, subject, '2027-01-31');
+    expect(short.adjusted).not.toBeNull();
+    expect(short).toMatchObject({ ratingLevelId: null, payoutPct: null });
+    // 99.99 is within the tolerance (BR-KPI-07).
+    const third = computeResult([line('a', 33.33, 95), line('b', 33.33, 95), line('c', 33.33, 95)], 0, scale, rules, subject, '2027-01-31');
+    expect(third.ratingLevelId).toBe(level('B'));
+  });
+
   it('payout: Position > nearest OrgUnit > All, the latest effectiveFrom, no rule → null', () => {
     const b = level('B') as string;
     const lines = [line('g', 100, 95)];
@@ -320,6 +329,11 @@ describe('applyAdjustment — setAdjustment', () => {
     const final = { ...built, PeriodResult: built.PeriodResult.map((r) => ({ ...r, status: 'Final' as const })) };
     expect(applyAdjustment(final, 'r:T01:plan1', 1)).toMatchObject({ ok: false, issues: [{ code: 'ERR-KPI-04', detail: 'RESULT_FINAL' }] });
   });
+
+  it('refuses a Draft left in a Closed cycle (04 CYCLE_CLOSED)', () => {
+    const closed = { ...built, PerformanceCycle: [cycle({ status: 'Closed' })] };
+    expect(applyAdjustment(closed, 'r:T01:plan1', 1)).toMatchObject({ ok: false, issues: [{ code: 'ERR-KPI-04', detail: 'CYCLE_CLOSED' }] });
+  });
 });
 
 describe('finalizePeriodResults / lockPeriodResults', () => {
@@ -343,6 +357,14 @@ describe('finalizePeriodResults / lockPeriodResults', () => {
         ['ERR-KPI-09', 'r:T01:unit'],
       ]);
     }
+  });
+
+  it('refuses a Closed cycle (04 CYCLE_CLOSED) and a plan sent back to Draft since it was calculated (04 NOT_ELIGIBLE)', () => {
+    const closed = { ...built, PerformanceCycle: [cycle({ status: 'Closed' })] };
+    expect(finalizePeriodResults(closed, 'T01', undefined, NOW, ids)).toMatchObject({ ok: false, issues: [{ code: 'ERR-KPI-04', detail: 'CYCLE_CLOSED' }] });
+    const reopened = { ...built, GoalPlan: built.GoalPlan.map((p) => (p.id === 'plan1' ? { ...p, status: 'Draft' as const } : p)) };
+    const outcome = finalizePeriodResults(reopened, 'T01', ['r:T01:plan1'], NOW, ids);
+    expect(outcome).toMatchObject({ ok: false, issues: [{ code: 'ERR-KPI-04', detail: 'NOT_ELIGIBLE' }] });
   });
 
   it('refuses: a listed result not Draft (04), of another period (06), nothing Draft (04); lock with no Final (04)', () => {

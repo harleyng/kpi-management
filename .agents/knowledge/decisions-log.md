@@ -10,7 +10,7 @@
 
 **Decision.** Gate 1 now means: every Phase 1 rule is wired into the mock, and nothing is deferred or
 guard-pending **bar the Phase 2 tracks' own work packages** (`registry.trackOwned`: T4 `stageImport`,
-`commitImport`, `rejectImport`, `runSync`; T6 `exportPayroll`) — the original "both lists empty" test
+`commitImport`, `runSync`; T6 `exportPayroll`) — the original "both lists empty" test
 was redefined, since those methods ARE the tracks' work. Every user write declares its authorization and
 the gateway enforces `can()` on it (`authorize.ts`). Product-owner decisions:
 1. an employee's result comes only from a Completed evaluation form's FINAL column (`ASSUMPTION Q17`);
