@@ -89,30 +89,36 @@ function FocusedUnit({
           )}
         </div>
 
-        {/* Under 1536px the panels stack below the tables, two by two — the tables keep the full width. */}
-        <div className="grid content-start gap-4 md:grid-cols-2 min-[1536px]:grid-cols-1">
-          <Panel title="Chỉ tiêu cần chú ý" hint={ATTENTION_HINT}>
-            {focus.own === null ? (
-              <p className="text-sm text-muted-foreground">{focus.ownPlan === null ? 'Đơn vị không có kế hoạch riêng.' : 'Chưa có kết quả kỳ này.'}</p>
-            ) : (
-              <PanelState query={lines.query} hasData={lines.view !== undefined}>
-                {lines.view && <AttentionList items={lines.view.attention.items} hiddenCount={lines.view.attention.hiddenCount} />}
-              </PanelState>
-            )}
-          </Panel>
-          <Panel title="Theo viễn cảnh BSC" hint="% hoàn thành bình quân có trọng số của từng viễn cảnh — không cộng thành điểm tổng.">
-            {focus.own === null ? (
-              <p className="text-sm text-muted-foreground">Chưa có kết quả để chia theo viễn cảnh.</p>
-            ) : (
-              <PanelState query={lines.query} hasData={lines.view !== undefined}>
-                {lines.view && <PerspectiveBars rows={lines.view.perspectives} names={lines.view.perspectiveNames} />}
-              </PanelState>
-            )}
-          </Panel>
-          <Panel title="Xu hướng">
-            {focus.ownPlan === null ? <p className="text-sm text-muted-foreground">Đơn vị không có kế hoạch riêng.</p> : <TrendChart points={trend} name={focus.unit.name} />}
-          </Panel>
-          <InsightCard snapshot={snapshot} />
+        {/* Under 1536px the panels sit in two free columns below the tables — each column stacks at its own
+            height, so a tall card (the expanded assistant) never stretches its neighbour. From 1536px both
+            columns stack into the one side column. */}
+        <div className="grid content-start items-start gap-4 md:grid-cols-2 min-[1536px]:grid-cols-1">
+          <div className="min-w-0 space-y-4">
+            <Panel title="Chỉ tiêu cần chú ý" hint={ATTENTION_HINT}>
+              {focus.own === null ? (
+                <p className="text-sm text-muted-foreground">{focus.ownPlan === null ? 'Đơn vị không có kế hoạch riêng.' : 'Chưa có kết quả kỳ này.'}</p>
+              ) : (
+                <PanelState query={lines.query} hasData={lines.view !== undefined}>
+                  {lines.view && <AttentionList items={lines.view.attention.items} hiddenCount={lines.view.attention.hiddenCount} />}
+                </PanelState>
+              )}
+            </Panel>
+            <Panel title="Xu hướng">
+              {focus.ownPlan === null ? <p className="text-sm text-muted-foreground">Đơn vị không có kế hoạch riêng.</p> : <TrendChart points={trend} name={focus.unit.name} />}
+            </Panel>
+          </div>
+          <div className="min-w-0 space-y-4">
+            <Panel title="Theo viễn cảnh BSC" hint="% hoàn thành bình quân có trọng số của từng viễn cảnh — không cộng thành điểm tổng.">
+              {focus.own === null ? (
+                <p className="text-sm text-muted-foreground">Chưa có kết quả để chia theo viễn cảnh.</p>
+              ) : (
+                <PanelState query={lines.query} hasData={lines.view !== undefined}>
+                  {lines.view && <PerspectiveBars rows={lines.view.perspectives} names={lines.view.perspectiveNames} />}
+                </PanelState>
+              )}
+            </Panel>
+            <InsightCard snapshot={snapshot} />
+          </div>
         </div>
       </div>
     </div>
