@@ -201,9 +201,9 @@ export function EvaluationFormBody({ detail, title }: { detail: FormDetail; titl
               <Table aria-label="Các chỉ tiêu đánh giá" className="min-w-[58rem]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="sticky left-0 z-[1] w-48 bg-background text-xs">Chỉ tiêu</TableHead>
+                    <TableHead className="sticky left-0 z-[1] w-48 bg-inherit text-xs">Chỉ tiêu</TableHead>
                     {column && (
-                      <TableHead className="w-56 bg-primary-subtle text-xs text-foreground">
+                      <TableHead className="w-56 bg-primary text-xs">
                         {EVALUATION_COLUMN_LABEL[column]} (%)<span className="sr-only"> — cột bạn đang nhập</span>
                       </TableHead>
                     )}
@@ -227,7 +227,7 @@ export function EvaluationFormBody({ detail, title }: { detail: FormDetail; titl
                     const markerId = `row-issue-${item.id}`;
                     return (
                       <TableRow key={item.id} className="align-top hover:bg-surface-alt">
-                        <TableCell className="sticky left-0 z-[1] bg-background px-3 py-2">
+                        <TableCell className="sticky left-0 z-[1] bg-inherit px-3 py-2">
                           <div className="font-medium">{name}</div>
                           {rowIssues.length > 0 && (
                             <p id={markerId} className="mt-0.5 text-xs text-support-negative">

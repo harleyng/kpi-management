@@ -58,7 +58,7 @@ export function AppShell() {
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 py-6">
           <RouteErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>{allowed ? <Outlet /> : <AccessDenied />}</Suspense>
           </RouteErrorBoundary>

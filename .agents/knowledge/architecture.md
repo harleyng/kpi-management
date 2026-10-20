@@ -23,7 +23,7 @@ scaffold (tooling, agent panel, workflow) on 2026-10-19; no OmniX business code 
 | Layer | Detail |
 |---|---|
 | Framework | React 18 + TypeScript (`strict: true`) + Vite 5 (`@vitejs/plugin-react-swc`) |
-| UI | shadcn-ui + Tailwind CSS + Radix. White background, primary `#863EEA` (`--primary: 265 80% 58%`) |
+| UI | shadcn-ui + Tailwind CSS + Radix. Light grey canvas, white borderless cards, dark purple sidebar, primary `#863EEA` (`--primary: 265 80% 58%`) |
 | Server state | **React Query v5** over the `DataGateway`, in `src/hooks/queries/*` |
 | Client state | **Zustand** (`src/lib/*Store.ts`) + `SessionContext` (simulated tenant and person; access = the union of their roles) |
 | Forms | React Hook Form + Zod |

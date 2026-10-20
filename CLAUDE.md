@@ -21,7 +21,7 @@ pay rules have to be right before anyone trusts the screens.
 | Aspect | Detail |
 |---|---|
 | Framework | React 18 + TypeScript (`strict`) + Vite (`@vitejs/plugin-react-swc`) |
-| UI | shadcn-ui + Tailwind CSS + Radix. White background, primary `#863EEA` |
+| UI | shadcn-ui + Tailwind CSS + Radix. Light grey canvas, white borderless cards, dark purple sidebar, primary `#863EEA` |
 | Data | **Simulated** — a `DataGateway` contract with a `mock` adapter (in-memory + localStorage, seeded fixtures). **No database yet**; `supabaseGateway` is a stub until Phase 5 |
 | Tenancy | **Multi-tenant from day one** — every gateway call takes `tenantId` and filters by it |
 | Server state | **TanStack React Query v5** over the gateway, in `src/hooks/queries/*` |

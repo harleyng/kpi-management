@@ -19,11 +19,10 @@ import type {
  * colour (design-system.md, "Status → tone mapping"). The badges in `StatusBadge.tsx` read these;
  * no screen chooses a tone itself.
  *
- * The principle: **muted** = nothing happening, or the normal running state · **info** = waiting on
- * someone else or on the system · **warning** = waiting on the person looking, or needs attention ·
- * **positive** = settled and good · **negative** = refused or failed. A badge marks the exception,
- * so a set's ordinary state (a goal that is Active, a KPI in use) stays muted rather than green on
- * every row.
+ * The principle — five colours, one meaning each:
+ * **info** (blue) = waiting on someone else or on the system · **positive** (green) = in effect
+ * ("applying") or succeeded · **warning** (yellow) = needs action, waiting on the person looking ·
+ * **negative** (red) = error, refused or failed · **muted** (grey) = cancelled, ended, or not started.
  *
  * Kept free of JSX so the component file exports only components (clean hot reload).
  */
@@ -35,22 +34,25 @@ export const GOAL_PLAN_STATUS_TONE: Readonly<Record<GoalPlanStatus, Tone>> = {
   Submitted: 'info',
   Returned: 'warning',
   Approved: 'positive',
-  // Final and read-only, not an alarm — the badge adds a lock icon.
-  Locked: 'muted',
+  // In effect for the cycle — the badge adds a lock icon.
+  Locked: 'positive',
 };
 
 export const FORM_STATUS_TONE: Readonly<Record<FormStatus, Tone>> = {
-  Open: 'muted',
+  // Launched, waiting on its first actor.
+  Open: 'info',
   InProgress: 'info',
   Completed: 'positive',
   Cancelled: 'muted',
 };
 
 export const CYCLE_STATUS_TONE: Readonly<Record<CycleStatus, Tone>> = {
-  Planning: 'muted',
-  Active: 'info',
+  // Being prepared, waiting to open.
+  Planning: 'info',
+  Active: 'positive',
   Evaluating: 'warning',
-  Closed: 'positive',
+  // Over — like an expired delegation.
+  Closed: 'muted',
 };
 
 export const PERIOD_RESULT_STATUS_TONE: Readonly<Record<PeriodResultStatus, Tone>> = {
@@ -60,15 +62,15 @@ export const PERIOD_RESULT_STATUS_TONE: Readonly<Record<PeriodResultStatus, Tone
 };
 
 export const GOAL_STATUS_TONE: Readonly<Record<GoalStatus, Tone>> = {
-  Active: 'muted',
-  // Superseded by an approved adjustment — the replacement goal is the one to read.
-  Changed: 'info',
+  Active: 'positive',
+  // Superseded by an approved adjustment — no longer in effect; the replacement goal is the one to read.
+  Changed: 'muted',
   Cancelled: 'muted',
 };
 
 export const LIBRARY_STATUS_TONE: Readonly<Record<LibraryStatus, Tone>> = {
   Draft: 'muted',
-  Active: 'muted',
+  Active: 'positive',
   Archived: 'muted',
 };
 
@@ -93,23 +95,22 @@ export const SYNC_RUN_STATUS_TONE: Readonly<Record<SyncRunStatus, Tone>> = {
 };
 
 export const NOTIFICATION_STATUS_TONE: Readonly<Record<NotificationStatus, Tone>> = {
-  Queued: 'muted',
-  // Delivered, waiting on the recipient to read it.
-  Sent: 'info',
-  Read: 'muted',
+  Queued: 'info',
+  Sent: 'positive',
+  Read: 'positive',
   Failed: 'negative',
 };
 
-/** An attribute, not a workflow — every value is muted; the label carries the meaning. */
 export const EMPLOYMENT_STATUS_TONE: Readonly<Record<EmploymentStatus, Tone>> = {
-  Probation: 'muted',
-  Official: 'muted',
+  // Waiting on confirmation.
+  Probation: 'info',
+  Official: 'positive',
   Resigned: 'muted',
 };
 
-/** `null` = render no badge: "Active" is every row's norm, only "Inactive" is worth marking. */
+/** `null` would render no badge; every value is badged today. */
 export const RECORD_STATUS_TONE: Readonly<Record<RecordStatus, Tone | null>> = {
-  Active: null,
+  Active: 'positive',
   Inactive: 'muted',
 };
 
@@ -129,12 +130,12 @@ export function formTone(status: FormStatus, atMyStep: boolean): Tone {
 export const OVERDUE_LABEL = 'Quá hạn';
 
 /**
- * A delegation's derived state (`formViewRules.delegationState`): granting now is the person's
- * attention (`info`, waiting on the delegate), the rest is history or not yet live.
+ * A delegation's derived state (`formViewRules.delegationState`): granting now is in effect, an
+ * upcoming one is waiting on its start date, the rest is history.
  */
 export const DELEGATION_STATE_TONE: Readonly<Record<DelegationState, Tone>> = {
-  Upcoming: 'muted',
-  Active: 'info',
+  Upcoming: 'info',
+  Active: 'positive',
   Expired: 'muted',
   Revoked: 'muted',
 };

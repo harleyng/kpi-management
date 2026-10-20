@@ -91,7 +91,7 @@ export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTa
       id: 'name',
       header: 'Chỉ tiêu',
       // Sticky, so the row keeps its name while the D3 columns scroll (UI/UX critique).
-      className: 'sticky left-0 z-10 min-w-[14rem] bg-background',
+      className: 'sticky left-0 z-10 min-w-[14rem] bg-inherit',
       cell: (goal) => {
         const kpi = goal.kpiDefId ? lookups.kpi.get(goal.kpiDefId) : undefined;
         const warnings = warningsByGoal.get(goal.id);
@@ -259,7 +259,7 @@ export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTa
 
   const footer = (
     <TableRow className="sticky bottom-0 bg-background font-medium">
-      <TableCell className="sticky left-0 z-10 bg-background">
+      <TableCell className="sticky left-0 z-10 bg-inherit">
         Tổng trọng số
         {data.hiddenCount > 0 && <span className="block text-xs font-normal text-muted-foreground">Gồm {data.hiddenCount} chỉ tiêu riêng tư bạn không xem được</span>}
       </TableCell>

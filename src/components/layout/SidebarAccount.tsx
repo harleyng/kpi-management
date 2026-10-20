@@ -32,7 +32,7 @@ export function SidebarAccount({ collapsed = false }: { collapsed?: boolean }) {
         type="button"
         aria-label="Tài khoản"
         className={cn(
-          'flex w-full items-center rounded-md py-2 text-left transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+          'flex w-full items-center rounded-md py-2 text-left transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar',
           collapsed ? 'justify-center' : 'gap-2.5 px-2',
         )}
       >
@@ -48,9 +48,9 @@ export function SidebarAccount({ collapsed = false }: { collapsed?: boolean }) {
               <span className="block truncate text-sm font-medium text-sidebar-foreground">
                 {user.name}
               </span>
-              <span className="block truncate text-[11px] text-muted-foreground">{user.email}</span>
+              <span className="block truncate text-[11px] text-sidebar-muted-foreground">{user.email}</span>
             </span>
-            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-muted-foreground" aria-hidden />
           </>
         )}
       </button>
@@ -70,7 +70,7 @@ export function SidebarAccount({ collapsed = false }: { collapsed?: boolean }) {
 
       <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-60">
         <DropdownMenuLabel>Vai trò</DropdownMenuLabel>
-        <div className="px-2 pb-1.5 text-xs text-muted-foreground">
+        <div className="px-2 pb-1.5 text-xs text-sidebar-muted-foreground">
           {roles.map((role) => ROLE_LABEL[role]).join(', ')}
         </div>
         <DropdownMenuSeparator />

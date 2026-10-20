@@ -48,6 +48,23 @@ no tabs for pages, detail pages, list toolbar), `common-pitfalls.md`, `/new-page
 
 ---
 
+## 2026-10-19 — Visual refresh: dark purple sidebar, grey canvas, shadowed cards, five-colour badges
+
+**Decision.** The sidebar sits on dark purple (`--sidebar-*`); the main area on a light grey `--canvas`
+with borderless, shadowed white cards; tables keep very light `--divider` row lines under a light grey
+header. These are global rules in `index.css`, not edits to `components/ui`. Badges now use five colours
+with one meaning each: blue waiting · green in effect or succeeded · yellow needs action · red error ·
+grey cancelled/ended/draft. This **replaces** the Phase 1.4 "a badge marks the exception" rule — an
+in-effect state (Active goal, Locked plan, Active cycle) is now green rather than grey.
+
+**Why.** Product owner's direction: the frame should read apart from the body, and a badge's colour
+should tell the state at a glance.
+
+**Updated alongside.** `design-system.md` (layout patterns, status → tone tables, badge), `statusTones.ts`
+and its test, `architecture.md` / `CLAUDE.md` UI line.
+
+---
+
 ## 2026-10-19 — Phase 3: one scoped drill-down, stored figures only, an assistant that only phrases a snapshot
 
 **Decision.** (product owner: tracks merged first; Q40–Q43 defaults; a thin deterministic assistant)

@@ -28,7 +28,7 @@ export function KgiSection({ data, lookups, editable }: { data: PlanWorkspaceDat
   const goalCount = (kgiId: string) => data.goals.filter((g) => g.kgiId === kgiId && g.status === 'Active').length;
 
   return (
-    <section aria-labelledby="kgi-title" className="rounded-md border">
+    <section aria-labelledby="kgi-title" className="rounded-md border bg-card">
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <button type="button" className="flex items-center gap-2 text-sm font-semibold" aria-expanded={open} aria-controls="kgi-list" id="kgi-title" onClick={() => setOpen((o) => !o)}>
           {open ? <ChevronDown className="h-4 w-4" aria-hidden /> : <ChevronRight className="h-4 w-4" aria-hidden />}

@@ -41,7 +41,7 @@ export function PermissionMatrix() {
           <caption className="sr-only">Ma trận quyền theo vai trò</caption>
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b">
-              <th scope="col" className="sticky left-0 z-20 w-64 bg-background px-3 py-2 text-left font-medium">
+              <th scope="col" className="sticky left-0 z-20 w-64 bg-inherit px-3 py-2 text-left font-medium">
                 Quyền
               </th>
               {roles.map((r) => (
@@ -64,7 +64,7 @@ export function PermissionMatrix() {
                 </tr>
                 {permissions.map((p) => (
                   <tr key={p.code} className="border-b last:border-0">
-                    <th scope="row" className="sticky left-0 bg-background px-3 py-1.5 text-left font-normal">
+                    <th scope="row" className="sticky left-0 bg-inherit px-3 py-1.5 text-left font-normal">
                       <span className="block">{p.description}</span>
                       <span className="block font-mono text-xs text-muted-foreground">{p.code}</span>
                     </th>

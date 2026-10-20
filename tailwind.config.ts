@@ -54,10 +54,13 @@ export default {
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
+          "muted-foreground": "hsl(var(--sidebar-muted-foreground))",
+          section: "hsl(var(--sidebar-section))",
           accent: "hsl(var(--sidebar-accent))",
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
         },
+        canvas: "hsl(var(--canvas))",
         /* Secondary surfaces — table rows, toolbars. */
         surface: {
           DEFAULT: "hsl(var(--surface))",

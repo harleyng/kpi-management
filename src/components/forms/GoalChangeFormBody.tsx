@@ -301,7 +301,7 @@ function ProposalRow({
   return (
     <li className="grid gap-2 py-3 md:grid-cols-[minmax(12rem,1fr)_7rem_10rem_minmax(14rem,1.5fr)_auto] md:items-start">
       <div className="min-w-0">
-        <Badge variant={row.changeType === 'CANCEL' ? 'negative' : row.changeType === 'ADD' ? 'positive' : 'info'}>{GOAL_CHANGE_TYPE_LABEL[row.changeType]}</Badge>
+        <Badge variant={row.changeType === 'CANCEL' ? 'muted' : row.changeType === 'ADD' ? 'positive' : 'info'}>{GOAL_CHANGE_TYPE_LABEL[row.changeType]}</Badge>
         <p className="mt-1 font-medium">{name}</p>
         {issues.length > 0 && <p className="mt-0.5 text-xs text-support-negative">{ERROR_CATALOG[issues[0].code].title}</p>}
       </div>

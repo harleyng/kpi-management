@@ -27,13 +27,13 @@ describe('status tones match design-system.md', () => {
       Submitted: 'info',
       Returned: 'warning',
       Approved: 'positive',
-      Locked: 'muted',
+      Locked: 'positive',
     });
   });
 
   it('Form', () => {
     expect(FORM_STATUS_TONE).toEqual({
-      Open: 'muted',
+      Open: 'info',
       InProgress: 'info',
       Completed: 'positive',
       Cancelled: 'muted',
@@ -42,10 +42,10 @@ describe('status tones match design-system.md', () => {
 
   it('Cycle', () => {
     expect(CYCLE_STATUS_TONE).toEqual({
-      Planning: 'muted',
-      Active: 'info',
+      Planning: 'info',
+      Active: 'positive',
       Evaluating: 'warning',
-      Closed: 'positive',
+      Closed: 'muted',
     });
   });
 
@@ -53,13 +53,13 @@ describe('status tones match design-system.md', () => {
     expect(PERIOD_RESULT_STATUS_TONE).toEqual({ Draft: 'muted', Final: 'info', Locked: 'positive' });
   });
 
-  it('Delegation (derived): only one granting now is marked', () => {
-    expect(DELEGATION_STATE_TONE).toEqual({ Upcoming: 'muted', Active: 'info', Expired: 'muted', Revoked: 'muted' });
+  it('Delegation (derived): in effect is green, upcoming is waiting', () => {
+    expect(DELEGATION_STATE_TONE).toEqual({ Upcoming: 'info', Active: 'positive', Expired: 'muted', Revoked: 'muted' });
     expect(PLAN_ADJUSTING_TONE).toBe('info');
   });
 
-  it('Record: only Inactive is badged', () => {
-    expect(RECORD_STATUS_TONE).toEqual({ Active: null, Inactive: 'muted' });
+  it('Record: active is green, inactive grey', () => {
+    expect(RECORD_STATUS_TONE).toEqual({ Active: 'positive', Inactive: 'muted' });
   });
 });
 
@@ -88,7 +88,7 @@ describe('formTone', () => {
   });
 
   it('ignores "my step" for any other status', () => {
-    expect(formTone('Open', true)).toBe('muted');
+    expect(formTone('Open', true)).toBe('info');
     expect(formTone('Completed', true)).toBe('positive');
     expect(formTone('Cancelled', true)).toBe('muted');
   });

@@ -58,7 +58,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out md:flex',
+        'hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out md:flex',
         collapsed ? 'w-16' : 'w-60',
       )}
     >
@@ -96,7 +96,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
               type="button"
               aria-label={label}
               onClick={sidebarActions.toggle}
-              className="group relative flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="group relative flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
             >
               <PRODUCT_ICON className="h-4 w-4 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0" />
               <PanelLeftOpen
@@ -116,7 +116,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
         <PRODUCT_ICON className="h-4 w-4" aria-hidden />
       </div>
-      <span className="truncate text-sm font-semibold">Syntra KPI</span>
+      <span className="truncate text-sm font-semibold text-sidebar-accent-foreground">Syntra KPI</span>
 
       <Tooltip>
         <TooltipTrigger asChild>
@@ -124,7 +124,7 @@ function SidebarHeader({ collapsed }: { collapsed: boolean }) {
             type="button"
             aria-label={label}
             onClick={sidebarActions.toggle}
-            className="-mr-1.5 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            className="-mr-1.5 ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar"
           >
             <PanelLeftClose className="h-4 w-4" />
           </button>
@@ -152,7 +152,7 @@ function SidebarGroup({ group, index, nav }: { group: NavGroup; index: number; n
       {collapsed ? (
         index > 0 && <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-sidebar-border" />
       ) : (
-        <div className="px-2 pb-1 text-xs font-medium text-muted-foreground">
+        <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-section">
           {group.label}
         </div>
       )}
@@ -175,7 +175,7 @@ function SidebarGroup({ group, index, nav }: { group: NavGroup; index: number; n
 const ROW = 'flex h-9 items-center rounded-md text-sm text-sidebar-foreground transition-colors';
 const ROW_ACTIVE = 'bg-sidebar-accent font-medium text-sidebar-accent-foreground';
 const ROW_IDLE = 'hover:bg-sidebar-accent/60';
-const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1';
+const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar';
 
 /** A sub-item's link: siblings of the current page keep its cycle / period (`carryParams`). */
 function childHref(parent: NavParent, child: NavChild, nav: NavState): string {
@@ -236,7 +236,7 @@ function SidebarParent({ parent, nav }: { parent: NavParent; nav: NavState }) {
       >
         <parent.icon className="h-4 w-4 shrink-0" aria-hidden />
         <span className="flex-1 truncate">{parent.title}</span>
-        <ChevronRight aria-hidden className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none', open && 'rotate-90')} />
+        <ChevronRight aria-hidden className={cn('h-4 w-4 shrink-0 text-sidebar-muted-foreground transition-transform motion-reduce:transition-none', open && 'rotate-90')} />
       </button>
       {open && (
         <ul id={listId} className="mb-1 mt-0.5 space-y-0.5">

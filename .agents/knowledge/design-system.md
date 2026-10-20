@@ -70,9 +70,15 @@ mapping lives in **exactly one place**: `src/components/shared/statusTones.ts` (
 `statusTones.test.ts`), rendered by one badge per state set in `StatusBadge.tsx` (`GoalPlanStatusBadge`,
 `FormStatusBadge`, `CycleStatusBadge`…). A screen passes only the status. Never pick a tone at the call site.
 
-The tones follow one principle: **muted** = nothing happening yet, or the set's normal running
-state · **info** = waiting on someone else / the system · **warning** = waiting on the person looking at it, or needs attention · **positive** =
-settled and good · **negative** = refused or failed. A **locked** thing is settled, so it is not red.
+The tones follow one principle — **five colours, one meaning each**:
+
+| Tone | Colour | Means |
+|---|---|---|
+| `info` | blue | **waiting** — on someone else or on the system |
+| `positive` | green | **in effect ("applying") or succeeded** |
+| `warning` | yellow | **needs action** — waiting on the person looking at it, or a warning |
+| `negative` | red | **error** — refused or failed |
+| `muted` | grey | **cancelled**, ended, or not started yet (a draft) |
 
 ### Goal Plan
 
@@ -80,15 +86,15 @@ settled and good · **negative** = refused or failed. A **locked** thing is sett
 |---|---|---|---|
 | Draft | Nháp | `muted` | not yet sent |
 | Submitted | Đã gửi | `info` | waiting on the approver |
-| Returned | Bị trả lại | `warning` | waiting on the owner to fix it — the row they must act on |
+| Returned | Bị trả lại | `warning` | the owner must fix it |
 | Approved | Đã duyệt | `positive` | settled |
-| Locked | Đã khóa | `muted` + lock icon | final and read-only; not an alarm |
+| Locked | Đã khóa | `positive` + lock icon | in effect for the cycle |
 
 ### Form (phiếu)
 
 | Status | Label (vi) | Tone | Note |
 |---|---|---|---|
-| Open | Mới | `muted` | launched, nobody has acted |
+| Open | Mới | `info` | launched, waiting on its first actor |
 | InProgress | Đang xử lý | `info` — `warning` when it is at **my** step | the inbox highlights my turn |
 | Completed | Hoàn thành | `positive` | |
 | Cancelled | Đã hủy | `muted` | |
@@ -100,24 +106,23 @@ settled and good · **negative** = refused or failed. A **locked** thing is sett
 
 | Set | Value → tone |
 |---|---|
-| Cycle | Planning `muted` · Active `info` · Evaluating `warning` · Closed `positive` |
-| Period result | Draft `muted` · Final `info` · Locked `positive` |
+| Cycle | Planning `info` · Active `positive` · Evaluating `warning` · Closed `muted` (over) |
+| Period result | Draft `muted` · Final `info` (waiting to be locked) · Locked `positive` |
 
-### The other state sets (Phase 1.4)
-
-A badge marks the exception: a set's ordinary state (an Active goal, a KPI in use) stays muted, never
-green on every row.
+### The other state sets
 
 | Set | Value → tone |
 |---|---|
-| Goal | Active `muted` · Changed `info` (superseded; read the replacement) · Cancelled `muted` |
-| Library (KPI, template) | Draft `muted` · Active `muted` · Archived `muted` — the label carries it |
-| Launch | Scheduled `info` (waiting on the system's date) · Launched `positive` · Cancelled `muted` |
+| Goal | Active `positive` · Changed `muted` (superseded; read the replacement) · Cancelled `muted` |
+| Library (KPI, template) | Draft `muted` · Active `positive` · Archived `muted` |
+| Launch | Scheduled `info` · Launched `positive` · Cancelled `muted` |
 | Import batch | Validating `info` · Committed `positive` · Rejected `negative` |
 | Sync run | Running `info` · Succeeded `positive` · PartiallyFailed `warning` (+ a row count via `detail`) · Failed `negative` |
-| Notification | Queued `muted` · Sent `info` (waiting on the reader) · Read `muted` · Failed `negative` |
-| Employment | every value `muted` — an attribute, not a workflow |
-| Record (Active/Inactive) | Active → **no badge** · Inactive `muted` |
+| Notification | Queued `info` · Sent `positive` · Read `positive` · Failed `negative` |
+| Employment | Probation `info` · Official `positive` · Resigned `muted` |
+| Record (Active/Inactive) | Active `positive` · Inactive `muted` |
+| Delegation (derived) | Upcoming `info` · Active `positive` · Expired `muted` · Revoked `muted` |
+| Goal change type | Add `positive` · Update `info` · Cancel `muted` |
 
 ---
 
@@ -152,9 +157,8 @@ green on every row.
 `src/components/ui/badge.tsx` — beyond `default`/`secondary`/`outline` it carries five semantic tones,
 `positive` · `warning` · `negative` · `info` · `muted`, serving exactly the mapping above.
 
-**A badge marks the EXCEPTION, not the norm** in a list where most rows are fine (badge the overdue form,
-not every on-time one). This does not apply to a **state set** column, where every row's badge names one
-of several statuses.
+A **state set** column badges every row in its tone, so an in-effect row reads green. A derived flag
+(overdue, attention) is still added only to the rows it applies to.
 
 ---
 
@@ -165,7 +169,20 @@ of several statuses.
   visible). The sidebar collapses to a 64px icon rail (⌘B / Ctrl-B), a remembered user preference —
   never collapsed by a route.
 - **The sidebar is a three-part column**: product mark, scrolling nav (5 groups by role, group captions
-  `text-xs font-medium text-muted-foreground` in sentence case), account block on the bottom edge.
+  `text-[11px] font-semibold uppercase tracking-wider text-sidebar-section` — a plain grey, the one
+  place uppercase is used, so a module reads apart from its near-white items), account block on the bottom edge.
+  It sits on a **dark purple surface** (`--sidebar-*` tokens, `bg-sidebar`) to set the frame apart from the
+  white body — inside it use only `sidebar-*` colours (`text-sidebar-muted-foreground`, never
+  `text-muted-foreground`), and give focus rings `ring-offset-sidebar`.
+- **Canvas and cards**: the main area sits on a light blue-grey `bg-canvas` (the top bar, dialogs, sheets and
+  inputs stay on white `bg-background`). Cards and tables are **borderless with a soft shadow** — the
+  `.border.bg-card` rule in `index.css` does this for `<Card>` (and so `<DataTable>`) and for every
+  `rounded-md border bg-card` section. A new white panel uses `bg-card` + `border` and gets it for free;
+  don't add your own `shadow-*` or border colour to it.
+- **Row dividers**: tables and `divide-y` lists use a very light `--divider` line between rows (global
+  rule in `index.css`); headers use a mid purple (`--table-head`, lighter than the menu) with white text — forced in `index.css`, so
+  don't set a text colour on a header cell; to highlight one, give it `bg-primary`. A sticky cell uses `bg-inherit` to take its
+  row's fill.
 - **Areas with sub-pages** (sidebar): a parent is a disclosure button (icon, title, chevron that turns
   90°) over its sub-items — indented, no icon, `h-8`. Accordion: one area unfolded by hand at a time,
   and the area holding the current page always open (its button inert). The filled highlight is on the
