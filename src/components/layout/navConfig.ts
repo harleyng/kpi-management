@@ -22,7 +22,7 @@ import {
 import type { PermissionCode } from '@/lib/permissionRules';
 
 /**
- * Left-hand navigation — the **5 groups of plan §7.1** ("Menu theo vai trò"). Inside a group an item
+ * Left-hand navigation — the **5 groups of plan §7.1** ("Menu theo vai trò"), "Điều hành" first (product owner, 2026-10-20). Inside a group an item
  * is either a destination (`NavLeaf`) or a parent (`NavParent`) whose sub-items are the sub-pages
  * of one area — every screen that used to be a tab is its own sub-page with its own route
  * (product owner, 2026-10-19).
@@ -85,6 +85,21 @@ const RESULT_PERIOD = ['cycle', 'period'] as const;
 
 export const NAV_GROUPS: NavGroup[] = [
   {
+    label: 'Điều hành',
+    items: [
+      {
+        title: 'Dashboard',
+        url: '/dashboard',
+        icon: LayoutDashboard,
+        carryParams: ['cycle', 'period', 'unit'],
+        children: [
+          { title: 'Tổng quan', url: '/dashboard/overview', permission: 'dashboard.view' },
+          { title: 'Vận hành', url: '/dashboard/operations', permission: 'dashboard.view' },
+        ],
+      },
+    ],
+  },
+  {
     label: 'Của tôi',
     items: [
       { title: 'KPI của tôi', url: '/my/kpi', icon: Target, permission: null },
@@ -115,21 +130,6 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { title: 'Duyệt & đánh giá', url: '/team/reviews', icon: ClipboardCheck, permission: 'team.view' },
-    ],
-  },
-  {
-    label: 'Điều hành',
-    items: [
-      {
-        title: 'Dashboard',
-        url: '/dashboard',
-        icon: LayoutDashboard,
-        carryParams: ['cycle', 'period', 'unit'],
-        children: [
-          { title: 'Tổng quan', url: '/dashboard/overview', permission: 'dashboard.view' },
-          { title: 'Vận hành', url: '/dashboard/operations', permission: 'dashboard.view' },
-        ],
-      },
     ],
   },
   {

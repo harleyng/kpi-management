@@ -16,10 +16,10 @@ const PARENTS: NavParent[] = NAV_GROUPS.flatMap((g) => g.items.filter(isNavParen
  */
 const PLAN_7_1: [persona: AccountKey, role: string, groups: string[]][] = [
   ['emp', 'EMPLOYEE', ['Của tôi']],
-  ['head', 'MANAGER', ['Của tôi', 'Đội nhóm', 'Điều hành']],
-  ['hr', 'HR', ['Của tôi', 'Điều hành', 'Quản trị KPI']],
+  ['head', 'MANAGER', ['Điều hành', 'Của tôi', 'Đội nhóm']],
+  ['hr', 'HR', ['Điều hành', 'Của tôi', 'Quản trị KPI']],
   ['cnb', 'CNB', ['Của tôi', 'Quản trị KPI']],
-  ['ceo', 'BOD', ['Của tôi', 'Điều hành']],
+  ['ceo', 'BOD', ['Điều hành', 'Của tôi']],
   ['admin', 'ADMIN', ALL_GROUPS],
 ];
 

@@ -366,6 +366,6 @@ describe('the AppShell route guard', () => {
     await who();
     const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
     const groups = [...nav.querySelectorAll('[role="group"]')].map((g) => g.getAttribute('aria-label'));
-    expect(groups).toEqual(['Của tôi', 'Điều hành']);
+    expect(groups).toEqual(['Điều hành', 'Của tôi']);
   });
 });
