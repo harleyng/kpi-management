@@ -17,7 +17,7 @@ import { UnitBreadcrumb, UnitSummary } from './UnitSummary';
 /**
  * "Tổng quan" (WBS 4.7.1 executive + 4.7.2 manager): one drill-down whose root is the highest unit the
  * viewer's `dashboard.view` covers — the company for BOD / HR, their own unit for a manager. The unit
- * table is the main surface; the side column explains the unit in focus.
+ * table is the main surface; the two panel columns below it explain the unit in focus.
  */
 export function OverviewTab({ selection, read, overdueForms }: { selection: DashboardSelection; read: DashboardRead; overdueForms: number | null }) {
   const { model } = read;
@@ -68,7 +68,7 @@ function FocusedUnit({
       )}
       <UnitSummary node={focus} previousLabel={model.previous?.label ?? null} />
 
-      <div className="grid gap-4 min-[1536px]:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="space-y-4">
         <div className="min-w-0 space-y-4">
           {children.length > 0 && (
             <section className="space-y-2">
@@ -89,10 +89,10 @@ function FocusedUnit({
           )}
         </div>
 
-        {/* Under 1536px the panels sit in two free columns below the tables — each column stacks at its own
-            height, so a tall card (the expanded assistant) never stretches its neighbour. From 1536px both
-            columns stack into the one side column. */}
-        <div className="grid content-start items-start gap-4 md:grid-cols-2 min-[1536px]:grid-cols-1">
+        {/* At every width the panels sit below the tables in two free columns — each column stacks at its
+            own height, so a tall card (the expanded assistant) never stretches its neighbour, and the tables
+            keep the full width. */}
+        <div className="grid items-start gap-4 md:grid-cols-2">
           <div className="min-w-0 space-y-4">
             <Panel title="Chỉ tiêu cần chú ý" hint={ATTENTION_HINT}>
               {focus.own === null ? (

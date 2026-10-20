@@ -11,7 +11,7 @@ import type { DashboardSnapshot } from '@/lib/dashboardRules';
 import { errorSpecOf } from '@/lib/errorCatalog';
 
 /**
- * "Trợ lý KPI · Giả lập" (WBS 4.7.4, BR-KPI-89) — last in the side column, collapsed to its summary.
+ * "Trợ lý KPI · Giả lập" (WBS 4.7.4, BR-KPI-89) — last in the right-hand panel column, collapsed to its summary.
  * It answers only from the snapshot of the numbers on screen, so it never says more than the viewer
  * may see, and it is labelled a simulation everywhere it speaks.
  */
