@@ -74,10 +74,12 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/dashboard/operations" element={<DashboardPage section="operations" />} />
 
       {/* Quản trị KPI — HR, C&B */}
-      <Route path="/admin/cycles" element={<CyclesPage />} />
-      <Route path="/admin/cycles/:cycleId" element={<CycleDetailPage />} />
-      <Route path="/admin/cycles/:cycleId/plans/:planId" element={<PlanPage kind="cycles" />} />
-      <Route path="/admin/cycles/:cycleId/plans/:planId/goals/:goalId" element={<GoalPage kind="cycles" />} />
+      <Route path="/admin/cycles/list" element={<CyclesPage section="list" />} />
+      <Route path="/admin/cycles/list/:cycleId" element={<CycleDetailPage />} />
+      <Route path="/admin/cycles/periods" element={<CyclesPage section="periods" />} />
+      <Route path="/admin/cycles/plans" element={<CyclesPage section="plans" />} />
+      <Route path="/admin/cycles/plans/:cycleId/:planId" element={<PlanPage kind="cycles" />} />
+      <Route path="/admin/cycles/plans/:cycleId/:planId/goals/:goalId" element={<GoalPage kind="cycles" />} />
       <Route path="/admin/library/definitions" element={<KpiLibraryPage section="definitions" />} />
       <Route path="/admin/library/perspectives" element={<KpiLibraryPage section="perspectives" />} />
       <Route path="/admin/library/units" element={<KpiLibraryPage section="units" />} />

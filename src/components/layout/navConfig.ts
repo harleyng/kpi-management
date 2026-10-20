@@ -36,7 +36,7 @@ import type { PermissionCode } from '@/lib/permissionRules';
  * (`cycle.manage`), which was a tab only cycle managers saw.
  *
  * Destination urls never nest inside another destination's url: a detail route
- * (`/admin/cycles/:cycleId`) is claimed by — and needs the permission of — the one destination it sits
+ * (`/admin/cycles/list/:cycleId`) is claimed by — and needs the permission of — the one destination it sits
  * under. A parent's own url is not a page: `legacyRedirect` (navRules.ts) sends it to its first
  * sub-page.
  *
@@ -135,7 +135,17 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Quản trị KPI',
     items: [
-      { title: 'Chu kỳ', url: '/admin/cycles', icon: CalendarRange, permission: 'cycle.manage' },
+      {
+        title: 'Chu kỳ',
+        url: '/admin/cycles',
+        icon: CalendarRange,
+        carryParams: ['cycle'],
+        children: [
+          { title: 'Kỳ đánh giá', url: '/admin/cycles/list', permission: 'cycle.manage' },
+          { title: 'Đợt đánh giá', url: '/admin/cycles/periods', permission: 'cycle.manage' },
+          { title: 'Goal Plan', url: '/admin/cycles/plans', permission: 'cycle.manage' },
+        ],
+      },
       {
         title: 'Thư viện KPI',
         url: '/admin/library',

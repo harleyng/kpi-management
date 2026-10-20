@@ -569,7 +569,7 @@ export function claimsPath(url: string, path: string): boolean {
 /**
  * May the profile open this path? The longest menu url that is the path or a parent segment of it
  * decides — a leaf by its permission, a parent (its own url, or a path under it no child claims) by
- * whether any child is visible. So a detail route (`/admin/cycles/123`) follows its leaf ("Chu kỳ"),
+ * whether any child is visible. So a detail route (`/admin/cycles/list/123`) follows its leaf ("Kỳ đánh giá"),
  * and `/admin/libraryX` matches nothing. A path no item claims — `/`, the not-found page — is open;
  * `navConfig.test.ts` keeps every route of `App.tsx` claimed or explicitly public. A detail page
  * still checks its own record with `can`.

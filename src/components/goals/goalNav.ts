@@ -14,6 +14,12 @@ export type GoalTab = 'info' | 'split' | 'link';
 export const goalPageUrl = (basePath: string, goalId: string | 'new', tab: GoalTab = 'info') =>
   `${basePath}/goals/${encodeURIComponent(goalId)}${tab === 'info' ? '' : `?tab=${tab}`}`;
 
+/** A cycle's own page, under "Chu kỳ › Kỳ đánh giá". */
+export const cycleDetailUrl = (cycleId: string) => `/admin/cycles/list/${encodeURIComponent(cycleId)}`;
+
+/** A Goal Plan under "Chu kỳ › Goal Plan" — its cycle stays in the path, so the route checks the plan is of it (BR-KPI-90). */
+export const cyclePlanUrl = (cycleId: string, planId: string) => `/admin/cycles/plans/${encodeURIComponent(cycleId)}/${encodeURIComponent(planId)}`;
+
 /** Where a goal page sends the person back to: the plan, with the goal's row to bring into view. */
 export interface PlanReturnState {
   focusId?: string;

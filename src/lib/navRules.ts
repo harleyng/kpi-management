@@ -31,8 +31,8 @@ export interface NavLocation<I extends NavTreeItem = NavTreeItem> {
 
 /**
  * Which menu destination a path belongs to — the longest menu url that is the path or a parent
- * segment of it, the same rule as the route guard. A detail page (`/admin/cycles/123`) belongs to its
- * list ("Chu kỳ"). `null` for a path the menu does not claim (`/forms/1`, the not-found page).
+ * segment of it, the same rule as the route guard. A detail page (`/admin/cycles/list/123`) belongs to its
+ * list ("Kỳ đánh giá"). `null` for a path the menu does not claim (`/forms/1`, the not-found page).
  */
 export function findNavLocation<I extends NavTreeItem>(pathname: string, groups: readonly { label: string; items: readonly I[] }[]): NavLocation<I> | null {
   let best: NavLocation<I> | null = null;
@@ -76,6 +76,7 @@ const TAB_ROUTES: Record<string, [tab: string | null, url: string][]> = {
   '/my/tasks': [[null, '/my/tasks/inbox'], ['inbox', '/my/tasks/inbox'], ['mine', '/my/tasks/forms'], ['delegations', '/my/tasks/delegations']],
   '/team/kpi': [[null, '/team/kpi/members'], ['team', '/team/kpi/members'], ['unit', '/team/kpi/unit']],
   '/dashboard': [[null, '/dashboard/overview'], ['tong-quan', '/dashboard/overview'], ['van-hanh', '/dashboard/operations']],
+  '/admin/cycles': [[null, '/admin/cycles/list']],
   '/admin/library': [[null, '/admin/library/definitions'], ['chi-tieu', '/admin/library/definitions'], ['danh-muc', '/admin/library/perspectives'], ['phuong-phap', '/admin/library/calc-methods']],
   '/admin/launches': [[null, '/admin/launches/runs'], ['launches', '/admin/launches/runs'], ['rules', '/admin/launches/rules'], ['forms', '/admin/launches/forms'], ['workflows', '/admin/launches/workflows']],
   '/admin/actuals': [[null, '/admin/actuals/entry'], ['entry', '/admin/actuals/entry'], ['import', '/admin/actuals/import'], ['sync', '/admin/actuals/sync']],
@@ -109,7 +110,7 @@ const RECORD_ROUTES: Record<string, Remap> = {
     const plan = p.get('plan') ? take(p, 'plan') : null;
     p.delete('goal');
     p.delete('mode');
-    return plan ? `/admin/cycles/${enc(cycle)}/plans/${enc(plan)}` : `/admin/cycles/${enc(cycle)}`;
+    return plan ? `/admin/cycles/plans/${enc(cycle)}/${enc(plan)}` : `/admin/cycles/list/${enc(cycle)}`;
   },
   '/admin/templates': (p) => {
     if (!p.get('bo')) return null;

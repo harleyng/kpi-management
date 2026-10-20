@@ -117,7 +117,7 @@ the tenant).
 | `/team/kpi/unit` (+ `/:planId`, `/:planId/goals/:goalId`) | KPI đội nhóm › KPI bộ phận — the headed unit's plan, cascade | Đội nhóm · `team.view` | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` | 4.5.2–4.5.4 (T5) |
 | `/dashboard/overview` · `/operations` | Dashboard › Tổng quan · Vận hành; `?cycle=&period=&unit=` | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 |
-| `/admin/cycles` · `/:cycleId` (`?tab=periods\|plans`) · `/:cycleId/plans/:planId` (+ goals) | Chu kỳ — list · one cycle · one plan | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
+| `/admin/cycles/list` · `/list/:cycleId` (`?tab=periods\|plans`) · `/admin/cycles/periods` · `/admin/cycles/plans` · `/plans/:cycleId/:planId` (+ goals) | Chu kỳ › Kỳ đánh giá (cycle list · one cycle) · Đợt đánh giá (periods, `?cycle=`) · Goal Plan (plans, `?cycle=` · one plan) | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
 | `/admin/library/definitions` · `/perspectives` · `/units` · `/calc-methods` | Thư viện KPI › Chỉ tiêu mẫu · Viễn cảnh BSC · Đơn vị đo · Phương pháp tính | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 (T2) |
 | `/admin/templates` · `/:templateId` (`new`) | Bộ mẫu — list (`q`, `ad`) · editor page | Quản trị KPI · `library.manage` | 4.2.4 (T2) |
 | `/admin/launches/runs` (+ `/new`) · `/rules` · `/forms` (`?launch=`) · `/workflows` (+ `/:workflowId`) | Khởi chạy phiếu › Đợt khởi chạy · Lịch tự động · Phiếu đã tạo · Quy trình duyệt | Quản trị KPI · `form.launch` (HR, CNB); Quy trình duyệt `cycle.manage` | D5, 4.5.1 (T5) |

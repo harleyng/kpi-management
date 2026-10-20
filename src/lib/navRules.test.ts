@@ -103,8 +103,9 @@ describe('legacyRedirect', () => {
     ['/admin/actuals', '?tab=import&batch=b1', '/admin/actuals/import/b1'],
     ['/system/org', '?unit=u1', '/system/org/structure/u1'],
     ['/system/org', '?tab=co-cau&unit=u1', '/system/org/structure/u1'],
-    ['/admin/cycles', '?cycle=c1', '/admin/cycles/c1'],
-    ['/admin/cycles', '?cycle=c1&plan=p1&goal=g1&mode=edit', '/admin/cycles/c1/plans/p1'],
+    ['/admin/cycles', '', '/admin/cycles/list'],
+    ['/admin/cycles', '?cycle=c1', '/admin/cycles/list/c1'],
+    ['/admin/cycles', '?cycle=c1&plan=p1&goal=g1&mode=edit', '/admin/cycles/plans/c1/p1'],
     ['/admin/templates', '?bo=t1&q=x', '/admin/templates/t1?q=x'],
     ['/admin/templates', '?bo=moi', '/admin/templates/new'],
     // Ids are encoded.
@@ -116,10 +117,9 @@ describe('legacyRedirect', () => {
   it.each([
     ['/my/kpi', ''],
     ['/my/kpi', '?cycle=c'],
-    ['/admin/cycles', ''],
     ['/admin/templates', '?q=x'],
     ['/admin/library/units', '?tab=x'],
-    ['/admin/cycles/c1', '?cycle=c2'],
+    ['/admin/cycles/list/c1', '?cycle=c2'],
     ['/forms/f1', ''],
     ['/', ''],
   ])('leaves %s%s alone', (path, search) => {

@@ -6,6 +6,24 @@
 
 ---
 
+## 2026-10-20 — "Chu kỳ" split into Kỳ đánh giá / Đợt đánh giá / Goal Plan
+
+**Decision.** (product owner) "Chu kỳ" is an area with three sub-pages: **Kỳ đánh giá**
+(`/admin/cycles/list` — the cycle list; a cycle opens at `/list/:cycleId` with its status step, edit and
+the two facets), **Đợt đánh giá** (`/admin/cycles/periods` — the periods of the cycle picked in `?cycle=`)
+and **Goal Plan** (`/admin/cycles/plans` — that cycle's plans). A plan opens at
+`/admin/cycles/plans/:cycleId/:planId`: the cycle stays a path segment so BR-KPI-90's "a plan of the
+route's cycle" check is unchanged. `?cycle=` is carried between the three; `/admin/cycles` and the old
+`?cycle=&plan=` links redirect. The menu labels are the product owner's words; the domain terms in
+`business-rules.md` (Chu kỳ = cycle, kỳ = period) and the period labels elsewhere ("Kỳ đánh giá" pickers
+on launches, forms, reviews) are not renamed yet.
+
+**Why.** HR works periods and plans of one cycle day to day; the cycle record itself is opened rarely.
+
+**Updated alongside.** `architecture.md` (route table), `component-registry.md`, `navConfig.ts`, `navRules.ts`.
+
+---
+
 ## 2026-10-19 — Sub-pages instead of tabs; a record's detail is its own route; the list toolbar above the card
 
 **Decision.** (product owner) Every page that bundled views as tabs is an AREA in the menu with one

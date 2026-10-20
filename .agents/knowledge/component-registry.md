@@ -127,7 +127,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `PeriodSplitPanel` / `LinkGoalPanel` | Split by month / quarter with "Chia đều" and live warnings; link up to the manager's / unit's / company's goals (visible ones only) |
 | `CascadeDialog` | "Phân giao": reports with a disabled reason, share, weight (remaining to 100%), method when the parent's is not share-safe, bucket preview, ERR-KPI-11 inline |
 | `PlanLockActions` | HR's lock (confirm), unlock (reason + new due date when a form is open), lock history from the audit log |
-| `CycleDetailPage` + `CycleDetail.tsx` (`CycleActions`, `PeriodsPanel`, `CyclePlansPanel`, `CycleFormDialog`) | `/admin/cycles/:cycleId`: next-status action, facets Kỳ đánh giá (generate in a dialog → preview → apply, lock switches) / Goal Plan (filters, create Company / OrgUnit plan; rows open the plan page) |
+| `CycleDetailPage` + `CycleDetail.tsx` (`CycleActions`, `PeriodsPanel`, `CyclePlansPanel`, `CycleFormDialog`) | `/admin/cycles/list/:cycleId`: next-status action, facets Đợt đánh giá (generate in a dialog → preview → apply, lock switches) / Goal Plan (filters, create Company / OrgUnit plan; rows open the plan page). `PeriodsPanel` / `CyclePlansPanel` are also the "Đợt đánh giá" / "Goal Plan" sub-pages (`CyclesPage section`) under a `CyclePicker` |
 | `CyclePicker` + `useSelectedCycle` | `?cycle=` with `cycleRules.defaultCycleId` |
 | `goalCopy.ts` | `EDIT_REASON_COPY`, `issueText` (catalogue title + the detail's words), `formatTarget`, `formatWeight`, `planOwnerName` |
 

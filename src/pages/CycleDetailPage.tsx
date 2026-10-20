@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CycleActions, CycleFormDialog, CyclePlansPanel, PeriodsPanel } from '@/components/goals/CycleDetail';
+import { cyclePlanUrl } from '@/components/goals/goalNav';
 import { useFacetTab } from '@/components/goals/useFacetTab';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -11,13 +12,14 @@ import { useCycles } from '@/hooks/queries/goals';
 import { ERROR_CATALOG, errorSpecOf } from '@/lib/errorCatalog';
 import { formatDate } from '@/lib/utils';
 
-const CRUMBS = [{ label: 'Chu kỳ', to: '/admin/cycles' }];
+const CRUMBS = [{ label: 'Kỳ đánh giá', to: '/admin/cycles/list' }];
 const TABS = ['periods', 'plans'] as const;
 
 /**
- * One cycle (WBS 4.3.1, 4.3.6): name + status, "Sửa thông tin" and the next status step, then facet
- * tabs Kỳ đánh giá / Goal Plan (`?tab=`). The cycle comes from the tenant's (cached) cycle list —
- * an id not in it reads as not found. A plan opens at `/admin/cycles/:cycleId/plans/:planId`.
+ * One cycle (`/admin/cycles/list/:cycleId`, WBS 4.3.1, 4.3.6): name + status, "Sửa thông tin" and the
+ * next status step, then facet tabs Đợt đánh giá / Goal Plan (`?tab=`) — the same panels as the
+ * "Đợt đánh giá" and "Goal Plan" sub-pages, here for this one cycle. The cycle comes from the tenant's
+ * (cached) cycle list — an id not in it reads as not found. A plan opens under "Goal Plan" (`cyclePlanUrl`).
  */
 export default function CycleDetailPage() {
   const { cycleId = '' } = useParams();
@@ -31,7 +33,7 @@ export default function CycleDetailPage() {
   if (!cycle) {
     return (
       <>
-        <PageHeader title="Chu kỳ" breadcrumb={CRUMBS} />
+        <PageHeader title="Kỳ đánh giá" breadcrumb={CRUMBS} />
         {cycles.error ? (
           <ErrorStateCard spec={errorSpecOf(cycles.error)} onAction={() => void cycles.refetch()} />
         ) : !cycles.data ? (
@@ -59,14 +61,14 @@ export default function CycleDetailPage() {
       )}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="periods">Kỳ đánh giá</TabsTrigger>
+          <TabsTrigger value="periods">Đợt đánh giá</TabsTrigger>
           <TabsTrigger value="plans">Goal Plan</TabsTrigger>
         </TabsList>
         <TabsContent value="periods" className="mt-4">
           <PeriodsPanel cycle={cycle} />
         </TabsContent>
         <TabsContent value="plans" className="mt-4">
-          <CyclePlansPanel cycle={cycle} onOpenPlan={(planId) => navigate(`/admin/cycles/${encodeURIComponent(cycle.id)}/plans/${encodeURIComponent(planId)}`)} />
+          <CyclePlansPanel cycle={cycle} onOpenPlan={(planId) => navigate(cyclePlanUrl(cycle.id, planId))} />
         </TabsContent>
       </Tabs>
       {editing && cycles.data && <CycleFormDialog cycle={cycle} cycles={cycles.data} onClose={() => setEditing(false)} onSaved={() => undefined} />}

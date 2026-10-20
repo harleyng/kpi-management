@@ -260,7 +260,7 @@ describe('SessionProvider — switching', () => {
 
   it('goes home from a detail page the new person may not open', async () => {
     store({ tenantId: 't1', userIdByTenant: { t1: 't1-user-hr' } });
-    renderApp('/admin/cycles/c1/plans/p1');
+    renderApp('/admin/cycles/plans/c1/p1');
     await who();
     act(() => session!.switchUser('t1-user-emp'));
     expect(await who()).toBe('t1|t1-user-emp');

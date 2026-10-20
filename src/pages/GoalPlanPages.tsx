@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GoalEditorPanel } from '@/components/goals/GoalEditorPanel';
 import { GoalPlanWorkspace } from '@/components/goals/GoalPlanWorkspace';
-import { goalPageUrl, inactiveGoalReason, planNotEditableReason, type GoalTab, type PlanReturnState } from '@/components/goals/goalNav';
+import { cyclePlanUrl, goalPageUrl, inactiveGoalReason, planNotEditableReason, type GoalTab, type PlanReturnState } from '@/components/goals/goalNav';
 import { LinkGoalPanel } from '@/components/goals/LinkGoalPanel';
 import { PeriodSplitPanel } from '@/components/goals/PeriodSplitPanel';
 import { planOwnerName } from '@/components/goals/goalCopy';
@@ -16,7 +16,7 @@ import { UnsavedChangesGuard } from '@/components/shared/UnsavedChangesGuard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSession } from '@/contexts/useSession';
-import type { Goal, GoalPlan, PerformanceCycle } from '@/data/types';
+import type { Goal, GoalPlan } from '@/data/types';
 import { useCycles, useGoalLookups, useGoalPlan, usePlanWorkspace, type GoalLookups, type PlanWorkspaceData } from '@/hooks/queries/goals';
 import { ERROR_CATALOG, KpiError, errorSpecOf } from '@/lib/errorCatalog';
 import { planRouteAllows, type PlanRouteKind } from '@/lib/planAccessRules';
@@ -25,7 +25,7 @@ import { resourceOfOwner } from '@/lib/permissionRules';
 /**
  * The Goal Plan and goal DETAIL pages, mounted under four lists (`App.tsx`):
  * `/my/kpi/plans/:planId`, `/team/kpi/members/:planId`, `/team/kpi/unit/:planId`,
- * `/admin/cycles/:cycleId/plans/:planId` — each with `…/goals/:goalId` and `…/goals/new`.
+ * `/admin/cycles/plans/:cycleId/:planId` — each with `…/goals/:goalId` and `…/goals/new`.
  *
  * A plan id is typed into a URL and `getGoalPlan` checks only the tenant, so nothing of the plan is
  * shown before `planRouteAllows` (scope over the owner + the route fits the plan). A refusal reads
@@ -44,12 +44,12 @@ function planBasePath(kind: PlanRouteKind, planId: string, cycleId: string | nul
     case 'unit':
       return `/team/kpi/unit/${enc(planId)}`;
     case 'cycles':
-      return `/admin/cycles/${enc(cycleId ?? '')}/plans/${enc(planId)}`;
+      return cyclePlanUrl(cycleId ?? '', planId);
   }
 }
 
 /** The trail up to (not including) the plan: the list it was opened from, with the plan's cycle carried. */
-function listCrumbs(kind: PlanRouteKind, cycleId: string | null, cycle: PerformanceCycle | null, plan: GoalPlan | null): Crumb[] {
+function listCrumbs(kind: PlanRouteKind, cycleId: string | null, plan: GoalPlan | null): Crumb[] {
   const carry = plan ? `?cycle=${enc(plan.cycleId)}` : '';
   switch (kind) {
     case 'my':
@@ -59,10 +59,7 @@ function listCrumbs(kind: PlanRouteKind, cycleId: string | null, cycle: Performa
     case 'unit':
       return [{ label: 'KPI bộ phận', to: `/team/kpi/unit${carry}` }];
     case 'cycles':
-      return [
-        { label: 'Chu kỳ', to: '/admin/cycles' },
-        { label: cycle?.name ?? 'Chu kỳ', to: `/admin/cycles/${enc(cycleId ?? '')}?tab=plans` },
-      ];
+      return [{ label: 'Goal Plan', to: `/admin/cycles/plans?cycle=${enc(cycleId ?? '')}` }];
   }
 }
 
@@ -100,9 +97,9 @@ function usePlanRoute(kind: PlanRouteKind) {
   }
 
   const allowedPlan = access.status === 'ok' ? access.plan : null;
-  // The route's cycle names the "Chu kỳ" crumb even before the plan is known; never a denied plan's cycle.
-  const cycle = cycles.data?.find((c) => c.id === (allowedPlan?.cycleId ?? cycleId)) ?? null;
-  const crumbs = listCrumbs(kind, cycleId, kind === 'cycles' ? cycle : null, allowedPlan);
+  // Never a denied plan's cycle.
+  const cycle = cycles.data?.find((c) => c.id === allowedPlan?.cycleId) ?? null;
+  const crumbs = listCrumbs(kind, cycleId, allowedPlan);
   const planName = access.status === 'ok' ? `Goal Plan của ${planOwnerName(access.plan, access.lookups)}` : 'Goal Plan';
   return { planId, basePath, access, crumbs, planName, cycle: allowedPlan ? cycle : null };
 }

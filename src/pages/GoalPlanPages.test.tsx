@@ -71,7 +71,7 @@ function renderAt(path: string) {
             <Route path="/my/kpi/plans/:planId" element={<PlanPage kind="my" />} />
             <Route path="/my/kpi/plans/:planId/goals/:goalId" element={<GoalPage kind="my" />} />
             <Route path="/team/kpi/members/:planId" element={<PlanPage kind="members" />} />
-            <Route path="/admin/cycles/:cycleId/plans/:planId" element={<PlanPage kind="cycles" />} />
+            <Route path="/admin/cycles/plans/:cycleId/:planId" element={<PlanPage kind="cycles" />} />
           </Routes>
         </MemoryRouter>
       </TooltipProvider>
@@ -146,7 +146,7 @@ describe('PlanPage / GoalPage — the route access guard', () => {
 
   it('HR: a plan under another cycle\'s route reads as not found', async () => {
     const { plans } = await setup(SYNTRA.personas.hr);
-    renderAt(`/admin/cycles/not-its-cycle/plans/${plans[0].id}`);
+    renderAt(`/admin/cycles/plans/not-its-cycle/${plans[0].id}`);
     expect(await screen.findByText(NOT_FOUND, {}, { timeout: 5000 })).toBeInTheDocument();
   });
 });

@@ -17,7 +17,7 @@ interface PageHeaderProps {
   /**
    * The trail above the title. A DETAIL page passes its own, with explicit targets — never "back
    * in history", which breaks on a shared link or a reload:
-   * `[{ label: 'Chu kỳ', to: '/admin/cycles' }, { label: cycle.name, to: … }]`.
+   * `[{ label: 'Kỳ đánh giá', to: '/admin/cycles/list' }]`.
    * Omitted: a sub-page shows its area ("Thư viện KPI") from the menu; a top-level page shows none.
    */
   breadcrumb?: Crumb[];
