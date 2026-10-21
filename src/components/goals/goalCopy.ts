@@ -1,5 +1,6 @@
 import { ERROR_CATALOG, type RuleIssue } from '@/lib/errorCatalog';
 import type { PlanEditReason } from '@/lib/planAccessRules';
+import type { TemplateSkipReason } from '@/lib/templateApplyRules';
 import { OWNER_TYPE_LABEL, type Goal, type GoalPlan, type MeasureUnit } from '@/data/types';
 import type { GoalLookups } from '@/hooks/queries/goals';
 import { formatNumber } from '@/lib/utils';
@@ -95,3 +96,10 @@ export function planOwnerName(plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeI
   const unit = lookups.orgUnit.get(plan.ownerOrgUnitId ?? '');
   return plan.ownerType === 'Company' ? `${OWNER_TYPE_LABEL.Company}${unit ? ` · ${unit.name}` : ''}` : (unit?.name ?? '—');
 }
+
+/** Why a template item is not added — short, shown in the preview's last column. */
+export const TEMPLATE_SKIP_COPY: Readonly<Record<TemplateSkipReason, string>> = {
+  ALREADY_IN_PLAN: 'Đã có trong Goal Plan',
+  KPI_NOT_ACTIVE: 'Chỉ tiêu không còn áp dụng',
+  NO_DATA_SOURCE: 'Chưa có nguồn số liệu',
+};

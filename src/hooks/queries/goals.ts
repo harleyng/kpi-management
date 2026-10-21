@@ -25,6 +25,7 @@ import type {
 import { getDataGateway } from '@/integrations/data';
 import type { AlignmentFilter, ChildInput, GoalFilter, GoalPlanFilter, GoalScope, Upsert } from '@/integrations/data/types';
 import { allocationBuckets, type AllocationBuckets, type CascadedGoalDraft } from '@/lib/alignmentRules';
+import type { TemplateGoalInput } from '@/lib/templateApplyRules';
 import type { Clock } from '@/lib/isoDate';
 import { planSummaries, planSummary, type PlanSummary } from '@/lib/goalPlanRules';
 import {
@@ -251,7 +252,7 @@ function useGatewayWrite<TInput, TResult>(
     mutationFn: (input: TInput) => write({ tenantId, actorUserId: user.id }, input),
     onError: (error) => {
       // A partial two-write failure already toasted its own, persistent message.
-      if (options.toastError !== false && !(error instanceof PartialGoalSaveError) && !(error instanceof CascadeOrphanError)) toastWriteError(error);
+      if (options.toastError !== false && !(error instanceof PartialGoalSaveError) && !(error instanceof CascadeOrphanError) && !(error instanceof TemplateApplyError)) toastWriteError(error);
     },
     onSettled: () => refresh(queryClient, tenantId, roots),
   });
@@ -400,6 +401,46 @@ export function useCascadeGoal() {
         throw error;
       }
     },
+  );
+}
+
+/** "Thêm từ bộ mẫu" stopped part-way: `saved` goals were added before `failed` was refused. */
+export class TemplateApplyError extends Error {
+  constructor(
+    readonly saved: Goal[],
+    readonly failed: TemplateGoalInput,
+    readonly cause: unknown,
+  ) {
+    super(`Template applied part-way: ${saved.length} goals saved, then "${failed.name}" was refused`);
+  }
+}
+
+/**
+ * "Thêm từ bộ mẫu" (BR-KPI-77): the goals of `templateApplyRules.templateApplication`, saved one by
+ * one — the contract has no batch write, and each `saveGoal` re-checks the plan's editability. A
+ * refusal stops the run and rejects with `TemplateApplyError` (what was saved, what was refused); its
+ * one toast names both. Nothing saved is rolled back: added goals are ordinary goals, removable on
+ * the plan. One refresh at the end, whatever the outcome.
+ */
+export function useApplyTemplate() {
+  return useGatewayWrite(
+    ['goals'],
+    async ({ tenantId, actorUserId }, input: { goals: readonly TemplateGoalInput[] }) => {
+      const saved: Goal[] = [];
+      for (const goal of input.goals) {
+        try {
+          saved.push(await goals().saveGoal(tenantId, actorUserId, goal));
+        } catch (error) {
+          toastWriteError(error, {
+            persistent: saved.length > 0,
+            description: saved.length > 0 ? `Đã thêm ${saved.length}/${input.goals.length} chỉ tiêu, dừng ở "${goal.name}".` : undefined,
+          });
+          throw new TemplateApplyError(saved, goal, error);
+        }
+      }
+      return saved;
+    },
+    { toastError: false },
   );
 }
 

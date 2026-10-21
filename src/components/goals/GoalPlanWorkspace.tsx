@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ListChecks, Plus } from 'lucide-react';
+import { LayoutTemplate, ListChecks, Plus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { SectionTitle } from '@/components/shared/SectionTitle';
@@ -13,6 +13,7 @@ import { toastSaved } from '@/hooks/queries/toasts';
 import { errorSpecOf } from '@/lib/errorCatalog';
 import { combineQueries } from '@/lib/queryState';
 import { planOwnerOf } from '@/lib/planAccessRules';
+import { ApplyTemplateDialog } from './ApplyTemplateDialog';
 import { CascadeDialog } from './CascadeDialog';
 import { planOwnerName } from './goalCopy';
 import { goalPageUrl, inactiveGoalReason, planNotEditableReason, type GoalTab, type PlanReturnState } from './goalNav';
@@ -64,6 +65,7 @@ function LoadedWorkspace({ data, lookups, basePath }: { data: PlanWorkspaceData;
   const navigate = useNavigate();
   const location = useLocation();
   const [cascadeFrom, setCascadeFrom] = useState<Goal | null>(null);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [deleting, setDeleting] = useState<Goal | null>(null);
   const remove = useDeleteGoal();
 
@@ -112,10 +114,16 @@ function LoadedWorkspace({ data, lookups, basePath }: { data: PlanWorkspaceData;
 
   const planName = `Goal Plan của ${planOwnerName(data.plan, lookups)}`;
   const addButton = editable ? (
-    <Button size="sm" onClick={() => openGoal('new')}>
-      <Plus aria-hidden />
-      Thêm chỉ tiêu
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" variant="outline" onClick={() => setApplyingTemplate(true)}>
+        <LayoutTemplate aria-hidden />
+        Thêm từ bộ mẫu
+      </Button>
+      <Button size="sm" onClick={() => openGoal('new')}>
+        <Plus aria-hidden />
+        Thêm chỉ tiêu
+      </Button>
+    </div>
   ) : null;
 
   return (
@@ -141,6 +149,7 @@ function LoadedWorkspace({ data, lookups, basePath }: { data: PlanWorkspaceData;
         />
       </section>
 
+      {applyingTemplate && <ApplyTemplateDialog data={data} lookups={lookups} onClose={() => setApplyingTemplate(false)} />}
       {cascadeFrom && <CascadeDialog data={data} lookups={lookups} parent={cascadeFrom} open onOpenChange={(o) => !o && setCascadeFrom(null)} />}
       <ConfirmDialog
         open={deleting !== null}

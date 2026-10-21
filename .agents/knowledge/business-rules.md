@@ -374,6 +374,17 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   **weight total of 100% (±0.01) and the 5–8 item count are WARNINGS, never refusals** (`ASSUMPTION
   Q26`): the template saves, and the Goal Plan made from it is what BR-KPI-03/04 gate. *Source: ERD
   `KPI_TEMPLATE`; DATX's 4-item sets (fixtures README, Q14).* `templateIssues` → `{ errors, warnings }`.
+  **Applying a template** ("Thêm từ bộ mẫu" on the plan page, whoever may edit the plan now — `canEditPlan`):
+  only Active templates; suggested first for the plan's position (an Employee plan's primary position),
+  then its unit and the units above it, nearest first, then general ones; the rest stay selectable
+  (`templateApplyRules.templatesForPlan`). Each item becomes a goal built from its library KPI (name,
+  perspective, unit, method, formula, definition, the KPI's default data source; PUBLIC, NUMERIC) with the
+  item's default weight and target, the cycle's dates, the plan owner, after the plan's last goal in
+  template order. **Append only, never replace**: an item is skipped when the plan already has an Active
+  goal of that KPI (private ones included), the KPI is no longer Active, or it has no default data source
+  (`templateApplication`). Weight, count and missing targets are warnings, fixed on the plan before Gửi.
+  The goals are saved one `saveGoal` at a time; a refusal stops the run and says how many were added
+  (`useApplyTemplate`). A registration launch still creates an EMPTY plan — applying at launch is deferred.
 - **BR-KPI-78** — **Library status** Draft ⇄ Active ⇄ Archived; any move is allowed and "Lưu trữ" never
   deletes. Only Active items can be newly picked (KpiPicker). A KPI cannot **leave Active** while an
   **Active template** holds it (ERR-KPI-04 `IN_ACTIVE_TEMPLATE`, listing the templates). Archiving a KPI

@@ -89,4 +89,41 @@ test.describe('@smoke Goal Plan công ty → bộ phận', () => {
     await expect(page.getByRole('cell', { name: '154.000.000.000' }).first()).toBeVisible();
     expect(errors).toEqual([]);
   });
+
+  test('HR fills a new department plan from a KPI template; skipped items say why', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await become(page, ...HR);
+    await page.goto('/admin/cycles/plans');
+    await page.getByRole('combobox', { name: 'Chu kỳ' }).click();
+    await page.getByRole('option', { name: /KPI 2028/ }).click();
+    await page.getByRole('button', { name: 'Tạo Goal Plan công ty / bộ phận' }).click();
+    const create = page.getByRole('dialog');
+    await create.getByRole('combobox', { name: /Tầng/ }).click();
+    await page.getByRole('option', { name: 'Bộ phận' }).click();
+    await create.getByRole('combobox', { name: /Bộ phận/ }).click();
+    await page.getByRole('option', { name: 'Phòng Kinh doanh' }).click();
+    await create.getByRole('button', { name: 'Tạo Goal Plan' }).click();
+    await expect(page).toHaveURL(/\/admin\/cycles\/plans\/[^/]+\/[^/?]+/);
+
+    await page.getByRole('button', { name: 'Thêm từ bộ mẫu' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('combobox', { name: /Bộ mẫu/ }).click();
+    await expect(page.getByText(/^Gợi ý cho/)).toBeVisible();
+    await page.getByRole('option').first().click();
+    const add = dialog.getByRole('button', { name: /^Thêm \d+ chỉ tiêu$/ });
+    await expect(add).toBeEnabled();
+    await expect(dialog.getByText(/Sau khi thêm: tổng trọng số/)).toBeVisible();
+    const count = Number((await add.textContent())?.match(/\d+/)?.[0]);
+    await add.click();
+    await expect(page.getByText(`Đã thêm ${count} chỉ tiêu từ bộ mẫu`)).toBeVisible();
+
+    // Applying the same template again adds nothing: every KPI is already in the plan.
+    await page.getByRole('button', { name: 'Thêm từ bộ mẫu' }).click();
+    await page.getByRole('dialog').getByRole('combobox', { name: /Bộ mẫu/ }).click();
+    await page.getByRole('option').first().click();
+    await expect(page.getByRole('dialog').getByText('Đã có trong Goal Plan').first()).toBeVisible();
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'Thêm chỉ tiêu' })).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
 });

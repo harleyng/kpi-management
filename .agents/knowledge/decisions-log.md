@@ -6,6 +6,28 @@
 
 ---
 
+## 2026-10-21 — "Thêm từ bộ mẫu": a KPI template is applied to a Goal Plan, append-only
+
+**Decision.** (product owner asked for it) The plan page gets "Thêm từ bộ mẫu" beside "Thêm chỉ tiêu", for
+whoever may edit the plan now. Active templates only, suggested by position → unit (and units above) →
+general (`templateApplyRules.templatesForPlan`); each item becomes a goal from its library KPI with the
+item's default weight and target (`templateApplication`); items already in the plan, no longer Active, or
+without a default data source are skipped with the reason. Saved one `saveGoal` at a time
+(`useApplyTemplate`). No contract change. Applying a template automatically at a registration launch is
+deferred.
+
+**Why.** `new-flow.md` §1A already promised "chọn chỉ tiêu hoặc áp bộ mẫu", but goals could only be added one
+by one. Append-only because a plan at step 2 already holds what the manager cascaded at step 1 — replacing
+would silently drop those goals and their alignments. A KPI without a default data source is skipped,
+not saved: the gateway does not check `dataSourceId` on save, so the goal would only fail later at Gửi
+(BR-KPI-05). "Already in the plan" reads the plan's goals unfiltered: the screen's list hides PRIVATE goals
+from some viewers, and a hidden goal must not be added twice.
+
+**Updated alongside.** `business-rules.md` BR-KPI-77; `docs/flows/new-flow.md` §1A and §7;
+`component-registry.md`.
+
+---
+
 ## 2026-10-21 — The company → department tier gets its two screens: start a unit registration, cascade to unit plans
 
 **Decision.** (product owner, phase 2 approved) HR starts a Company / OrgUnit plan's registration from

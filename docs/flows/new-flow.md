@@ -53,6 +53,14 @@ flowchart LR
   sẽ làm điểm các kỳ đang mở thay đổi âm thầm. Muốn tính khác thì tạo phương pháp mới.
 - **Bộ mẫu**: tổng trọng số 100% và 5–8 chỉ tiêu là **khuyến nghị**, màn hình cảnh báo nhưng vẫn cho lưu;
   Goal Plan lập từ bộ mẫu mới là thứ phải đủ 100% và 5–8 chỉ tiêu để gửi duyệt.
+- **Thêm từ bộ mẫu** (trên trang Goal Plan, cạnh "Thêm chỉ tiêu"): ai đang được sửa Goal Plan — HR khi Goal
+  Plan còn Nháp, quản lý ở bước 1 và 3 của phiếu đăng ký, nhân viên ở bước 2 — chọn một bộ mẫu *Đang áp dụng*
+  và thêm cả bộ một lần. Bộ mẫu được gợi ý trước theo chức danh của nhân viên, rồi theo đơn vị (và các đơn vị
+  cấp trên), rồi bộ dùng chung; các bộ khác vẫn chọn được. Mỗi chỉ tiêu lấy tên, viễn cảnh, đơn vị đo, cách
+  tính, nguồn số liệu từ thư viện và trọng số, mục tiêu mặc định từ bộ mẫu. **Chỉ thêm, không thay**: chỉ
+  tiêu đã có trong Goal Plan, không còn áp dụng, hoặc chưa có nguồn số liệu thì bỏ qua và ghi rõ lý do.
+  Màn xem trước cho biết tổng trọng số và số chỉ tiêu sau khi thêm, cùng chỉ tiêu còn thiếu mục tiêu; các
+  điểm này chỉ cảnh báo, sửa trên Goal Plan trước khi gửi.
 - **Xuất Excel** cả thư viện, bộ mẫu và danh mục mã. **Nhập từ Excel** sẽ có khi khung import chung (T4) xong.
 
 ## 2. Quy trình 1 — Đăng ký KPI (GOAL_SETTING)
@@ -456,3 +464,10 @@ BR-KPI-07, 19.
 - Phân giao từ Goal Plan công ty / khối xuống Goal Plan của đơn vị cấp dưới gần nhất có kế hoạch.
 - Quy trình mặc định không đổi: giám đốc khối nhận bước 1, trưởng phòng bước 2. Quy tắc ai được sửa
   không đổi; HR thao tác thay ở mọi bước.
+
+**21/10/2026 — Thêm chỉ tiêu từ bộ mẫu vào Goal Plan (product owner yêu cầu).** Chi tiết: `business-rules.md`
+BR-KPI-77.
+
+- Nút "Thêm từ bộ mẫu" trên Goal Plan, cho người đang được sửa Goal Plan; chỉ thêm, không thay chỉ tiêu có sẵn.
+- Gợi ý theo chức danh, đơn vị, rồi bộ dùng chung. Phiếu đăng ký khởi chạy vẫn tạo Goal Plan rỗng; tự áp
+  bộ mẫu lúc khởi chạy để sau.
