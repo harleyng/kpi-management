@@ -690,11 +690,14 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   tied to that actual. An import type whose track has not landed (GoalPlan T3, OrgData T1, Library T2)
   is refused with `KpiDeferredError`.
 - **BR-KPI-55** — **Data sources** (WBS 4.4.1): a per-tenant catalogue (unique code, name, type
-  MANUAL / EXCEL / API, an owning unit); every goal names one (BR-KPI-05). Admin maintains it
+  MANUAL / EXCEL / API — API sources only feed the later-phase sync, BR-KPI-56 — an owning unit); every goal names one (BR-KPI-05). Admin maintains it
   (`datasource.manage`). API connections and their KPI mappings are seeded and read-only in P1; Admin
   can only switch a connection on or off. The schedule (`0 6 1 * *` = 06:00 on day 1) is documentation —
   no cron runs in P1.
-- **BR-KPI-56** — **The API sync** (WBS 4.4.5, simulated ERP Sale): started by hand (`actual.import`)
+- **BR-KPI-56** — **The API sync** (WBS 4.4.5, simulated ERP Sale). **A later phase, not part of P1** (product
+  owner, 2026-10-21): P1 records actuals by hand and by Excel import only — no API, no integration with other
+  systems. The sync and the connection screens stay in the prototype on simulated data, tagged "Phase sau" in
+  the menu and at the top of each page (`LaterPhaseNotice`). The rules below describe that later flow. Started by hand (`actual.import`)
   for one **month**. An Inactive connection is refused (04) and records no run. For every Active goal of
   the month's cycle whose KPI the connection maps AND whose source is that connection's: if the current
   number came from a person (manual or Excel) it is **kept and the goal skipped** (`ASSUMPTION Q37`);

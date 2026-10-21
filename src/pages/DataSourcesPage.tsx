@@ -13,6 +13,7 @@ import { ScheduleText, SYNC_URL } from '@/components/actuals/SyncTab';
 import { DataTable, type DataTableColumn } from '@/components/shared/DataTable';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { FormField, RequiredLegend } from '@/components/shared/FormField';
+import { LaterPhaseNotice } from '@/components/shared/LaterPhaseNotice';
 import { PageHeader, type Crumb } from '@/components/shared/PageHeader';
 import { RecordStatusBadge } from '@/components/shared/StatusBadge';
 import { useSession } from '@/contexts/useSession';
@@ -46,7 +47,14 @@ export default function DataSourcesPage({ section }: { section: DataSourcesSecti
   return (
     <>
       <PageHeader title={title} description={description} />
-      {section === 'catalogue' ? <SourceCatalogue /> : <Connections />}
+      {section === 'catalogue' ? (
+        <SourceCatalogue />
+      ) : (
+        <>
+          <LaterPhaseNotice className="mb-4" />
+          <Connections />
+        </>
+      )}
     </>
   );
 }
@@ -342,6 +350,7 @@ export function ConnectionDetailPage() {
           </>
         }
       />
+      <LaterPhaseNotice className="mb-4" />
       <div className="space-y-6">
         <Card>
           <CardContent className="p-4">

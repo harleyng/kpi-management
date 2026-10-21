@@ -250,6 +250,7 @@ function SidebarParent({ parent, nav }: { parent: NavParent; nav: NavState }) {
                   className={cn('flex h-8 items-center rounded-md pl-[2.375rem] pr-2 text-sm text-sidebar-foreground transition-colors', isActive ? ROW_ACTIVE : ROW_IDLE)}
                 >
                   <span className="truncate">{child.title}</span>
+                  {child.laterPhase && <LaterPhaseTag />}
                 </Link>
               </li>
             );
@@ -287,6 +288,7 @@ function CollapsedParent({ parent, nav }: { parent: NavParent; nav: NavState }) 
             <DropdownMenuItem key={child.url} asChild>
               <Link to={childHref(parent, child, nav)} aria-current={isActive ? 'page' : undefined} className={cn(isActive && 'font-medium text-primary')}>
                 {child.title}
+                {child.laterPhase && <LaterPhaseTag />}
               </Link>
             </DropdownMenuItem>
           );
@@ -294,4 +296,9 @@ function CollapsedParent({ parent, nav }: { parent: NavParent; nav: NavState }) 
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/** "Phase sau" beside a menu item kept for a later phase (`NavChild.laterPhase`). */
+function LaterPhaseTag() {
+  return <span className="ml-auto shrink-0 rounded-full border border-current/30 px-1.5 text-[10px] font-semibold uppercase leading-4 tracking-wide opacity-70">Phase sau</span>;
 }

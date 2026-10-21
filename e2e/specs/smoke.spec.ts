@@ -113,7 +113,8 @@ test.describe('@smoke app shell', () => {
         const toggle = nav.getByRole('button', { name: area, exact: true });
         if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
       }
-      await nav.getByRole('link', { name: title, exact: true }).click();
+      // A menu item kept for a later phase carries a "Phase sau" tag after its title.
+      await nav.getByRole('link', { name: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( Phase sau)?$`) }).click();
 
       // A built screen may keep its selection in the query string (`?cycle=&period=`).
       await expect(page).toHaveURL(new RegExp(`${path.replace(/\//g, '\\/')}(\\?.*)?$`));

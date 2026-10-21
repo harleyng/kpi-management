@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-21 — Phase 1 records actuals by hand and by Excel import only; the API sync is a later phase
+
+**Decision.** (product owner) P1 has no API and no integration with other systems: actuals come from manual
+entry and Excel import. "Đồng bộ API" and "Kết nối API" stay in the prototype on simulated data, tagged
+"Phase sau" in the sidebar (`NavChild.laterPhase`) and by a notice at the top of each page
+(`LaterPhaseNotice`, also on the two detail pages). No rule or data change.
+
+**Why.** The guide and the video presented the ERP sync as part of the monthly P1 routine ("ngày 1, 06:00 ERP
+Sale đẩy số"); readers would plan the rollout around an integration that is not in scope. Keeping the screens
+(rather than hiding them) lets the product owner still show the later flow.
+
+**Updated alongside.** `business-rules.md` BR-KPI-55, 56; `docs/flows/new-flow.md` §1, §4, §4E, §7;
+`docs/plans/KPI_repo_plan.md` §1 and WBS 4.4.4–4.4.5.
+
+---
+
 ## 2026-10-21 — "Thêm từ bộ mẫu": a KPI template is applied to a Goal Plan, append-only
 
 **Decision.** (product owner asked for it) The plan page gets "Thêm từ bộ mẫu" beside "Thêm chỉ tiêu", for

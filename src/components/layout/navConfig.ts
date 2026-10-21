@@ -55,6 +55,8 @@ export interface NavChild {
   /** The permission that shows the item AND opens its route (and every detail route under it). */
   permission: PermissionCode | null;
   children?: undefined;
+  /** Kept in the prototype for a later phase, not part of P1 — the sidebar tags it "Phase sau". */
+  laterPhase?: boolean;
 }
 
 export interface NavLeaf extends NavChild {
@@ -177,7 +179,7 @@ export const NAV_GROUPS: NavGroup[] = [
         children: [
           { title: 'Nhập tay', url: '/admin/actuals/entry', permission: 'actual.import' },
           { title: 'Nhập từ Excel', url: '/admin/actuals/import', permission: 'actual.import' },
-          { title: 'Đồng bộ API', url: '/admin/actuals/sync', permission: 'actual.import' },
+          { title: 'Đồng bộ API', url: '/admin/actuals/sync', permission: 'actual.import', laterPhase: true },
         ],
       },
       {
@@ -222,7 +224,7 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Database,
         children: [
           { title: 'Danh mục nguồn', url: '/system/data-sources/catalogue', permission: 'datasource.manage' },
-          { title: 'Kết nối API', url: '/system/data-sources/connections', permission: 'datasource.manage' },
+          { title: 'Kết nối API', url: '/system/data-sources/connections', permission: 'datasource.manage', laterPhase: true },
         ],
       },
       { title: 'Mẫu thông báo', url: '/system/notification-templates', icon: BellRing, permission: 'notification.manage' },

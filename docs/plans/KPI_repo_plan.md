@@ -14,7 +14,7 @@
 | Nghiệp vụ | Toàn bộ 42 work package của WBS 4.0 Phase 1 (mục 7) | Tính năng P2/P3: hiệu suất liên tục, năng lực & 360, thử việc/HĐLĐ, calibration, thương mại hóa |
 | Dữ liệu | Gateway dữ liệu giả lập (in-memory + localStorage), seed từ biểu mẫu DATX | Supabase/Postgres, migration, RLS |
 | Đăng nhập | Chọn công ty, người dùng, vai trò từ seed (giả lập) | SSO, mật khẩu |
-| Tích hợp | Connector ERP Sale **giả lập** sau cùng một contract | Gọi API thật |
+| Tích hợp | **Phase 1 không tích hợp hệ thống khác hay API** (product owner, 21/10/2026): số thực tế chỉ nhập tay và import Excel. Connector ERP Sale **giả lập** (WBS 4.4.4–4.4.5) giữ trong bản thử nghiệm, gắn nhãn "Phase sau" | Gọi API thật, mọi tích hợp hệ thống |
 | AI | Trợ lý AI **giả lập** sau contract `InsightGateway` | Gọi LLM thật |
 | Thông báo | In-app | Email thật |
 | Ngôn ngữ | UI tiếng Việt viết trực tiếp. Code, comment, tài liệu kỹ thuật tiếng Anh | i18n, tiếng Anh |
@@ -209,7 +209,7 @@ Các track **chạy song song được vì cùng dựa trên seed fixtures**, kh
 - **Thư viện**: chỉ tiêu và bộ mẫu lấy từ sheet "2. KPIs phòng ban" (15 bộ = công ty + 14 đơn vị, 87 dòng → 54 chỉ tiêu sau khi gộp trùng), đã sửa lỗi phát hiện ở Q4/Q5 và làm sạch theo Q14 (Phase 1.2).
 - **Chu kỳ 2027**, 12 kỳ tháng và 4 kỳ quý.
 - **Goal Plan ở đủ mọi trạng thái** (Nháp, Đã gửi, Bị trả lại, Đã duyệt, Đã khóa), để track nào cũng có dữ liệu cho mọi trạng thái.
-- **Số thực tế 3 tháng**, trong đó có dòng thủ công, dòng import và dòng "API".
+- **Số thực tế 3 tháng**, trong đó có dòng thủ công, dòng import và dòng "API" (dòng API là dữ liệu minh họa cho phase sau).
 - **Phiếu ở đủ mọi bước**, có phiếu quá hạn và phiếu đã chốt.
 - **Thang xếp loại + bảng % lương mẫu.** Đánh dấu rõ là giả định, chờ Q2.
 
@@ -241,8 +241,8 @@ Các track **chạy song song được vì cùng dựa trên seed fixtures**, kh
 | 4.4.1 | Danh mục nguồn dữ liệu | T4 |
 | 4.4.2 | Nhập số thực tế thủ công | T4 |
 | 4.4.3 | Khung import Excel theo lô (dùng chung) | T4 |
-| 4.4.4 | Khung kết nối API (giả lập) | T4 |
-| 4.4.5 | Connector ERP Sale (giả lập) | T4 |
+| 4.4.4 | Khung kết nối API (giả lập — phase sau, không thuộc P1) | T4 |
+| 4.4.5 | Connector ERP Sale (giả lập — phase sau, không thuộc P1) | T4 |
 | 4.4.6 | Quản lý bằng chứng | T4 |
 | 4.5.1 | Workflow engine (giao diện cấu hình) | T5 (logic ở 1.5) |
 | 4.5.2 | Quy trình đăng ký KPI | T5 |

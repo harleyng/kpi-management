@@ -1,3 +1,4 @@
+import { LaterPhaseNotice } from '@/components/shared/LaterPhaseNotice';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ActualEntryTab } from '@/components/actuals/ActualEntryTab';
 import { ActualImportTab } from '@/components/actuals/ActualImportTab';
@@ -40,7 +41,10 @@ export default function ActualsImportPage({ section }: { section: ActualsSection
       ) : section === 'import' ? (
         <ActualImportTab cycleId={cycleId} search={search} />
       ) : (
-        <SyncTab cycleId={cycleId} search={search} />
+        <>
+          <LaterPhaseNotice className="mb-4" />
+          <SyncTab cycleId={cycleId} search={search} />
+        </>
       )}
     </>
   );

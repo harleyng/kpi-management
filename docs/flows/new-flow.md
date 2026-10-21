@@ -13,7 +13,7 @@ flowchart LR
   A[HR tạo chu kỳ 2027<br/>12 kỳ tháng, 4 kỳ quý] --> B[Giao KPI công ty<br/>và bộ phận]
   B --> C[Quy trình 1<br/>Đăng ký KPI cá nhân]
   C --> D[HR khóa Goal Plan]
-  D --> E[Nhập số thực tế hằng tháng<br/>tay · Excel · API]
+  D --> E[Nhập số thực tế hằng tháng<br/>tay · Excel]
   E --> F[Quy trình 3<br/>Đánh giá KPI tháng]
   F --> G[Kết quả: điểm có trọng số<br/>→ xếp loại → % lương]
   G --> H[Dashboard sống<br/>công ty · bộ phận · cá nhân<br/>mục 4F]
@@ -140,7 +140,7 @@ sequenceDiagram
   SYS->>SYS: Tính điểm có trọng số → xếp loại → % lương
 ```
 
-- Số **thực tế** trên phiếu lấy từ dữ liệu đã nhập (tay, Excel, API) và **chỉ đọc**.
+- Số **thực tế** trên phiếu lấy từ dữ liệu đã nhập (tay, Excel) và **chỉ đọc**.
 - Phiếu chỉ gửi được khi mọi chỉ tiêu ở bước hiện tại đã có điểm (và nhận xét nếu bắt buộc).
 - Quá hạn chỉ xử lý **một lần mỗi bước**: nhắc hạn không lặp lại liên tục. Nếu bước được cấu hình
   **khóa** khi quá hạn, phiếu dừng tại bước đó; HR mở khóa Goal Plan phải nhập **hạn mới**, bước chạy lại
@@ -252,12 +252,14 @@ thông báo được đánh dấu đã đọc. Giai đoạn này **chỉ gửi t
 
 ## 4E. Số liệu thực hiện hằng tháng (Track T4)
 
-Sau khi tháng kết thúc (ngày 1 tháng sau), số thực tế của từng chỉ tiêu được ghi vào hệ thống theo ba
-đường. Màn hình "Số liệu & import" mở sẵn tháng vừa kết thúc.
+Sau khi tháng kết thúc (ngày 1 tháng sau), số thực tế của từng chỉ tiêu được ghi vào hệ thống. **Phase 1 chỉ
+có hai đường do người làm: nhập tay và import Excel — không tích hợp hệ thống khác hay API.** Đồng bộ API
+(ERP Sale) là phase sau; màn hình vẫn giữ trong bản thử nghiệm trên dữ liệu mô phỏng và gắn nhãn "Phase sau".
+Màn hình "Số liệu & import" mở sẵn tháng vừa kết thúc.
 
 ```mermaid
 flowchart LR
-  ERP[ERP Sale<br/>kết nối API] -- HR bấm Chạy đồng bộ --> S{Kiểm tra<br/>từng chỉ tiêu}
+  ERP[ERP Sale · kết nối API<br/>PHASE SAU] -. HR bấm Chạy đồng bộ .-> S{Kiểm tra<br/>từng chỉ tiêu}
   X[Tệp Excel<br/>theo mẫu] -- HR tải lên --> P[Xem trước<br/>lỗi từng dòng] -- Ghi nhận cả lô --> S
   M[Nhập tay<br/>QL / HR / C&B] --> S
   S -- hợp lệ --> A[Số thực tế hiện tại<br/>+ lịch sử]
@@ -269,7 +271,7 @@ flowchart LR
 2. **Nhập từ Excel.** HR tải mẫu đã điền sẵn chỉ tiêu của tháng, điền số, tải lên. Tệp sai mẫu bị chặn
    ngay, không tạo lô. Tệp đúng mẫu tạo một lô "Đang kiểm tra" với lỗi từng dòng; còn một dòng lỗi thì
    không ghi nhận được, sửa tệp và tải lên thành lô mới. Ghi nhận là ghi cả lô hoặc không ghi gì.
-3. **Đồng bộ API.** HR chạy đồng bộ cho một tháng. Số do người nhập (tay, Excel) không bị ghi đè
+3. **Đồng bộ API — phase sau, chưa có trong P1.** HR chạy đồng bộ cho một tháng. Số do người nhập (tay, Excel) không bị ghi đè
    (giả định Q37); số bị từ chối được ghi vào nhật ký lần chạy.
 4. Mọi đường đều qua cùng một kiểm tra: kế hoạch đã duyệt/khóa (Q35), kỳ chưa khóa, kết quả chưa chốt,
    chỉ tiêu còn hiệu lực, **chỉ nhập theo tháng** (quý, năm tự cộng từ các tháng — Q36), kỳ đã bắt đầu,
@@ -437,7 +439,7 @@ trực tiếp đến quy trình:
 
 - Nhân viên không nhập số thực tế; quản lý, HR, C&B nhập (giả định Q33).
 - Chỉ nhập số cho chỉ tiêu của Goal Plan đã duyệt hoặc đã khóa (Q35); chỉ nhập theo tháng (Q36).
-- Đồng bộ API không ghi đè số do người nhập (Q37); import Excel thì ghi đè, có cảnh báo trước khi ghi nhận.
+- Đồng bộ API không ghi đè số do người nhập (Q37); import Excel thì ghi đè, có cảnh báo trước khi ghi nhận. (Đồng bộ API là phase sau — xem quyết định 21/10/2026.)
 - Import Excel ghi cả lô hoặc không ghi gì; tệp sửa lại được tải lên thành lô mới.
 **19/10/2026 — Track T6, kết quả và file lương (product owner duyệt).**
 
@@ -471,3 +473,10 @@ BR-KPI-77.
 - Nút "Thêm từ bộ mẫu" trên Goal Plan, cho người đang được sửa Goal Plan; chỉ thêm, không thay chỉ tiêu có sẵn.
 - Gợi ý theo chức danh, đơn vị, rồi bộ dùng chung. Phiếu đăng ký khởi chạy vẫn tạo Goal Plan rỗng; tự áp
   bộ mẫu lúc khởi chạy để sau.
+
+**21/10/2026 — Phase 1 chỉ nhập số tay và import Excel (product owner).** Chi tiết: `business-rules.md`
+BR-KPI-55, 56.
+
+- Phase 1 không tích hợp hệ thống khác hay API. Số thực tế vào hệ thống bằng nhập tay hoặc import Excel.
+- Màn "Đồng bộ API" và "Kết nối API" giữ trong bản thử nghiệm để minh họa phase sau, dữ liệu mô phỏng, gắn
+  nhãn "Phase sau" trên menu và đầu trang.

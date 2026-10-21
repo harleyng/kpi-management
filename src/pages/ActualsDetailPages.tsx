@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { LaterPhaseNotice } from '@/components/shared/LaterPhaseNotice';
 import { useLocation, useParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -140,6 +141,7 @@ export function SyncConnectionPage() {
         }
       />
       <div className="space-y-4">
+        <LaterPhaseNotice />
         {inactive && (
           <InlineNotice tone="info" title="Kết nối đang ngừng hoạt động">
             Quản trị viên bật lại kết nối ở trang Kết nối API thì mới chạy đồng bộ được.

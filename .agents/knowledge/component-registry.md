@@ -47,6 +47,7 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `EmployeePicker` | Person picker with an `EmployeeFilter` (direct reports, unit); resigned shown disabled |
 | `OrgUnitTree` / `OrgUnitTreeView` | ARIA tree of the org (roving tabindex, ↑↓←→ Home End Enter/Space), single or multiple, search above >10 units |
 | `InlineNotice` (T4) | A short tinted notice inside a panel (`info` / `warning` / `negative`, 1px border, icon + title + body) — why an action is blocked, what a preview means; `alert` only for something that just failed |
+| `LaterPhaseNotice` | "Phase sau — chưa có trong P1" info notice at the top of a screen kept for a later phase (the API sync and connections, BR-KPI-56); pairs with `NavChild.laterPhase`, which tags the menu item "Phase sau" in `AppSidebar` |
 | `ConfirmDialog` | Confirmation before an irreversible action (lock, finalise, delete); `destructive` for removals |
 | `StatusBadge` | The `Tone` primitive, plus one badge per state set (`GoalPlanStatusBadge`, `FormStatusBadge` with `atMyStep`, `OverdueBadge`, `CycleStatusBadge`, `PeriodResultStatusBadge`, `GoalStatusBadge`, `LibraryStatusBadge`, `LaunchStatusBadge`, `ImportBatchStatusBadge`, `SyncRunStatusBadge`, `NotificationStatusBadge`, `EmploymentStatusBadge`, `RecordStatusBadge`); tones in `statusTones.ts`; `AttentionBadge` (Phase 3: "Dưới ngưỡng" / "Thiếu số liệu" / "Xếp loại thấp", `ATTENTION_LABEL` in `statusTones.ts`) |
 | `Pagination` | Footer of a paged table; pairs with `paginate()` |
