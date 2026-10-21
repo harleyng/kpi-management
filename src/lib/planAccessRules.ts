@@ -444,6 +444,43 @@ export function linkCandidatePlans(
   return result;
 }
 
+// ─── Cascade targets (WBS 4.3.4) ───────────────────────────────────────────────────────────────
+
+/** A unit still in use on `today`: Active and not past its `effectiveTo`. */
+const unitInUse = (u: Pick<OrgUnit, 'status' | 'effectiveTo'>, today: IsoDate) => u.status === 'Active' && (u.effectiveTo === null || u.effectiveTo >= today);
+
+/**
+ * The unit plans a goal of a Company / OrgUnit plan may CASCADE down to (BR-KPI-07) — the mirror of
+ * `linkCandidatePlans`: the OrgUnit plans, in the same cycle, of the NEAREST planned units below the
+ * plan's unit. Walking down, a unit with a plan is offered and its own subtree is not (it cascades
+ * further itself); a unit without a plan is passed through (the seed's Khối: Company → Phòng). A unit
+ * no longer in use is skipped with its whole subtree. Tree order, depth first. `[]` for an Employee
+ * plan — its targets are the owner's direct reports, not units.
+ */
+export function cascadeTargetPlans(
+  plan: Pick<GoalPlan, 'id' | 'cycleId' | 'ownerType' | 'ownerOrgUnitId'>,
+  plans: readonly GoalPlan[],
+  units: readonly OrgUnit[],
+  today: IsoDate,
+): GoalPlan[] {
+  if (plan.ownerType === 'Employee' || plan.ownerOrgUnitId === null) return [];
+  const planOf = (unitId: Id) => plans.find((p) => p.cycleId === plan.cycleId && p.ownerType === 'OrgUnit' && p.ownerOrgUnitId === unitId && p.id !== plan.id);
+  const result: GoalPlan[] = [];
+  const seen = new Set<Id>([plan.ownerOrgUnitId]);
+  const walk = (parentId: Id) => {
+    for (const u of units) {
+      if (u.parentId !== parentId || seen.has(u.id)) continue;
+      seen.add(u.id);
+      if (!unitInUse(u, today)) continue;
+      const own = planOf(u.id);
+      if (own) result.push(own);
+      else walk(u.id);
+    }
+  };
+  walk(plan.ownerOrgUnitId);
+  return result;
+}
+
 // ─── Which plan a route may show (sub-page routes) ─────────────────────────────────────────────
 
 /** The route family a Goal Plan page is mounted under — `/my/kpi/plans`, `/team/kpi/members`, … */

@@ -81,8 +81,22 @@ sequenceDiagram
   thống nói rõ còn thiếu gì.
 - Quản lý thấy với mỗi KPI đã cascade: **đã giao cho NV / tự nhận / chưa giao / tự thực hiện**; phần
   "chưa giao" do hệ thống tính.
-- Goal Plan của **công ty / bộ phận** được HR khởi tạo phiếu đăng ký bằng tay, người nhận là trưởng đơn
-  vị; mỗi Goal Plan chỉ có một phiếu đăng ký đang mở.
+- Goal Plan của **công ty / bộ phận** được HR khởi tạo phiếu đăng ký bằng tay, người được đăng ký là
+  trưởng đơn vị; mỗi Goal Plan chỉ có một phiếu đăng ký đang mở. Nút **Bắt đầu đăng ký** nằm trên từng
+  dòng ở *Quản trị KPI › Chu kỳ › Goal Plan* (cột "Phiếu đăng ký" ghi "Chưa bắt đầu", hoặc "Chưa có trưởng
+  đơn vị" khi chưa bắt đầu được). Hộp thoại cho thấy ai xử lý từng bước lúc này và hạn xử lý (mặc định
+  bằng tổng thời hạn các bước, 11 ngày). Với quy trình 4 bước mặc định, phiếu của một phòng tới **giám
+  đốc khối trước** (bước 1, giao chỉ tiêu), rồi tới **trưởng phòng** ở bước 2. Phiếu của công ty không có
+  người nhận ở bước 1 và 3 (Tổng giám đốc không có quản lý trực tiếp): HR thao tác thay, và cần làm kịp vì
+  quá hạn bước 1 thì Goal Plan tự khóa.
+- **Phân giao từ công ty xuống bộ phận.** Trên Goal Plan công ty (hoặc của một khối), "Phân giao" cho chọn
+  **Giao cho: Đơn vị | Nhân viên**. "Đơn vị" liệt kê Goal Plan của các đơn vị cấp dưới **gần nhất** có
+  Goal Plan trong chu kỳ: khối chưa có Goal Plan thì đi thẳng xuống các phòng. Chỉ tiêu giao xuống thuộc
+  trưởng đơn vị; "Đã giao / Tự giao / Chưa giao" tính như khi giao cho nhân viên.
+- **Ai giao được vào Goal Plan của một phòng**: khi chưa có phiếu đăng ký — trưởng phòng hoặc HR (Goal Plan
+  *Nháp*); khi phiếu đang chạy — người xử lý bước hiện tại, hoặc HR thao tác thay họ (được ghi cả hai
+  người). Tổng giám đốc không giao trực tiếp được vào Goal Plan phòng. Thứ tự HR nên làm cho chu kỳ mới:
+  lập Goal Plan công ty → tạo Goal Plan các phòng → phân giao → bắt đầu đăng ký từng phòng.
 - Hết hạn ở một bước → hệ thống **khóa Goal Plan**, phiếu đứng yên ở bước đó. HR mở khóa phải ghi lý do
   và hạn mới; bước được tính lại từ lúc mở khóa nên lần chạy sau không khóa lại ngay.
 - HR hủy phiếu đăng ký (kể cả khi đang bị khóa) thì Goal Plan về *Nháp*; việc mở khóa này được ghi
@@ -434,3 +448,11 @@ trực tiếp đến quy trình:
   xếp loại thấp nhất (Q41); so với kỳ liền trước (Q42); người chuyển đơn vị tính theo từng kỳ (Q43).
 - Trợ lý KPI là bản giả lập, chỉ đọc số liệu đang hiển thị trong phạm vi người xem.
 
+**21/10/2026 — Tầng công ty → bộ phận trên màn hình (product owner duyệt).** Chi tiết: `business-rules.md`
+BR-KPI-07, 19.
+
+- HR bắt đầu đăng ký Goal Plan công ty / bộ phận ngay trên danh sách Goal Plan của chu kỳ; hộp thoại nêu
+  người xử lý từng bước và hạn mặc định bằng tổng thời hạn các bước.
+- Phân giao từ Goal Plan công ty / khối xuống Goal Plan của đơn vị cấp dưới gần nhất có kế hoạch.
+- Quy trình mặc định không đổi: giám đốc khối nhận bước 1, trưởng phòng bước 2. Quy tắc ai được sửa
+  không đổi; HR thao tác thay ở mọi bước.

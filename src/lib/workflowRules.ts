@@ -162,6 +162,35 @@ export function resolveStepActors(step: WorkflowStep, subjectEmployeeId: Id, dir
   return [...new Set(actors)].filter((id) => id !== subjectUserId);
 }
 
+/** One step of a form's route as it stands now — what the start dialog shows. */
+export interface RouteStep {
+  step: WorkflowStep;
+  /** `resolveStepActors` today; empty = nobody is assigned (HR acts as proxy, or a SELF step with no account). */
+  actorUserIds: Id[];
+}
+
+/**
+ * Who would act at each step of `steps` (one workflow) for `subjectEmployeeId`, in step order, read
+ * NOW with `resolveStepActors` — the same lookup the inbox uses. Lines are read again at each action,
+ * so this is a forecast: a manager change moves a step. Delegates are not added (they act for these).
+ */
+export function registrationRoute(steps: readonly WorkflowStep[], subjectEmployeeId: Id, dir: ActorDirectory, clock: Clock): RouteStep[] {
+  return [...steps].sort((a, b) => a.stepNo - b.stepNo).map((step) => ({ step, actorUserIds: resolveStepActors(step, subjectEmployeeId, dir, clock) }));
+}
+
+/** The due date a form started by hand gets by default when its steps carry no SLA. */
+export const DEFAULT_START_DUE_DAYS = 7;
+
+/**
+ * Days from start to the default due date of a form started by hand: the sum of its steps' SLAs, so
+ * the last steps are not squeezed by the due date (`stepDeadline` takes the earlier of the two);
+ * `DEFAULT_START_DUE_DAYS` when no step has an SLA.
+ */
+export function defaultStartDueDays(steps: readonly Pick<WorkflowStep, 'slaDays'>[]): number {
+  const total = steps.reduce((sum, s) => sum + (s.slaDays ?? 0), 0);
+  return total > 0 ? total : DEFAULT_START_DUE_DAYS;
+}
+
 /** A delegation grants `formType` steps between its dates (tenant zone, inclusive) until revoked (BR-KPI-21). */
 export function isDelegationValid(delegation: Delegation, formType: FormType, clock: Clock): boolean {
   if (delegation.formType !== formType) return false;

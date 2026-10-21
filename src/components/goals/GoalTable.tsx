@@ -206,7 +206,7 @@ export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTa
   if (showBuckets) {
     const bucket = (goal: Goal) => data.buckets.get(goal.id);
     columns.push(
-      { id: 'assigned', header: 'Phân bổ nhân viên', numeric: true, className: 'whitespace-nowrap', cell: (goal) => (bucket(goal) ? formatNumber(bucket(goal)!.assigned) : null) },
+      { id: 'assigned', header: 'Đã giao', numeric: true, className: 'whitespace-nowrap', cell: (goal) => (bucket(goal) ? formatNumber(bucket(goal)!.assigned) : null) },
       { id: 'self', header: 'Tự giao', numeric: true, className: 'whitespace-nowrap', cell: (goal) => (bucket(goal) ? formatNumber(bucket(goal)!.selfAssigned) : null) },
       {
         id: 'unassigned',
@@ -249,7 +249,7 @@ export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTa
           <MenuItem label="Sửa chỉ tiêu và định mức" refusal={actions.edit.refusal(goal)} onSelect={() => actions.edit.run(goal)} />
           <MenuItem label="Phân bổ mục tiêu theo kỳ" refusal={actions.split.refusal(goal)} onSelect={() => actions.split.run(goal)} />
           <MenuItem label="Liên kết lên chỉ tiêu cấp trên" refusal={actions.link.refusal(goal)} onSelect={() => actions.link.run(goal)} />
-          {actions.cascade && <MenuItem label="Phân giao cho nhân viên" refusal={actions.cascade.refusal(goal)} onSelect={() => actions.cascade!.run(goal)} />}
+          {actions.cascade && <MenuItem label="Phân giao" refusal={actions.cascade.refusal(goal)} onSelect={() => actions.cascade!.run(goal)} />}
           <DropdownMenuSeparator />
           <MenuItem label="Xóa chỉ tiêu" refusal={actions.remove.refusal(goal)} onSelect={() => actions.remove.run(goal)} />
         </DropdownMenuContent>

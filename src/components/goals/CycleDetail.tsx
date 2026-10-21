@@ -39,12 +39,14 @@ import {
 } from '@/hooks/queries/goals';
 import { useEmployees, useOrgUnits } from '@/hooks/queries/org';
 import { toastSaved } from '@/hooks/queries/toasts';
-import { canEditCycle, canLockPeriod, cycleIssues, generatePeriods, mergeGeneratedPeriods, nextCycleStatus, PERIOD_GENERATION_DEFAULTS, type PeriodMergeSummary } from '@/lib/cycleRules';
+import { canEditCycle, canLockPeriod, cycleAllowsLaunch, cycleIssues, generatePeriods, mergeGeneratedPeriods, nextCycleStatus, PERIOD_GENERATION_DEFAULTS, type PeriodMergeSummary } from '@/lib/cycleRules';
 import { KpiError } from '@/lib/errorCatalog';
+import { planOwnerOf } from '@/lib/planAccessRules';
 import { combineQueries } from '@/lib/queryState';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import { firstIssueText, formatWeight, issueText } from './goalCopy';
 import { PlanLockActions } from './PlanLockActions';
+import { StartRegistrationButton } from './StartRegistrationButton';
 
 /** What the next-status button says — the action, not the state (UI/UX review). */
 const NEXT_STATUS_ACTION: Readonly<Record<CycleStatus, string>> = {
@@ -270,7 +272,8 @@ export function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle
   const [tier, setTier] = useState<OwnerType | typeof ALL>(ALL);
   const [status, setStatus] = useState<GoalPlanStatus | typeof ALL>(ALL);
   const [creating, setCreating] = useState(false);
-  const query = combineQueries([plans, units, employees, summaryQuery]);
+  // The forms read decides the "Phiếu đăng ký" column: a failure must show, never a misleading "Chưa bắt đầu".
+  const query = combineQueries([plans, units, employees, summaryQuery, access.state]);
 
   const ownerName = (p: GoalPlan) =>
     p.ownerType === 'Employee' ? (employees.data?.find((e) => e.id === p.ownerEmployeeId)?.fullName ?? '—') : (units.data?.find((u) => u.id === p.ownerOrgUnitId)?.name ?? '—');
@@ -298,7 +301,12 @@ export function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle
       header: 'Phiếu đăng ký',
       cell: (p) => {
         const form = access.registrations.get(p.id);
-        if (!form) return null;
+        if (!form) {
+          // A unit plan's registration is started by hand (BR-KPI-19): say why it has none yet.
+          const known = access.byPlan.get(p.id)?.reason !== 'UNKNOWN';
+          if (p.ownerType === 'Employee' || p.status === 'Locked' || !units.data || !known || !cycleAllowsLaunch(cycle, 'GOAL_SETTING').ok) return null;
+          return <span className="text-sm text-muted-foreground">{planOwnerOf(p, units.data) === null ? 'Chưa có trưởng đơn vị' : 'Chưa bắt đầu'}</span>;
+        }
         const steps = (access.steps ?? []).filter((s) => s.workflowId === form.workflowId).sort((a, b) => a.stepNo - b.stepNo);
         const step = steps.find((s) => s.id === form.currentStepId);
         return step ? <span className="text-sm">Bước {step.stepNo}/{steps.length}: {step.name}</span> : null;
@@ -325,10 +333,11 @@ export function CyclePlansPanel({ cycle, onOpenPlan }: { cycle: PerformanceCycle
       id: 'actions',
       header: 'Thao tác',
       cell: (p) => (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex min-w-36 flex-wrap gap-1">
           <Button variant="outline" size="sm" onClick={() => onOpenPlan(p.id)} aria-label={`Xem Goal Plan của ${ownerName(p)}`}>
             Xem
           </Button>
+          <StartRegistrationButton plan={p} cycle={cycle} registration={access.registrations.get(p.id) ?? null} planName={ownerName(p)} compact />
           <PlanLockActions plan={p} cycle={cycle} registration={access.registrations.get(p.id) ?? null} planName={`Goal Plan của ${ownerName(p)}`} compact />
         </div>
       ),

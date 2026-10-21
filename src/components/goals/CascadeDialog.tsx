@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSession } from '@/contexts/useSession';
-import type { Goal } from '@/data/types';
+import type { Employee, Goal, GoalPlan } from '@/data/types';
 import { useCascadeGoal, useCycles, useGoalRows, usePlansEditability, type GoalLookups, type PlanWorkspaceData } from '@/hooks/queries/goals';
 import { useSessionDirectory } from '@/hooks/queries/session';
 import { toastSaved } from '@/hooks/queries/toasts';
@@ -15,7 +15,7 @@ import { KpiError } from '@/lib/errorCatalog';
 import { nextSortOrder, remainingWeight } from '@/lib/goalPlanRules';
 import { formatDecimalInput, parseDecimalInput } from '@/lib/numberInput';
 import { isEffectiveOn } from '@/lib/orgRules';
-import { planOwnerOf } from '@/lib/planAccessRules';
+import { cascadeTargetPlans, planOwnerOf } from '@/lib/planAccessRules';
 import { formatNumber } from '@/lib/utils';
 import { EDIT_REASON_COPY, firstIssueText, formatTarget } from './goalCopy';
 
@@ -27,11 +27,26 @@ interface CascadeDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type CascadeMode = 'unit' | 'employee';
+
+/** One plan a share can go to, with the person whose dates clip the child goal and why it is closed. */
+interface CascadeTarget {
+  key: string;
+  plan: GoalPlan | null;
+  owner: Employee | null;
+  label: string;
+  description: string | undefined;
+  disabled: boolean;
+}
+
 /**
- * "Phân giao cho nhân viên" (WBS 4.3.4, BR-KPI-07, BR-KPI-12 step 1): hand part of a goal down to a
- * direct report — a child goal in their plan plus a CASCADE alignment (`useCascadeGoal`). A report
- * whose plan the manager may not edit now is listed disabled with the reason (their registration
- * form must be at the manager's step). The buckets preview is `alignmentRules.allocationBuckets`.
+ * "Phân giao" (WBS 4.3.4, BR-KPI-07, BR-KPI-12 step 1): hand part of a goal down — a child goal in
+ * the target plan plus a CASCADE alignment (`useCascadeGoal`). From an Employee plan the targets are
+ * the owner's direct reports; from a Company / OrgUnit plan also the plans of the nearest planned
+ * units below (`cascadeTargetPlans`), chosen with "Giao cho: Đơn vị | Nhân viên". A target whose plan
+ * the user may not edit now is listed disabled with the reason (`usePlansEditability` — the gateway's
+ * own decision; HR acting for a step's actor is named). A unit target's child goal belongs to the unit
+ * head, like every goal of a unit plan. The buckets preview is `alignmentRules.allocationBuckets`.
  */
 export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: CascadeDialogProps) {
   const { tenantId, today } = useSession();
@@ -53,36 +68,71 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
     () => [...data.relatedPlans.values()].filter((p) => p.cycleId === data.plan.cycleId && p.ownerType === 'Employee' && reports.some((r) => r.id === p.ownerEmployeeId)),
     [data.relatedPlans, data.plan.cycleId, reports],
   );
-  const editability = usePlansEditability(reportPlans, cycles.data);
+  const unitPlans = useMemo(() => cascadeTargetPlans(data.plan, [...data.relatedPlans.values()], lookups.orgUnits, today), [data.plan, data.relatedPlans, lookups.orgUnits, today]);
+  const targetPlans = useMemo(() => [...unitPlans, ...reportPlans], [unitPlans, reportPlans]);
+  const editability = usePlansEditability(targetPlans, cycles.data);
 
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [mode, setMode] = useState<CascadeMode>(unitPlans.length > 0 ? 'unit' : 'employee');
+  const [targetKey, setTargetKey] = useState<string | null>(null);
   const [value, setValue] = useState('');
   const [weight, setWeight] = useState('');
   const [methodId, setMethodId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const targetPlan = reportPlans.find((p) => p.ownerEmployeeId === employeeId) ?? null;
+
+  /** Why a target plan cannot take the share now, else who the user acts for (HR as proxy). */
+  const planNote = (plan: GoalPlan): { reason?: string; actingFor?: string } => {
+    const decision = editability.byPlan.get(plan.id);
+    if (decision && !decision.decision.ok) return { reason: EDIT_REASON_COPY[decision.reason] ?? undefined };
+    const forUserId = decision?.standing?.onBehalfOfUserId ?? null;
+    if (forUserId === null || !directory) return {};
+    const account = directory.accounts.find((a) => a.id === forUserId);
+    const person = account?.employeeId ? lookups.employee.get(account.employeeId) : undefined;
+    return { actingFor: person?.fullName ?? account?.login };
+  };
+
+  const targets: CascadeTarget[] = (() => {
+    if (mode === 'unit') {
+      return unitPlans.map((plan) => {
+        const unit = plan.ownerOrgUnitId ? lookups.orgUnit.get(plan.ownerOrgUnitId) : undefined;
+        const head = unit?.headEmployeeId ? (lookups.employee.get(unit.headEmployeeId) ?? null) : null;
+        const note = planNote(plan);
+        const reason = head === null ? 'Đơn vị chưa có trưởng đơn vị — chỉ tiêu giao xuống cần người phụ trách.' : note.reason;
+        const description = reason ?? (note.actingFor ? `Thao tác thay ${note.actingFor}` : `Trưởng đơn vị: ${head?.fullName}`);
+        return { key: plan.id, plan, owner: head, label: unit?.name ?? '—', description, disabled: reason !== undefined };
+      });
+    }
+    return reports.map((r) => {
+      const plan = reportPlans.find((p) => p.ownerEmployeeId === r.id) ?? null;
+      const note = plan ? planNote(plan) : {};
+      const reason = !plan ? 'Chưa có Goal Plan trong chu kỳ này' : note.reason;
+      const description = reason ?? (note.actingFor ? `${r.employeeCode} · thao tác thay ${note.actingFor}` : r.employeeCode);
+      return { key: r.id, plan, owner: r, label: r.fullName, description, disabled: reason !== undefined };
+    });
+  })();
+
+  const target = targets.find((t) => t.key === targetKey && !t.disabled) ?? null;
+  const targetPlan = target?.plan ?? null;
   const targetGoals = useGoalRows({ goalPlanIds: targetPlan ? [targetPlan.id] : [] }, { enabled: targetPlan !== null });
   const cascade = useCascadeGoal();
 
+  const pickMode = (next: CascadeMode) => {
+    setMode(next);
+    setTargetKey(null);
+    setWeight('');
+    setError(null);
+  };
+  const pick = (key: string | null) => {
+    setTargetKey(key);
+    setWeight('');
+    setError(null);
+  };
   const parentMethod = lookups.method.get(parent.calcMethodId) ?? null;
   const shareSafe = parentMethod !== null && SHARE_SAFE_METHODS.includes(parentMethod.methodType);
 
-  const options = useMemo<ComboboxOption[]>(
-    () =>
-      reports.map((r) => {
-        const plan = reportPlans.find((p) => p.ownerEmployeeId === r.id);
-        const decision = plan ? editability.byPlan.get(plan.id) : undefined;
-        const reason = !plan ? 'Chưa có Goal Plan trong chu kỳ này' : decision && !decision.decision.ok ? (EDIT_REASON_COPY[decision.reason] ?? undefined) : undefined;
-        return { id: r.id, label: r.fullName, description: reason ?? r.employeeCode, disabled: reason !== undefined };
-      }),
-    [reports, reportPlans, editability.byPlan],
-  );
+  const options: ComboboxOption[] = targets.map((t) => ({ id: t.key, label: t.label, description: t.description, disabled: t.disabled }));
+  const byUnit = mode === 'unit';
 
-  const pick = (id: string | null) => {
-    setEmployeeId(id);
-    setError(null);
-  };
-  // Offer what is left to reach 100% in the report's plan, once their goals are known.
+  // Offer what is left to reach 100% in the target plan, once its goals are known.
   const suggestedWeight = targetGoals.data ? remainingWeight(targetGoals.data) : null;
   const weightText = weight !== '' ? weight : suggestedWeight !== null ? formatDecimalInput(suggestedWeight) : '';
 
@@ -102,7 +152,7 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
     { childGoalId: 'new-child', parentGoalId: parent.id, alignmentType: 'CASCADE', allocatedValue: proposedValue, contributionPct: null },
     { alignments: data.allAlignments, parentGoal: parent, existingChildren: existing, asOf: today },
   );
-  const owner = employeeId ? (lookups.employee.get(employeeId) ?? null) : null;
+  const owner = target?.owner ?? null;
   const draft =
     targetPlan && owner
       ? cascadedGoalDraft(parent, parentMethod, {
@@ -126,7 +176,7 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
       { parentGoalId: parent.id, child: draft.goal, allocatedValue: proposedValue },
       {
         onSuccess: () => {
-          toastSaved('Đã phân giao chỉ tiêu', `${owner?.fullName}: ${formatNumber(proposedValue)}${unit ? ` ${unit.name}` : ''}`);
+          toastSaved('Đã phân giao chỉ tiêu', `${target?.label}: ${formatNumber(proposedValue)}${unit ? ` ${unit.name}` : ''}`);
           onOpenChange(false);
         },
         onError: (e) => setError(e instanceof KpiError ? (firstIssueText(e.issues) ?? null) : null),
@@ -140,21 +190,43 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
         <DialogHeader>
           <DialogTitle>Phân giao: {parent.name}</DialogTitle>
           <DialogDescription>
-            Giao một phần mục tiêu {formatTarget(parent, unit)} cho nhân viên trực tiếp. Hệ thống tạo chỉ tiêu tương ứng trong Goal Plan của nhân viên.
+            Giao một phần mục tiêu {formatTarget(parent, unit)} cho {byUnit ? 'đơn vị cấp dưới' : 'nhân viên trực tiếp'}. Hệ thống tạo chỉ tiêu tương ứng trong Goal Plan
+            {byUnit ? ' của đơn vị' : ' của nhân viên'}.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <FormField label="Nhân viên" required hint={reports.length === 0 ? 'Bạn chưa có nhân viên trực tiếp nào.' : 'Chỉ chọn được nhân viên có phiếu đăng ký đang ở bước phân giao của bạn.'}>
+          {unitPlans.length > 0 && (
+            <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <legend className="float-left mr-4 text-sm font-medium">Giao cho</legend>
+              {(['unit', 'employee'] as const).map((m) => (
+                <label key={m} className="flex items-center gap-1.5 text-sm">
+                  <input type="radio" name="cascade-mode" value={m} checked={mode === m} onChange={() => pickMode(m)} />
+                  {m === 'unit' ? 'Đơn vị' : 'Nhân viên'}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          <FormField
+            label={byUnit ? 'Đơn vị nhận' : 'Nhân viên'}
+            required
+            hint={
+              byUnit
+                ? 'Goal Plan của các đơn vị cấp dưới gần nhất trong chu kỳ. Chỉ chọn được Goal Plan bạn đang được sửa.'
+                : reports.length === 0
+                  ? 'Bạn chưa có nhân viên trực tiếp nào.'
+                  : 'Chỉ chọn được nhân viên có phiếu đăng ký đang ở bước phân giao của bạn.'
+            }
+          >
             {(control) => (
               <EntityCombobox
                 {...control}
                 options={options}
                 query={editability.state}
-                placeholder="Chọn nhân viên"
-                searchPlaceholder="Tìm theo tên hoặc mã"
-                emptyText="Không có nhân viên trực tiếp."
-                value={employeeId}
+                placeholder={byUnit ? 'Chọn đơn vị' : 'Chọn nhân viên'}
+                searchPlaceholder={byUnit ? 'Tìm theo tên đơn vị' : 'Tìm theo tên hoặc mã'}
+                emptyText={byUnit ? 'Không có đơn vị cấp dưới nào có Goal Plan trong chu kỳ.' : 'Không có nhân viên trực tiếp.'}
+                value={target?.key ?? null}
                 onChange={pick}
               />
             )}
@@ -163,7 +235,7 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
             <FormField label={`Phần giao${unit ? ` (${unit.name})` : ''}`} required error={value !== '' ? firstIssueText(issues) : undefined}>
               {(control) => <Input {...control} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />}
             </FormField>
-            <FormField label="Trọng số (%)" required hint="Trong Goal Plan của nhân viên; mặc định là phần còn thiếu để đủ 100%.">
+            <FormField label="Trọng số (%)" required hint={`Trong Goal Plan ${byUnit ? 'của đơn vị' : 'của nhân viên'}; mặc định là phần còn thiếu để đủ 100%.`}>
               {(control) => <Input {...control} inputMode="decimal" value={weightText} onChange={(e) => setWeight(e.target.value)} />}
             </FormField>
           </div>
@@ -188,13 +260,13 @@ export function CascadeDialog({ data, lookups, parent, open, onOpenChange }: Cas
             </FormField>
           )}
 
-          <dl className="grid grid-cols-2 gap-3 rounded-md border bg-surface-alt p-3 text-right text-sm sm:grid-cols-4" aria-label="Phân bổ sau khi giao">
+          <dl className="grid grid-cols-2 gap-3 rounded-md border bg-surface-alt p-3 text-right text-sm" aria-label="Phân bổ sau khi giao">
             <div>
               <dt className="text-xs text-muted-foreground">Mục tiêu</dt>
               <dd className="tabular-nums">{formatNumber(preview.target)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Đã giao NV</dt>
+              <dt className="text-xs text-muted-foreground">Đã giao</dt>
               <dd className="tabular-nums">{formatNumber(preview.assigned)}</dd>
             </div>
             <div>

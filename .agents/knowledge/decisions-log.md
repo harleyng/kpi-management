@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-10-21 — The company → department tier gets its two screens: start a unit registration, cascade to unit plans
+
+**Decision.** (product owner, phase 2 approved) HR starts a Company / OrgUnit plan's registration from
+"Bắt đầu đăng ký" on the cycle's Goal Plan list (`StartRegistrationButton`, pre-checked with
+`canStartForm`; the dialog shows who acts at each step now via `workflowRules.registrationRoute`; default
+due date = today + Σ step SLAs, `defaultStartDueDays`). From a Company / OrgUnit plan, "Phân giao" also
+offers the OrgUnit plans of the NEAREST planned units below (`planAccessRules.cascadeTargetPlans`); the child
+goal belongs to the unit head. `usePlansEditability` now decides unit plans too. The bucket column
+"Phân bổ nhân viên" and the preview's "Đã giao NV" are both "Đã giao". No contract, fixture or rule change.
+
+**Why.** Without them the role guide could not walk company → department at all. "Nearest" rather than
+"every unit below": cascading the company straight to a department under a planned Khối would skip a level
+and the Khối's "chưa giao" would never see it. A default due date of 7 days is shorter than the template's
+3+3+3+2 = 11 days of SLAs, and `stepDeadline` takes the earlier of the two, so steps 3–4 would be due almost
+at once. `usePlansEditability` read forms by `plan.ownerEmployeeId` (null for unit plans), so every unit plan
+was UNKNOWN — the list's "Phiếu đăng ký" column was empty and the lock dialog thought no form was open;
+reading by the unit head instead would miss a form started for a previous head, so with a unit plan present
+it reads every GOAL_SETTING form and matches by plan, as the gateway does.
+
+**Consequence.** Who writes into a department plan is unchanged: no form → head or HR; a form open → the
+step's actor or HR as proxy (recorded for that actor). The division director receives the form first (step
+1), the head at step 2; the CEO can never write into a department plan, and a director cannot cascade from
+the Company plan (the action needs ownership of the parent plan or `goalplan.lock`). The guide's order is:
+company plan → department plans → HR cascades → start registration. A Company plan's steps 1 and 3 have no
+actor (HR proxies; step 1 auto-locks unseen if left), so the dialog warns.
+
+**Updated alongside.** `business-rules.md` BR-KPI-07 (unit targets, "assigned" wording) and BR-KPI-19 (the
+screen, default due date, routing); `docs/flows/new-flow.md` §2 and §7; `component-registry.md`.
+
+---
+
 ## 2026-10-20 — "Chu kỳ" split into Kỳ đánh giá / Đợt đánh giá / Goal Plan
 
 **Decision.** (product owner) "Chu kỳ" is an area with three sub-pages: **Kỳ đánh giá**

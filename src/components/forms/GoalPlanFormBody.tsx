@@ -90,7 +90,7 @@ export function GoalPlanFormBody({ detail, title }: { detail: FormDetail; title:
           <SectionTitle
             icon={Target}
             title="Goal Plan"
-            action={plan && plan.status === 'Locked' && form.status === 'Completed' ? <StartAdjustmentButton plan={plan} lookups={detail.lookups} /> : undefined}
+            action={plan && plan.status === 'Locked' && form.status === 'Completed' ? <StartAdjustmentButton plan={plan} /> : undefined}
           >
             {plan && (
               <span className="flex flex-wrap items-center gap-1.5">

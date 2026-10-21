@@ -100,8 +100,8 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
   "2. KPIs phòng ban".*
 - **BR-KPI-07** — Goals are joined by **cascade** (parent goal allocated down, `allocatedValue`) or
   **link** (child contributes to a parent, `contributionPct`). A goal can never be its own ancestor (no
-  cycles, A → B → A refused). For a cascaded goal the manager sees four buckets (D3): **assigned to
-  employees** = Σ `allocatedValue` (derived); **self-assigned / tự giao** = the parent's
+  cycles, A → B → A refused). For a cascaded goal the manager sees four buckets (D3): **assigned**
+  ("Đã giao", to units or employees) = Σ `allocatedValue` (derived); **self-assigned / tự giao** = the parent's
   `selfAssignedValue` (stored); **not yet assigned** = parent target − assigned − self-assigned (derived,
   never stored); **self-performed / tự thực hiện** is not tracked in P1 (`ASSUMPTION Q11`). Allocating
   more than the parent target is refused (ERR-KPI-11; ERR-KPI-10 for a cycle). When the owner of a cascaded
@@ -114,7 +114,13 @@ child goal in the report's plan (`cascadedGoalDraft`: same KPI, target = the all
 cycle and the owner's employment; the method copied only when share-safe — RATIO_UP / RATIO_DOWN / BINARY —
 else the manager picks one; levels, split, weight and KGI not copied) and then the CASCADE alignment; it is
 possible only while the manager may edit the report's plan (their registration form at a step with EDIT for
-the manager — BR-KPI-12 step 1 or 3). A **link**'s `contributionPct` (0, 100] is informational only
+the manager — BR-KPI-12 step 1 or 3). **Unit targets:** from a Company / OrgUnit plan a goal may also be
+cascaded to the OrgUnit plans of the **nearest planned units below** in the same cycle — a unit without a
+plan is passed through, a planned unit stops the walk, a unit no longer in use is skipped
+(`planAccessRules.cascadeTargetPlans`); the child goal belongs to the unit head. Writing into the unit plan
+follows `canEditPlan`: no form → the head or HR (Draft/Returned); a form open → the step's actor, or HR as
+proxy (`form.proxy`, both recorded). The CEO, owner of the Company plan, cannot write into a department plan.
+A **link**'s `contributionPct` (0, 100] is informational only
 (`ASSUMPTION Q31`).
 *Source: HR guide p. 24; email template steps 1–2.*
 - **BR-KPI-08** — A goal is **public or private** (visibility, D2). A PRIVATE goal is seen only by its
@@ -209,7 +215,11 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   recurring launch (`FORM_LAUNCH_RULE`, trigger `PERIOD_END` + `offsetDays` ≥ 0) moves from P2 into P1
   because the monthly evaluation must launch itself, and fires once per (rule, period) (D5). Starting a
   unit plan's registration by hand needs a Company / OrgUnit plan that is not Locked and has no open
-  registration; its subject is the unit head. A launch is NOW (fires at once, `scheduledAt` = now) or
+  registration; its subject is the unit head. The screen is "Bắt đầu đăng ký" on the cycle's Goal Plan list
+  (`StartRegistrationButton`, pre-checked with `canStartForm`); its default due date is today + the sum of
+  the steps' SLAs (`workflowRules.defaultStartDueDays`, 7 days when no step has one). With the default
+  template the department head's manager (the division director) acts first at step 1, the head at step 2;
+  the Company plan's steps 1 and 3 have no actor and HR acts as proxy. A launch is NOW (fires at once, `scheduledAt` = now) or
   SCHEDULED (strictly in the future, fires at the first tick after); RECURRING comes only from a rule
   (`launchTimingIssues`). Only a Scheduled launch can be cancelled (`canCancelLaunch`, 04). A recurring
   rule launches the **evaluation only**, whole days ≥ 0 (`validateLaunchRule`). Rules fire for periods

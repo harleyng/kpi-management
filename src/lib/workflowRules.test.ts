@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { issueText } from './errorCatalog';
 import type { FormInstance, WorkflowStep } from '@/data/types';
 import {
   TZ,
@@ -53,6 +54,9 @@ import {
   remindersDue,
   resolveRecipients,
   resolveStepActors,
+  registrationRoute,
+  defaultStartDueDays,
+  DEFAULT_START_DUE_DAYS,
   stepDeadline,
   transition,
   validateLaunch,
@@ -109,6 +113,34 @@ describe('validateWorkflow', () => {
     ['KPI_EVAL', [], 'STEPS_REQUIRED'],
   ] as const)('%s %# → %s', (formType, steps, detail) => {
     expect(details(formType, steps)).toContain(detail);
+  });
+});
+
+describe('registrationRoute / defaultStartDueDays — the start dialog\'s forecast', () => {
+  it('every step in order with who acts now: manager, self, manager, HR', () => {
+    const route = registrationRoute([...reg].reverse(), 'm1', dir, CLOCK);
+    expect(route.map((r) => [r.step.stepNo, r.actorUserIds])).toEqual([
+      [1, ['u-l2']],
+      [2, ['u-m1']],
+      [3, ['u-l2']],
+      [4, ['u-hr1']],
+    ]);
+  });
+
+  it('the top of the tree has nobody at the manager steps (HR proxies)', () => {
+    expect(registrationRoute(reg, 'l2', dir, CLOCK).map((r) => r.actorUserIds)).toEqual([[], ['u-l2'], [], ['u-hr1']]);
+  });
+
+  it('a subject with no active account leaves their own step empty', () => {
+    const noAccount: ActorDirectory = { ...dir, users: dir.users.filter((u) => u.id !== 'u-m1') };
+    expect(registrationRoute(reg, 'm1', noAccount, CLOCK)[1].actorUserIds).toEqual([]);
+  });
+
+  it('the default due date covers every step\'s SLA; 7 days when none has one', () => {
+    expect(defaultStartDueDays([{ slaDays: 3 }, { slaDays: 3 }, { slaDays: 3 }, { slaDays: 2 }])).toBe(11);
+    expect(defaultStartDueDays([{ slaDays: 5 }, { slaDays: null }])).toBe(5);
+    expect(defaultStartDueDays([{ slaDays: null }, { slaDays: 0 }])).toBe(DEFAULT_START_DUE_DAYS);
+    expect(DEFAULT_START_DUE_DAYS).toBe(7);
   });
 });
 
@@ -759,7 +791,7 @@ describe('canStartForm — an adjustment, or a unit plan\'s registration, by han
     expect(canStartForm(input(), base({ forms: closed }))).toEqual([]);
   });
 
-  it.each([
+  const refusals = [
     ['an evaluation', input(), base({ formType: 'KPI_EVAL' }), 'ERR-KPI-06 NOT_STARTABLE'],
     ['a plan not Locked', input(), base({ plan: plan({ status: 'Approved' }) }), 'ERR-KPI-04 PLAN_NOT_LOCKED'],
     ['no plan', input({ goalPlanId: null }), base({ plan: null }), 'ERR-KPI-06 PLAN_REQUIRED'],
@@ -767,8 +799,24 @@ describe('canStartForm — an adjustment, or a unit plan\'s registration, by han
     ['a past due date', input({ dueDate: '2027-02-02' }), base(), 'ERR-KPI-06 DUE_DATE_INVALID'],
     ['a period', input({ periodId: 'T01' }), base(), 'ERR-KPI-06 PERIOD_NOT_ALLOWED'],
     ['a Closed cycle', input(), base({ cycle: { status: 'Closed' } }), 'ERR-KPI-04 CYCLE_NOT_OPEN'],
-  ])('refuses %s', (_, i, ctx, expected) => {
+    ['an open adjustment', input(), base({ forms: [{ formType: 'GOAL_CHANGE', goalPlanId: 'plan1', status: 'Open' }] }), 'ERR-KPI-04 CHANGE_ALREADY_OPEN'],
+    ['an Employee plan registered by hand', input(), base({ formType: 'GOAL_SETTING', plan: plan() }), 'ERR-KPI-06 EMPLOYEE_PLAN_BY_LAUNCH'],
+    ['a Locked unit plan', input({ goalPlanId: 'plan-u', subjectEmployeeId: 'm1' }), base({ formType: 'GOAL_SETTING', plan: { ...unitPlan, status: 'Locked' }, planOwnerEmployeeId: 'm1' }), 'ERR-KPI-04 PLAN_LOCKED'],
+    [
+      'a second registration',
+      input({ goalPlanId: 'plan-u', subjectEmployeeId: 'm1' }),
+      base({ formType: 'GOAL_SETTING', plan: unitPlan, planOwnerEmployeeId: 'm1', forms: [{ formType: 'GOAL_SETTING', goalPlanId: 'plan-u', status: 'Open' }] }),
+      'ERR-KPI-04 REGISTRATION_ALREADY_OPEN',
+    ],
+  ] as const;
+  it.each(refusals)('refuses %s', (_, i, ctx, expected) => {
     expect(got(canStartForm(i, ctx))).toContain(expected);
+  });
+
+  it('every refusal has catalogue copy — the screen never shows a raw code', () => {
+    for (const [, i, ctx] of refusals) {
+      for (const issue of canStartForm(i, ctx)) expect(issueText(issue.detail, issue.code)).not.toBe(issue.detail);
+    }
   });
 
   it('a unit plan\'s registration: for its head, never an Employee plan, never a Locked one, one at a time', () => {

@@ -4,7 +4,7 @@ import { TZ, calcMethod, delegation, form, goal, goals, kgi, level, months2027, 
 import type { Clock } from './isoDate';
 import { buildTenant } from './permissionFixtures.test-util';
 import { can, resourceOfOwner } from './permissionRules';
-import { canSeeGoal, linkCandidatePlans, planEditability, planReadiness, planRouteAllows, submitAvailability, visibleGoals, type OpenRegistration, type PlanEditInput, type ReadinessContext } from './planAccessRules';
+import { canSeeGoal, cascadeTargetPlans, linkCandidatePlans, planEditability, planReadiness, planRouteAllows, submitAvailability, visibleGoals, type OpenRegistration, type PlanEditInput, type ReadinessContext } from './planAccessRules';
 import type { EntitlementContext } from './workflowRules';
 
 const CLOCK: Clock = { now: '2027-04-06T02:00:00.000Z', tz: TZ };
@@ -304,6 +304,48 @@ describe('linkCandidatePlans — where a goal may link up to', () => {
 
   it('missing plans are skipped', () => {
     expect(linkCandidatePlans(emp, [emp, company], ctx).map((x) => x.id)).toEqual(['company']);
+  });
+});
+
+describe('cascadeTargetPlans — the unit plans a unit goal may cascade down to', () => {
+  const t = buildTenant('t1');
+  const today = '2027-02-15';
+  // root (Company) → sales → salesA / salesB (Inactive); root → ops.
+  const p = (id: string, o: Partial<GoalPlan>) => plan({ id, cycleId: 'c', ownerType: 'OrgUnit', ownerEmployeeId: null, ownerOrgUnitId: null, ...o });
+  const company = p('company', { ownerType: 'Company', ownerOrgUnitId: t.unit('root') });
+  const sales = p('sales', { ownerOrgUnitId: t.unit('sales') });
+  const salesA = p('salesA', { ownerOrgUnitId: t.unit('salesA') });
+  const salesB = p('salesB', { ownerOrgUnitId: t.unit('salesB') });
+  const ops = p('ops', { ownerOrgUnitId: t.unit('ops') });
+  const emp = p('emp', { ownerType: 'Employee', ownerEmployeeId: t.employee('emp') });
+  const ids = (plans: GoalPlan[]) => plans.map((x) => x.id);
+
+  it('the company: the nearest planned unit on each branch — a planned unit hides the plans below it', () => {
+    expect(ids(cascadeTargetPlans(company, [company, sales, salesA, ops, emp], t.orgUnits, today))).toEqual(['sales', 'ops']);
+  });
+
+  it('a unit without a plan is passed through (Company → Phòng when the Khối has none)', () => {
+    expect(ids(cascadeTargetPlans(company, [company, salesA, ops], t.orgUnits, today))).toEqual(['salesA', 'ops']);
+    expect(ids(cascadeTargetPlans(sales, [company, sales, salesA], t.orgUnits, today))).toEqual(['salesA']);
+  });
+
+  it('a unit no longer in use is skipped; a closed-dated one too', () => {
+    expect(ids(cascadeTargetPlans(sales, [sales, salesA, salesB], t.orgUnits, today))).toEqual(['salesA']);
+    const closed = t.orgUnits.map((u) => (u.id === t.unit('ops') ? { ...u, effectiveTo: '2027-01-31' } : u));
+    expect(ids(cascadeTargetPlans(company, [company, sales, ops], closed, today))).toEqual(['sales']);
+  });
+
+  it('a broken tree with a loop (A → B → A) ends; an Inactive unit\'s own plan is not offered', () => {
+    const looped = [...t.orgUnits.filter((u) => u.id !== t.unit('sales')), { ...t.orgUnits.find((u) => u.id === t.unit('sales'))!, parentId: t.unit('salesA') }];
+    expect(ids(cascadeTargetPlans(salesA, [salesA, sales], looped, today))).toEqual(['sales']);
+    expect(ids(cascadeTargetPlans(sales, [sales, salesB], t.orgUnits, today))).toEqual([]);
+  });
+
+  it('same cycle only; never an Employee plan; nothing below a leaf unit or from an Employee plan', () => {
+    const old = p('old', { cycleId: 'old', ownerOrgUnitId: t.unit('ops') });
+    expect(ids(cascadeTargetPlans(company, [company, old, emp], t.orgUnits, today))).toEqual([]);
+    expect(cascadeTargetPlans(ops, [company, ops, sales], t.orgUnits, today)).toEqual([]);
+    expect(cascadeTargetPlans(emp, [company, sales], t.orgUnits, today)).toEqual([]);
   });
 });
 

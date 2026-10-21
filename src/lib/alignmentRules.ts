@@ -46,7 +46,7 @@ export interface CascadeChild {
 export interface AllocationBuckets {
   /** The parent's numeric target; `null` for a TEXT goal (nothing to split). */
   target: number | null;
-  /** "Phân bổ nhân viên" — Σ allocated to children whose owner is still employed. */
+  /** "Đã giao" — Σ allocated to children (units or employees) whose owner is still employed. */
   assigned: number;
   /** "Tự giao" — the parent's `selfAssignedValue`. */
   selfAssigned: number;

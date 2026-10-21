@@ -208,6 +208,9 @@ export const ISSUE_DETAILS = [
   'CONNECTION_INACTIVE', 'NO_MAPPED_GOAL', 'NO_PERIOD_TARGET', 'HUMAN_ACTUAL_KEPT',
   // the data-source catalogue form (WBS 4.4.1)
   'FIELD_REQUIRED', 'SOURCE_CODE_TAKEN',
+  // workflowRules.canStartForm — a form started by hand (BR-KPI-15, 19)
+  'PLAN_REQUIRED', 'EMPLOYEE_PLAN_BY_LAUNCH', 'SUBJECT_NOT_OWNER', 'PLAN_LOCKED', 'REGISTRATION_ALREADY_OPEN',
+  'CYCLE_NOT_OPEN', 'DUE_DATE_INVALID', 'PLAN_NOT_LOCKED', 'CHANGE_ALREADY_OPEN', 'NOT_STARTABLE', 'PERIOD_NOT_ALLOWED',
 ] as const;
 export type IssueDetail = (typeof ISSUE_DETAILS)[number];
 
@@ -247,6 +250,17 @@ export const ISSUE_DETAIL_COPY: Readonly<Record<IssueDetail, string>> = {
   HUMAN_ACTUAL_KEPT: 'Đã có số nhập tay hoặc Excel, giữ nguyên và bỏ qua.',
   FIELD_REQUIRED: 'Hãy nhập trường này.',
   SOURCE_CODE_TAKEN: 'Mã nguồn này đã có. Hãy dùng mã khác.',
+  PLAN_REQUIRED: 'Chọn Goal Plan để bắt đầu đăng ký.',
+  EMPLOYEE_PLAN_BY_LAUNCH: 'Phiếu đăng ký của nhân viên được tạo khi khởi chạy, không bắt đầu thủ công.',
+  SUBJECT_NOT_OWNER: 'Đơn vị chưa có trưởng đơn vị. Chỉ định trưởng đơn vị ở Cơ cấu tổ chức rồi bắt đầu đăng ký.',
+  PLAN_LOCKED: 'Goal Plan đã khóa. Muốn thay đổi, tạo phiếu điều chỉnh KPI.',
+  REGISTRATION_ALREADY_OPEN: 'Goal Plan này đang có phiếu đăng ký chưa hoàn thành.',
+  CYCLE_NOT_OPEN: 'Chu kỳ không còn nhận đăng ký (đang đánh giá hoặc đã đóng).',
+  DUE_DATE_INVALID: 'Hạn xử lý phải từ hôm nay trở đi.',
+  PLAN_NOT_LOCKED: 'Chỉ tạo phiếu điều chỉnh cho Goal Plan đã khóa.',
+  CHANGE_ALREADY_OPEN: 'Goal Plan này đang có phiếu điều chỉnh chưa hoàn thành.',
+  NOT_STARTABLE: 'Phiếu đánh giá được tạo khi khởi chạy, không bắt đầu thủ công.',
+  PERIOD_NOT_ALLOWED: 'Phiếu đăng ký và phiếu điều chỉnh không gắn với một kỳ.',
 };
 
 const isIssueDetail = (value: string): value is IssueDetail => Object.prototype.hasOwnProperty.call(ISSUE_DETAIL_COPY, value);

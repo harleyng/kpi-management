@@ -393,7 +393,7 @@ export function useCascadeGoal() {
         } catch (cleanup) {
           toastWriteError(cleanup, {
             persistent: true,
-            description: `Phân giao không thành công và chưa xóa được chỉ tiêu "${child.name}" vừa tạo trong Goal Plan của nhân viên. Hãy xóa chỉ tiêu đó.`,
+            description: `Phân giao không thành công và chưa xóa được chỉ tiêu "${child.name}" vừa tạo trong Goal Plan nhận phân giao. Hãy xóa chỉ tiêu đó.`,
           });
           throw new CascadeOrphanError(child, error);
         }
@@ -429,7 +429,7 @@ function useClock(): () => Clock {
 }
 
 /** The session directory as the actor rules read it (`null` until loaded). */
-function useActorDirectory(): { dir: ActorDirectory | null; query: QueryState } {
+export function useActorDirectory(): { dir: ActorDirectory | null; query: QueryState } {
   const { tenantId } = useSession();
   const query = useSessionDirectory(tenantId);
   const dir = useMemo<ActorDirectory | null>(
@@ -634,15 +634,19 @@ export function usePlanSummaries(plans: readonly GoalPlan[] | undefined) {
 }
 
 /**
- * Whether the signed-in person may edit each EMPLOYEE plan of `plans` now (a cascade needs it for the
- * report's plan, BR-KPI-12 step 1) — UNKNOWN for all while an input is loading, and always UNKNOWN for a
- * Company / OrgUnit plan (its forms are not read here; use `usePlanWorkspace` for one).
+ * Whether the signed-in person may edit each plan of `plans` now (a cascade needs it for the target
+ * plan, BR-KPI-12 step 1) — UNKNOWN for all while an input is loading or failed. Employee plans read
+ * the GOAL_SETTING forms of their owners; when a Company / OrgUnit plan is present, every GOAL_SETTING
+ * form is read instead of filtering by the unit head, because a form keeps the subject it was started
+ * with: a head who changes mid-registration must not make the plan look free (the gateway finds the
+ * open form by plan, `assertPlanEditable`).
  */
 export function usePlansEditability(plans: readonly GoalPlan[] | undefined, cycles: readonly PerformanceCycle[] | undefined) {
   const { user, access } = useSession();
   const clock = useClock();
+  const hasUnitPlan = (plans ?? []).some((p) => p.ownerType !== 'Employee');
   const subjectIds = useMemo(() => sortedIds([...new Set((plans ?? []).map((p) => p.ownerEmployeeId).filter((id): id is Id => id !== null))]), [plans]);
-  const forms = useFormList({ formType: 'GOAL_SETTING', subjectEmployeeIds: subjectIds }, { enabled: plans !== undefined });
+  const forms = useFormList(hasUnitPlan ? { formType: 'GOAL_SETTING' } : { formType: 'GOAL_SETTING', subjectEmployeeIds: subjectIds }, { enabled: plans !== undefined });
   const steps = useWorkflowSteps();
   const delegations = useDelegations();
   const { dir, query: dirQuery } = useActorDirectory();
@@ -651,7 +655,7 @@ export function usePlansEditability(plans: readonly GoalPlan[] | undefined, cycl
     const result = new Map<Id, PlanEditability>();
     for (const plan of plans ?? []) {
       const cycle = cycles?.find((c) => c.id === plan.cycleId);
-      if (!forms.data || !steps.data || !delegations.data || !dir || !cycle || plan.ownerEmployeeId === null) {
+      if (!forms.data || !steps.data || !delegations.data || !dir || !cycle) {
         result.set(plan.id, UNKNOWN_EDITABILITY);
         continue;
       }
