@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField, RequiredLegend } from '@/components/shared/FormField';
+import { InlineNotice } from '@/components/shared/InlineNotice';
 import { toastError, toastSuccess } from '@/components/shared/notify';
 import {
   AGGREGATION_LABEL,
@@ -301,7 +302,7 @@ function KpiDefinitionSheetInner({
                 label="Nguồn dữ liệu mặc định"
                 required={form.status === 'Active'}
                 error={errorOf('defaultDataSourceId') ?? (sourceMissing ? issueMessage({ code: 'ERR-KPI-06', ref: null, detail: 'DATA_SOURCE_REQUIRED', data: null }) : undefined)}
-                hint="Báo cáo hoặc hệ thống lấy số (KPI phải đo được), làm mặc định cho mục tiêu tạo từ chỉ tiêu này. Không phải kết nối: trong P1 số được nhập tay hoặc import Excel."
+                hint="Mục tiêu tạo từ chỉ tiêu này lấy nguồn này làm mặc định (KPI phải đo được)."
               >
                 {(control) => (
                   <Select value={form.defaultDataSourceId} onValueChange={(v) => set('defaultDataSourceId', v)} disabled={readOnly}>
@@ -319,6 +320,9 @@ function KpiDefinitionSheetInner({
                   </Select>
                 )}
               </FormField>
+              <InlineNotice tone="warning" title="Phase 1: nguồn dữ liệu không phải kết nối">
+                Nguồn chỉ ghi số lấy từ báo cáo hoặc hệ thống nào. Trong P1, số thực tế của mọi nguồn đều được nhập tay hoặc import Excel; chưa tích hợp API hay hệ thống khác.
+              </InlineNotice>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <FormField label="Tần suất" required error={errorOf('frequency')}>

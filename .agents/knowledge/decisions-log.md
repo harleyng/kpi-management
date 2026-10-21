@@ -21,8 +21,9 @@ Sale đẩy số"); readers would plan the rollout around an integration that is
 `docs/plans/KPI_repo_plan.md` §1 and WBS 4.4.4–4.4.5.
 
 **Follow-up (same day).** Choosing a KPI's data source stays in P1 — BR-KPI-05 requires it — but it read as
-setting up an integration. The library form's hint now says the source is the report or system the number
-comes from, not a connection, and that P1 numbers are entered by hand or by Excel. BR-KPI-05 says the same.
+setting up an integration. The library form shows a yellow warning notice under the field ("Phase 1: nguồn dữ liệu
+không phải kết nối" — the source is the report or system the number comes from; P1 numbers are entered by
+hand or by Excel). The product owner asked for a banner rather than a field hint. BR-KPI-05 says the same.
 
 ---
 
