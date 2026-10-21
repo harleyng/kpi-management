@@ -20,6 +20,10 @@ Sale đẩy số"); readers would plan the rollout around an integration that is
 **Updated alongside.** `business-rules.md` BR-KPI-55, 56; `docs/flows/new-flow.md` §1, §4, §4E, §7;
 `docs/plans/KPI_repo_plan.md` §1 and WBS 4.4.4–4.4.5.
 
+**Follow-up (same day).** Choosing a KPI's data source stays in P1 — BR-KPI-05 requires it — but it read as
+setting up an integration. The library form's hint now says the source is the report or system the number
+comes from, not a connection, and that P1 numbers are entered by hand or by Excel. BR-KPI-05 says the same.
+
 ---
 
 ## 2026-10-21 — "Thêm từ bộ mẫu": a KPI template is applied to a Goal Plan, append-only

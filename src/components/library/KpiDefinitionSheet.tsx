@@ -301,7 +301,7 @@ function KpiDefinitionSheetInner({
                 label="Nguồn dữ liệu mặc định"
                 required={form.status === 'Active'}
                 error={errorOf('defaultDataSourceId') ?? (sourceMissing ? issueMessage({ code: 'ERR-KPI-06', ref: null, detail: 'DATA_SOURCE_REQUIRED', data: null }) : undefined)}
-                hint="Mục tiêu tạo từ chỉ tiêu này lấy nguồn này làm mặc định (KPI phải đo được)."
+                hint="Báo cáo hoặc hệ thống lấy số (KPI phải đo được), làm mặc định cho mục tiêu tạo từ chỉ tiêu này. Không phải kết nối: trong P1 số được nhập tay hoặc import Excel."
               >
                 {(control) => (
                   <Select value={form.defaultDataSourceId} onValueChange={(v) => set('defaultDataSourceId', v)} disabled={readOnly}>

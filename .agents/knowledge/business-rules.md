@@ -92,8 +92,10 @@ example of today's practice. A CMC feature Syntra has not confirmed is **not in 
 - **BR-KPI-05** — **Every KPI has a data source** ("KPI phải đo được"). A goal without one cannot be
   saved: the column is required and must resolve in the tenant (the integrity check, ERR-KPI-06), and the
   goal editor requires it. Other fields (weight > 0, a target, dates in order) are checked on **Gửi**
-  (`submitIssues`), so a draft can be saved while it is being built (T3). *Source: NoteX minutes §2.3; ERD
-  `GOAL.data_source_id` (required).*
+  (`submitIssues`), so a draft can be saved while it is being built (T3). The data source names the
+  report or system the number is read from (ERP Sale, MHTC, CMS báo cáo kế toán…) — provenance, not a
+  connection: in Phase 1 every actual is entered by hand or imported from Excel, whatever the source
+  (BR-KPI-55, 56). *Source: NoteX minutes §2.3; ERD `GOAL.data_source_id` (required).*
 - **BR-KPI-06** — Every KPI belongs to exactly one **BSC perspective**. DATX's "Hiệu quả / Khối lượng /
   Chi phí" classification is a secondary tag only (`ASSUMPTION Q5`). The KRI type (KRItc / KRIpt) is
   hidden until its meaning is confirmed (`ASSUMPTION Q6`, D4). *Source: HR guide p. 22; DATX sheet
