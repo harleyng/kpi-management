@@ -30,6 +30,9 @@
 > Q38`, `Q39`) and the result screens; the glossary below gained the result and pay terms.
 > **Phase 3 (2026-10-19)** added §11 — the live dashboard and the simulated assistant (BR-KPI-83…89,
 > `ASSUMPTION Q40`–`Q43`) — in `src/lib/dashboardRules.ts` and `src/integrations/insight/`.
+> **22/10/2026 meeting** added §12 — changes the business **decided but the prototype does not do yet**
+> (PEND-01…13, `ASSUMPTION Q44`–`Q58`). The rules above stay authoritative for the code until each
+> change is built; a rule it will replace carries a *Pending* note.
 
 ---
 
@@ -125,6 +128,7 @@ proxy (`form.proxy`, both recorded). The CEO, owner of the Company plan, cannot 
 A **link**'s `contributionPct` (0, 100] is informational only
 (`ASSUMPTION Q31`).
 *Source: HR guide p. 24; email template steps 1–2.*
+  > **Pending (22/10/2026 meeting, §12):** PEND-03 — the chain is Company → Khối → Phòng → employee. Cascading to the nearest planned units is built (unit targets, above); still open: whether every Khối holds a plan, and the direct vs Khối manager (`Q40`, `Q56`).
 - **BR-KPI-08** — A goal is **public or private** (visibility, D2). A PRIVATE goal is seen only by its
   owner (the goal's, or the plan's — the unit head for a unit plan), anyone in that owner's manager chain
   today, and holders of a Tenant scope over plans (HR, C&B, BOD, Admin) (`planAccessRules.canSeeGoal`,
@@ -145,6 +149,7 @@ A **link**'s `contributionPct` (0, 100] is informational only
   `SPLIT_NO_AGGREGATION` (a typed-in KPI: the split applies to its months only). It shows on the goal row and
   the plan's readiness strip, because quarters and the year are built from the month splits
   (`resultRules`). *Source: DATX column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
+  > **Pending (22/10/2026 meeting, §12):** PEND-04, 05 — an annual target is split straight into quarters (even or typed in), and quarters are tracked cumulatively against the year (`Q50`, `Q51`).
 
 ## 2. Processes (P1)
 
@@ -160,6 +165,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   **Approved** when a reviewer already approved, and **Locked** on the final APPROVE; cancelling the
   form puts it back to Draft. 100% / 5–8 goals is required only from the owner's step on — the
   manager's step-1 SUBMIT hands an unfinished plan to the employee (`formRules.canSubmit`).
+  > **Pending (22/10/2026 meeting, §12):** PEND-01, 02 — step 1 becomes optional so an employee can register bottom-up without a cascade (`Q44`, `Q45`), and step 4 can be configured to record and lock automatically (`Q46`).
 - **BR-KPI-13** — When a step's deadline passes, the step's **overdue behaviour** applies, and it is
   configured per step: **lock** the Goal Plan (registration: "the goal plan will be locked and can not be
   editable after running out of time"), **auto-forward** to the next actor (evaluation: an employee who
@@ -201,9 +207,11 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-16** — **Evaluation runs in three steps**: (1) the employee self-assesses each goal (% and
   explanation) with evidence; (2) the direct manager scores each goal (% and comment); (3) HR/C&B records
   the final % per goal. *Source: NoteX minutes §2.3; Manager guide pp. 98–109; SF4C PMGM.12.*
+  > **Pending (22/10/2026 meeting, §12):** PEND-07, 08 — the self % is computed by the system, not typed (`Q49`); the direct manager decides the result and HR only records it, editing in special cases (`Q47`).
 - **BR-KPI-17** — On the evaluation form the **actual value comes from the actuals data (T4) and is
   read-only**; the form shows target/levels, actual, self %, manager %, final %, evidence, and the
   computed total score. *Source: plan §5.5.*
+  > **Pending (22/10/2026 meeting, §12):** PEND-06 — the employee enters the actual, with evidence, on step 1 of the form; it is no longer read-only (`Q48`, replaces `Q33`).
 - **BR-KPI-18** — A form can be **submitted** only when the weights sum to 100% (BR-KPI-04) and every
   item that requires a score or comment at that step has one (`formRules.canSubmit`, D6). *Source:
   Manager guide p. 26.*
@@ -306,6 +314,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
   Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
   **monthly** (`ASSUMPTION Q3`).
+  > **Pending (22/10/2026 meeting, §12):** PEND-09, 10 — the formal evaluation is quarterly and annual, monthly is continuous evaluation (`Q52`); probation evaluation moves into P1 (`Q53`).
 
 ## 3. Calculation
 
@@ -722,8 +731,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | # | Question | Default in use | Rules affected |
 |---|---|---|---|
 | Q1 | Does LEVELS interpolate between L1–L2–L3? | Yes, linear, capped at the top level | BR-KPI-33 |
-| Q2 | The rating scale and payout table? | Sample A+/A/B/C/D, marked as an assumption | BR-KPI-41, 42 |
-| Q3 | Main evaluation monthly or quarterly? | Monthly | BR-KPI-22, seed |
+| Q2 | The rating scale and payout table? | Sample A+/A/B/C/D, marked as an assumption — **22/10:** chị Phương to send the real conversion table | BR-KPI-41, 42 |
+| Q3 | Main evaluation monthly or quarterly? | Monthly — **22/10 answered: quarterly and annual; monthly is continuous** — not built (PEND-09, `Q52`) | BR-KPI-22, seed |
 | Q4 | Is "Tỉ lệ KH cũ" higher-is-better? | Yes | BR-KPI-34 |
 | Q5 | BSC or "Hiệu quả / Khối lượng / Chi phí"? | BSC primary, the other a secondary tag | BR-KPI-06 |
 | Q6 | What are KRItc / KRIpt? | Field hidden | BR-KPI-06 |
@@ -753,17 +762,32 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q30 | Size and format limits of attachments? No source states them | 10 MB; PDF, images, Word, Excel, CSV, text | BR-KPI-48 |
 | Q31 | What does a LINK's `contributionPct` mean (a share of the parent's target, or of the child's result)? | Informational only — shown, never computed | BR-KPI-07 |
 | Q32 | In a cycle that does not start in January, is Q1 January–March or the cycle's first three months? | The cycle's first three months | BR-KPI-27 |
-| Q33 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) | BR-KPI-52 |
+| Q33 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) — **22/10: the employee enters it on the form** — not built (PEND-06, `Q48`) | BR-KPI-52 |
 | Q34 | Can C&B upload the import file (`system.uploadFile` needs `evidence.upload`)? | Resolved: yes — a C&B account with an employee record holds EMPLOYEE (BR-KPI-62), whose `evidence.upload` covers a file upload. A C&B system account without an employee could not; none exists | BR-KPI-54, 57 |
 | Q35 | May actuals be recorded for a goal whose plan is not yet Approved / Locked? | No — refused (ERR-KPI-04 `PLAN_NOT_APPROVED`). A plan HR reopens takes no new actual until re-approved | BR-KPI-52 |
 | Q36 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
 | Q37 | May an API sync overwrite a number a person entered (manual or Excel)? | No — the goal is skipped and logged; an Excel import does overwrite (HR's act, with a warning) | BR-KPI-56 |
 | Q38 | Which results may be exported to payroll, and does exporting lock them? | Employee results that are Final OR Locked; exporting changes no status (locking stays HR's separate act) | BR-KPI-43, 45 |
 | Q39 | A finalised result with no payout % (no rule, no rating) — block the export, or export it? | Export it with a blank % and a note; never 0, never blocking (a Final result is frozen) | BR-KPI-81 |
-| Q40 | A Khối (or any unit) has no plan of its own: what is its score? | None — "Chưa có kế hoạch". Beside it, the UNWEIGHTED mean of its people's official (Final / Locked) results, labelled "Điểm trung bình nhân viên (không trọng số)" with its n/m; `null`, never 0, when nobody counts. Never ranked against a plan score | BR-KPI-85 |
+| Q40 | A Khối (or any unit) has no plan of its own: what is its score? | None — "Chưa có kế hoạch". Beside it, the UNWEIGHTED mean of its people's official (Final / Locked) results, labelled "Điểm trung bình nhân viên (không trọng số)" with its n/m; `null`, never 0, when nobody counts. Never ranked against a plan score — **22/10: a Khối director receives KPIs**, so a Khối may need its own plan (PEND-03, `Q56`) | BR-KPI-85 |
 | Q41 | When does a goal / a result "need attention"? | A goal below 90% achievement (exactly 90 is not; a fixed number, independent of the rating scale); a goal with no achievement is "Thiếu số liệu", never a warning. A result whose rating is one of the scale's two lowest bands (one on a scale of < 3) | BR-KPI-86 |
 | Q42 | What does the dashboard compare a period with? | The previous period of the same type in the same cycle — never an earlier one that happens to have data. Points, rounded once; "(tạm tính)" when a Draft is on either side; none for the first period | BR-KPI-87 |
 | Q43 | Under which unit does someone who moved (E021) or left (E024) count? | The unit they sat in on the period's last day (their last working day when earlier) — per period: earlier months under the old unit. Someone with no primary assignment then is "chưa xếp đơn vị", shown to a tenant-wide viewer only | BR-KPI-84 |
+| Q44 | Does a manager get their own KPIs top-down or bottom-up? | Both, like an employee | PEND-01, BR-KPI-12 |
+| Q45 | Bottom-up: where does a registration form start when the manager cascades nothing? | Step 1 becomes optional — the manager sends it on with nothing cascaded, or HR launches straight into the employee's step | PEND-01, BR-KPI-12, 19 |
+| Q46 | Where is automatic record-and-lock configured, and what is the default? | On the registration workflow template; manual by default | PEND-02, BR-KPI-12, 14 |
+| Q47 | How does HR edit a result "in special cases"? | HR edits the FINAL column with a required reason, audited; the FINAL column defaults to the manager's | PEND-08, BR-KPI-16, 23 |
+| Q48 | The employee enters the actual on the form: does manual entry by manager / HR (BR-KPI-52) stay, and which number wins? | Manual entry stays; the form's actual is entered by the employee at step 1 and may be corrected by the manager at step 2 | PEND-06, BR-KPI-17, 52 |
+| Q49 | May the system-computed % be overridden? | Not by the employee; the manager may, with a comment | PEND-07, BR-KPI-16, 32 |
+| Q50 | The minutes' quarterly example (500 tr + 2 tỷ + 5 tỷ + 10 tỷ = 17.5 tỷ) does not equal the 15 tỷ annual target — are quarter targets per quarter or cumulative? | Per quarter; a total that does not match is a warning (BR-KPI-11) | PEND-04, BR-KPI-11 |
+| Q51 | How is "lũy kế" (cumulative) computed for ratios and stock? | By the KPI's aggregation from the cycle start: SUM → running sum, AVG → running mean, LAST → the latest value | PEND-05, BR-KPI-11, 44 |
+| Q52 | Is the monthly continuous evaluation scored and paid? Which period produces the payout %? | Monthly is tracked, not paid; quarters and the year are scored and paid | PEND-09, BR-KPI-19, 40, 44 |
+| Q53 | Probation evaluation: steps, criteria (KPI or competency), trigger? | Not designed yet | PEND-10 |
+| Q54 | Does "manual only in P1" also drop the Excel import of actuals? | **Resolved (product owner, 2026-10-21):** no — hand entry and Excel import in P1; the API sync stays on simulated data, tagged "Phase sau" | PEND-11, BR-KPI-53…56 |
+| Q55 | The PMGM guide has 5 calculation methods; the prototype has 6 — which goes? | Keep all 6 until checked against the guide | PEND-11, BR-KPI-30 |
+| Q56 | Does a Khối hold its own Goal Plan? How does a direct manager differ from a Khối manager? | A Khối has a plan when its director receives KPIs; BA to clarify (Trang's action item) | PEND-03, BR-KPI-01, 07, 85; Q40 |
+| Q57 | Historical import: which data (actuals, results, ratings), how many years, shown where? | Not built — low priority | PEND-12 |
+| Q58 | Is the dashboard's "6 tháng" the cycle's half or the last six months? | The cycle's half (period type Half) | PEND-13, BR-KPI-87 |
 
 ## 9. Roles, permissions and data scope (Phase 1.3)
 
@@ -939,3 +963,32 @@ no source and are Syntra decisions (`docs/source-map.md`).*
   question → ERR-KPI-06. Labelled "Giả lập" wherever it speaks; nothing it says feeds a score. A real
   model (out of P1) would get the same snapshot as its only context.
 
+
+## 12. Pending changes — 22/10/2026 meeting (decided, not yet built)
+
+The business confirmed these in the system design meeting (NoteX, 22/10/2026 — `docs/source-map.md`;
+proposal and diagrams: `docs/flows/new-flow.md` §4G). **None is in the prototype yet**: until a change
+is built, the rule it names stays authoritative. Building one moves its text into that rule, removes the
+*Pending* note there, and deletes the row here. Open points are `ASSUMPTION Q44`–`Q58` (§8). Lanes per
+`CLAUDE.md`: Workflow = workflow-expert + system-architect; KPI Rules = hr-performance-expert + qa.
+
+| Code | Change | Replaces / affects | Open points | Lane |
+|---|---|---|---|---|
+| PEND-01 | **Top-down and bottom-up registration run in parallel.** An employee may create their own KPIs and link them to a superior's goal when one exists; the manager's cascade step is no longer required first. The manager approves and may add or edit goals | BR-KPI-12, 19, 28 | Q44, Q45 | Workflow |
+| PEND-02 | **Step 4 "record and lock" is configurable**: automatic on the manager's approval, or manual by HR. HR (e.g. the HR head) may review and send the plan back to the manager | BR-KPI-12, 14 | Q46 | Workflow |
+| PEND-03 | **Cascade chain Company → Khối → Phòng → employee**; a superior's KPI can be cascaded to a unit or to a named employee. *Partly built 2026-10-21:* a Company / OrgUnit goal cascades to the nearest planned units below (BR-KPI-07 unit targets). Left: a plan for every Khối whose director receives KPIs, the dashboard's Khối score (Q40), the direct vs Khối manager | BR-KPI-01, 07, 85 | Q40, Q56 | Large (fixtures) |
+| PEND-04 | **Annual target split into quarters** (or months) in the same cycle — even split or typed in | BR-KPI-11, 44 | Q50 | KPI Rules |
+| PEND-05 | **Cumulative (lũy kế) tracking** of quarter / month figures against the annual plan, on results and dashboards | BR-KPI-44, 83…88 | Q51 | KPI Rules |
+| PEND-06 | **The employee enters the actual** (e.g. sales) with evidence (file, report link) at step 1 of the evaluation | BR-KPI-17, 52; `Q33` | Q48 | Workflow + KPI Rules |
+| PEND-07 | **The system computes the achievement %** from the actual and the assigned target, by the goal's method (`calcRules.achievement`) — not typed by the employee | BR-KPI-16, 32 | Q49 | KPI Rules |
+| PEND-08 | **The direct manager decides the result; HR does not approve it** — HR records the manager's result and may edit it in special (ad hoc) cases | BR-KPI-16, 23 | Q47 | Workflow |
+| PEND-09 | **Evaluation cadence**: formal evaluation quarterly and annual; monthly is continuous evaluation | BR-KPI-19, 22, 40, 44; `Q3` | Q52 | Workflow + KPI Rules |
+| PEND-10 | **Probation evaluation** (thử việc → chính thức) moves into P1 (item 3, after items 1 and 4) | `FORM_TYPES` (`PROBATION_EVAL`, P2 today) | Q53 | Large |
+| PEND-11 | **Manual data only in P1**; the library's calculation methods follow the PMGM guide's five. *Data part built 2026-10-21:* actuals by hand and Excel import, the API sync tagged "Phase sau" (BR-KPI-55, 56; product owner kept Excel, Q54). Left: the five methods | BR-KPI-30 | Q55 | KPI Rules |
+| PEND-12 | **Historical data import** (e.g. 10 years of Excel) by C&B / HR — low priority | — (new) | Q57 | Large |
+| PEND-13 | **Role dashboards**: leadership (BSC by company / Khối / unit), manager (direct reports' KPIs, registration status, results), HR (registration forms, overdue forms, results by period); filters by month, quarter and 6 months, with cumulative figures | BR-KPI-83…88 | Q51, Q58 | Medium |
+
+**Scope (plan level).** Phase 1 = item 1 (quarterly and annual KPI assignment and evaluation), item 4
+(monthly continuous evaluation and the dashboard), item 3 (probation evaluation); build 1 and 4 first.
+Phase 2 = 360 review, Bell Curve, training and development (OD), competency. Pilot at two companies at
+once, then the other member companies. Setup order: org structure → KPI library → cycle.

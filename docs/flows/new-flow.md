@@ -315,6 +315,101 @@ flowchart LR
   thấp nhất, so với kỳ trước, chỉ tiêu cần chú ý, phiếu quá hạn) — chỉ từ số liệu đang hiển thị trong
   phạm vi người xem. Không phải đánh giá chính thức; không ảnh hưởng điểm.
 
+## 4G. Điều chỉnh sau buổi họp 22/10/2026 — đã thống nhất, **chưa làm vào prototype**
+
+> Nguồn: biên bản NoteX "Thiết kế và Phát triển Hệ thống Quản trị KPI" (22/10/2026, `docs/source-map.md`).
+> Các mục dưới đây **thay thế** phần tương ứng ở mục 2, 4, 4E, 4F khi được làm; cho tới lúc đó prototype vẫn
+> chạy như các mục trên. Mã `PEND-xx` khớp với `business-rules.md` §12. Điểm chưa rõ nằm ở mục 6 (Q44–Q57).
+
+### Đăng ký KPI: cả hai luồng chạy song song (PEND-01, 02, 03)
+
+```mermaid
+sequenceDiagram
+  participant HR as HR / C&B
+  participant QL as Quản lý trực tiếp
+  participant NV as Nhân viên
+  participant SYS as Hệ thống
+  HR->>QL: Khởi chạy phiếu đăng ký
+  alt Top-down — quản lý chủ động giao
+    QL->>NV: B1. Giao chỉ tiêu (cascade) từ KPI của mình
+  else Bottom-up — nhân viên tự đề xuất
+    Note over QL,NV: Không cần B1 — nhân viên tự lập
+  end
+  NV->>QL: B2. Tự tạo / bổ sung chỉ tiêu, liên kết lên KPI cấp trên (nếu có), đủ 100% → Gửi
+  alt Cần sửa
+    QL-->>NV: B3. Trả lại
+  else Đồng ý
+    Note over QL: B3. Duyệt — được thêm hoặc sửa chỉ tiêu trước khi duyệt
+  end
+  alt Ghi nhận tự động (cấu hình)
+    SYS->>SYS: B4. Tự ghi nhận và khóa Goal Plan
+  else Ghi nhận thủ công
+    HR->>HR: B4. Xem, ghi nhận và khóa
+    HR-->>QL: Chỉ tiêu chưa hợp lý → phản hồi quản lý điều chỉnh
+  end
+```
+
+- **Chuỗi phân bổ Công ty → Khối → Phòng → Nhân viên.** KPI cấp trên giao xuống được cho **một đơn vị**
+  (phòng ban) hoặc **một nhân viên cụ thể**. Giám đốc khối nhận KPI từ công ty (xem Q56 về Goal Plan của Khối).
+  Phần giao xuống Goal Plan đơn vị gần nhất đã làm ngày 21/10 (mục 2).
+- **Nhân viên tự tạo KPI** và liên kết lên chỉ tiêu cấp trên nếu có; không bắt buộc quản lý giao trước.
+  Cách quản lý nhận KPI của chính mình (top-down hay bottom-up) chưa chốt (Q44).
+- **B4 của HR là "ghi nhận và khóa"**, cấu hình được tự động hoặc thủ công (Q46). HR (ví dụ Trưởng phòng Nhân
+  sự) được xem và phản hồi quản lý khi chỉ tiêu không hợp lý.
+
+### Phân bổ mục tiêu năm theo quý và theo dõi lũy kế (PEND-04, 05)
+
+- KPI giao **cho cả năm** (ví dụ doanh thu 15 tỷ), rồi phân bổ cho từng **quý** (hoặc tháng) trong cùng chu
+  kỳ — **chia đều** hoặc **nhập tay** từng quý (ví dụ Q1 500 triệu, Q2 2 tỷ, Q3 5 tỷ, Q4 10 tỷ — xem Q50).
+- Chỉ tiêu quý / tháng được theo dõi **lũy kế** (từ đầu chu kỳ đến kỳ đang xem) so với kế hoạch năm (Q51).
+
+### Đánh giá KPI: nhân viên nhập kết quả, hệ thống tính % (PEND-06, 07, 08)
+
+```mermaid
+sequenceDiagram
+  participant NV as Nhân viên
+  participant SYS as Hệ thống
+  participant QL as Quản lý trực tiếp
+  participant HR as HR / C&B
+  NV->>SYS: B1. Nhập kết quả thực tế (ví dụ doanh số) + bằng chứng (tệp, link báo cáo)
+  SYS->>SYS: Tự tính % hoàn thành = thực tế so với kế hoạch đã giao, theo phương pháp tính
+  NV->>QL: Gửi
+  QL->>QL: B2. Xem bằng chứng, xác nhận kết quả — chịu trách nhiệm cuối cùng
+  QL-->>NV: (hoặc trả lại B1)
+  QL->>HR: Gửi
+  HR->>SYS: B3. Ghi nhận kết quả của quản lý (không phê duyệt)
+  Note over HR: Trường hợp đặc biệt (ad-hoc): HR được sửa
+  SYS->>SYS: Tính điểm có trọng số → xếp loại → % lương
+```
+
+- Số **thực tế do nhân viên nhập** trên phiếu, không còn chỉ đọc (thay mục 4 và Q33; xem Q48).
+- **% hoàn thành do hệ thống tính**, nhân viên không tự gõ % (Q49).
+- **Quản lý trực tiếp quyết định** kết quả. **HR không duyệt**, chỉ ghi nhận; sửa trong trường hợp đặc biệt (Q47).
+
+### Phạm vi và nhịp đánh giá (PEND-09…12)
+
+- **Phase 1** gồm: (mục 1) giao nhận và đánh giá KPI **theo quý và năm**; (mục 4) đánh giá hiệu suất **liên
+  tục hằng tháng** và dashboard; (mục 3) **đánh giá thử việc lên chính thức**. Làm mục 1 và 4 trước, rồi mục 3.
+- **Phase 2**: đánh giá 360 độ, Bell Curve (phân bổ chuẩn), đào tạo và phát triển (OD), năng lực (Competency).
+- **Nhịp đánh giá** (thay Q3): đánh giá chính thức theo quý và năm; hằng tháng là đánh giá liên tục (Q52).
+- **Đánh giá thử việc** chuyển từ P2 vào P1 (Q53).
+- **Nguồn số liệu**: Phase 1 **chỉ nhập tay** — đã làm 21/10 theo hướng nhập tay + import Excel, đồng bộ API để Phase
+  sau (Q54). Thư viện KPI theo tài liệu PMGM có **5 phương pháp tính** (Q55).
+- **Import dữ liệu lịch sử** (ví dụ 10 năm từ Excel) do C&B / HR thực hiện, **ưu tiên thấp** (Q57).
+- **Thứ tự**: cơ cấu tổ chức (công ty, phòng ban, nhân sự) → thư viện KPI → chu kỳ và các đợt đánh giá.
+- **Triển khai thử nghiệm** đồng thời cho công ty Sinh Cha và công ty chị Vinh (tên theo biên bản), sau đó mở
+  rộng ra các công ty thành viên.
+
+### Dashboard theo vai trò (PEND-13)
+
+| Người xem | Nội dung |
+|---|---|
+| Lãnh đạo | Tổng quan theo thẻ điểm cân bằng (BSC) cho công ty, khối, phòng ban |
+| Quản lý | KPI của nhân viên trực tiếp, trạng thái đăng ký, kết quả đánh giá |
+| HR | Phiếu đăng ký KPI, phiếu quá hạn, kết quả đánh giá theo kỳ |
+
+Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (Q51, Q58).
+
 ## 5. Khác biệt so với hiện tại
 
 | # | Hiện tại (`current-flow.md`) | Trên hệ thống | Lý do | Quy tắc |
@@ -328,6 +423,24 @@ flowchart LR
 | 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch (ngày 1 hằng tháng) | Không quên kỳ nào | BR-KPI-19 (D5) |
 | 8 | Mỗi phòng tự gõ bộ KPI trong sheet riêng, tổng trọng số có bộ không đủ 100% | Thư viện chỉ tiêu mẫu và bộ mẫu dùng chung; trọng số lệch được cảnh báo | Cùng tên, cùng cách tính giữa các phòng | BR-KPI-74…80 |
 
+**Thay đổi so với prototype hiện tại (buổi họp 22/10/2026, chưa làm — mục 4G):**
+
+| Mã | Prototype hiện tại | Sau buổi họp | Lý do | Ảnh hưởng |
+|---|---|---|---|---|
+| PEND-01 | Đăng ký luôn bắt đầu bằng B1 quản lý giao (BR-KPI-12) | Top-down và bottom-up song song; nhân viên tự lập không cần B1 | Doanh nghiệp dùng cả hai cách | Mẫu quy trình đăng ký, `workflowRules`, `formRules.canSubmit` |
+| PEND-02 | B4 HR ghi nhận và khóa, luôn thủ công | Cấu hình tự động hoặc thủ công | Giảm việc tay cho HR | Mẫu quy trình, `workflowRules` |
+| PEND-03 | Đã giao được từ Goal Plan công ty / đơn vị xuống đơn vị gần nhất có kế hoạch (21/10); Khối có thể không có Goal Plan (Q40) | Công ty → Khối → Phòng → NV; giao cho đơn vị hoặc NV | Đúng cơ cấu tập đoàn | Còn lại: Goal Plan của mọi Khối, điểm Khối trên dashboard (Q40, Q56) |
+| PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | `goalPlanRules`, `resultRules` |
+| PEND-05 | Không có số lũy kế | Theo dõi lũy kế so với kế hoạch năm | Quản lý thấy tiến độ năm | Quy tắc mới, kết quả, dashboard |
+| PEND-06 | Số thực tế trên phiếu chỉ đọc; nhân viên không nhập (BR-KPI-17, Q33) | Nhân viên nhập thực tế + bằng chứng trên phiếu | Nhân viên là người có số | `formRules`, `actualRules`, quyền nhập số |
+| PEND-07 | Nhân viên tự gõ % (BR-KPI-16) | Hệ thống tính % từ thực tế và kế hoạch | Tránh tự chấm cảm tính | `formRules`, `calcRules` (KPI Rules) |
+| PEND-08 | B3 "HR/C&B chốt % cuối cùng" | HR chỉ ghi nhận kết quả quản lý; sửa ad-hoc | Quản lý chịu trách nhiệm cuối cùng | Mẫu quy trình đánh giá, nhãn bước |
+| PEND-09 | Đánh giá chính theo tháng (Q3) | Chính thức theo quý và năm; tháng là đánh giá liên tục | Phạm vi P1 mục 1 và 4 | Khởi chạy, kết quả, % lương |
+| PEND-10 | Đánh giá thử việc để P2 | Vào P1 (mục 3) | Phạm vi P1 | Loại phiếu mới (lớn) |
+| PEND-11 | Nhập tay và Excel; đồng bộ API gắn nhãn "Phase sau" (đã làm 21/10) | P1 chỉ nhập tay; 5 phương pháp tính | Phạm vi P1 | Còn lại: số phương pháp tính (Q55). Product owner giữ import Excel (Q54) |
+| PEND-12 | Chưa có import dữ liệu lịch sử | Có, do C&B / HR, ưu tiên thấp | Dữ liệu tham chiếu | Tính năng mới |
+| PEND-13 | Dashboard: Tổng quan + Vận hành | Ba góc nhìn lãnh đạo / quản lý / HR; lọc tháng, quý, 6 tháng; lũy kế | Mỗi vai trò cần số khác nhau | `dashboardRules`, màn hình Dashboard |
+
 ## 6. Câu hỏi mở
 
 Danh sách đầy đủ và giá trị mặc định đang dùng: plan §9 và `business-rules.md` §8. Những câu ảnh hưởng
@@ -335,7 +448,7 @@ trực tiếp đến quy trình:
 
 | # | Câu hỏi | Mặc định | Người trả lời |
 |---|---|---|---|
-| Q3 | Đánh giá chính theo tháng hay quý? | Tháng | HR |
+| Q3 | Đánh giá chính theo tháng hay quý? | Tháng — **buổi họp 22/10 đã trả lời: quý và năm, tháng là đánh giá liên tục** (PEND-09; chi tiết còn mở ở Q52) | HR |
 | Q7 | P1 có "Lấy ý kiến", "Thêm người duyệt", bước hợp tác không? | Không (để P2) | Product owner + HR |
 | Q10 | "Kế hoạch công việc tháng" (PMGM.08) có thuộc P1 không? | Không | Product owner |
 | — | Goal Plan có trạng thái "Bị trả lại" riêng không? (Plan có, ERD chưa có) | Có — chốt ở Phase 1.1 | System architect + HR |
@@ -365,9 +478,42 @@ trực tiếp đến quy trình:
 | Q42 | Dashboard so sánh với kỳ nào? | Kỳ liền trước cùng loại trong chu kỳ; thiếu số thì không so sánh | Product owner |
 | Q43 | Nhân viên chuyển đơn vị / nghỉ việc tính ở đơn vị nào? | Đơn vị họ thuộc vào ngày cuối của từng kỳ | Product owner (đã chốt 19/10/2026) |
 
+**Câu hỏi mở từ buổi họp 22/10/2026** (mục 4G). "Đề xuất" là giá trị sẽ dùng khi làm, cho tới khi có câu trả lời.
+
+| # | Câu hỏi | Đề xuất | Người trả lời |
+|---|---|---|---|
+| Q44 | Quản lý nhận KPI của chính mình theo top-down hay bottom-up? | Cả hai, như nhân viên | Nhóm phát triển (action item) |
+| Q45 | Bottom-up: phiếu đăng ký bắt đầu ở bước nào khi quản lý không giao gì? | Bước 1 của quản lý thành tùy chọn: quản lý "Chuyển cho nhân viên" không cần giao, hoặc HR khởi chạy thẳng vào bước của nhân viên | Product owner + HR |
+| Q46 | Ghi nhận và khóa tự động cấu hình ở đâu, mặc định gì? | Theo mẫu quy trình đăng ký; mặc định thủ công | HR |
+| Q47 | HR sửa kết quả "trường hợp đặc biệt" thế nào? | Sửa cột cuối kèm lý do bắt buộc, ghi nhật ký; mặc định cột cuối = kết quả quản lý | HR + C&B |
+| Q48 | Nhân viên nhập thực tế trên phiếu: nhập tay của quản lý / HR (mục 4E) còn không, số nào thắng? | Giữ nhập tay của quản lý / HR; số trên phiếu do nhân viên nhập ở B1, quản lý sửa được ở B2 | Product owner + HR |
+| Q49 | % hệ thống tính có được sửa không? | Nhân viên không sửa; quản lý sửa được kèm nhận xét | HR |
+| Q50 | Ví dụ phân bổ quý (500 tr + 2 tỷ + 5 tỷ + 10 tỷ = 17,5 tỷ) không bằng mục tiêu năm 15 tỷ — số quý là riêng từng quý hay lũy kế? | Riêng từng quý; lệch tổng chỉ cảnh báo (như BR-KPI-11) | HR |
+| Q51 | Lũy kế tính thế nào cho chỉ tiêu tỷ lệ hay tồn kho? | Cộng dồn với chỉ tiêu cộng (SUM); trung bình (AVG) và số cuối kỳ (LAST) theo cách tổng hợp của KPI | HR |
+| Q52 | Đánh giá liên tục hằng tháng có chấm điểm và tính lương không? Kỳ nào ra % lương? | Tháng chỉ theo dõi, không ra % lương; quý và năm chấm điểm và ra % lương | HR + C&B |
+| Q53 | Đánh giá thử việc: các bước, tiêu chí (KPI hay năng lực), khi nào khởi chạy? | Chưa có — cần thiết kế riêng | Product owner + HR |
+| Q54 | "Chỉ nhập tay" có bỏ cả import Excel số thực tế không? | **Đã chốt 21/10:** không — P1 nhập tay và import Excel; đồng bộ API để Phase sau | Product owner |
+| Q55 | Tài liệu PMGM có 5 phương pháp tính; prototype có 6 — bỏ phương pháp nào? | Giữ cả 6 cho tới khi đối chiếu tài liệu | HR + BA |
+| Q56 | Khối có Goal Plan riêng không? Quản lý trực tiếp khác quản lý theo khối thế nào? | Khối có Goal Plan khi giám đốc khối nhận KPI; vẫn chờ BA làm rõ (action item của Trang) | BA + HR |
+| Q57 | Import dữ liệu lịch sử: dữ liệu gì (số thực tế, kết quả, xếp loại), bao nhiêu năm, hiển thị ở đâu? | Chưa làm — ưu tiên thấp | HR + C&B |
+| Q58 | Dashboard "6 tháng" là nửa năm của chu kỳ hay 6 tháng gần nhất? | Nửa năm của chu kỳ (kỳ Half) | Product owner |
+
 ## 7. Quyết định đã chốt
 
 *(Ghi ngày, quyết định và lý do khi từng điểm trên được chốt.)*
+
+**22/10/2026 — Buổi họp thiết kế hệ thống, phạm vi Phase 1 (chưa làm vào prototype).** Chi tiết: mục 4G,
+`business-rules.md` §12.
+
+- **Giao nhận KPI linh hoạt**: top-down (quản lý giao) và bottom-up (nhân viên tự đề xuất) chạy song song.
+- **Quản lý trực tiếp chịu trách nhiệm cuối cùng** về kết quả; **HR không phê duyệt**, chỉ ghi nhận và can
+  thiệp khi đặc biệt.
+- **Hệ thống tự tính % hoàn thành** từ số thực tế và kế hoạch.
+- **Phân bổ mục tiêu năm theo quý**, chia đều hoặc nhập tay; theo dõi lũy kế.
+- **Phạm vi P1**: giao nhận và đánh giá theo quý / năm, đánh giá liên tục hằng tháng, dashboard, đánh giá thử
+  việc. 360, Bell Curve, OD, năng lực để P2.
+- **Thử nghiệm** đồng thời ở công ty Sinh Cha và công ty chị Vinh.
+- *Lý do:* xác nhận luồng với doanh nghiệp và chốt phạm vi bản đầu để ước lượng và lên timeline.
 
 - **19/10/2026 — Chọn người dùng, không chọn vai trò.** Quyền của một người là tổng quyền mọi vai trò người đó
   có (BR-KPI-60). Bộ chuyển trên thanh trên chỉ đổi công ty và người dùng. *Lý do: một khái niệm ít hơn để giải

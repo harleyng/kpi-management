@@ -20,6 +20,7 @@ They live in the product owner's folder:
 | Source | Location | Used for |
 |---|---|---|
 | Requirements meeting minutes (NoteX) | https://notexapp.com/share/6acdac7b1ec40e06d9b64dc5 | Goals, BSC, three tiers, three-step evaluation, live dashboard, "KPI must be measurable" (§2.3) |
+| System design and Phase 1 scope meeting minutes (NoteX, 22/10/2026) | https://notexapp.com/share/6ad996a8216238dfb5777ef1 | Both registration flows, HR records and does not approve, auto-computed %, quarterly split and cumulative tracking, Phase 1 / Phase 2 scope, role dashboards, pilot companies — **decided, not yet built** (`business-rules.md` §12, PEND-01…13) |
 | ERD (P1–P3, 67 tables) | `docs/erd/kpi_erd.mermaid` (copy of `/Users/m116gb/Downloads/Tool/kpi_erd.mermaid`) | Domain types, entity names, relations, state sets |
 | CMC PMGM — HR user guide | `…/Request/CMC_PMGM_Userguide_HR.pdf` | Goal fields, import, form launch, lock/unlock, routing |
 | CMC PMGM — Manager user guide | `…/Request/CMC_PMGM_User_guide_Manager_v1.0.pdf` | Registration, approval, adjustment, evaluation from the manager's side |
@@ -67,6 +68,26 @@ They live in the product owner's folder:
 | PMGM.12 | KPI result evaluation | **P1** |
 | PMGM.13 | 360 review | P2 |
 | PMGM.14 | Contract-expiry evaluation | P2 |
+
+### System design and Phase 1 scope meeting (NoteX, 22/10/2026)
+
+A one-hour meeting with the business to confirm the flow and fix the Phase 1 scope. Where it conflicts
+with an older source (the CMC guides, the email template's fixed step 1), **this meeting wins** — it is a
+Syntra decision (priority 1). Its points are recorded as pending changes until the prototype is changed.
+
+| § | Topic | Feeds |
+|---|---|---|
+| 2.1 | Two parts: set up the cycle (start, end, evaluation periods by month and quarter); enter results and track them in each period | BR-KPI-25, 27 |
+| 2.2 | Org structure before the cycle; library item = name, BSC perspective, unit, method ("PGMG" guide: **5 methods**), data source (**manual only in P1**) | BR-KPI-74…80; PEND-11; Q54, Q55 |
+| 2.3.1 | Top-down: Company → Khối → Phòng → employee; a KPI can go to a unit or a named employee | BR-KPI-07; PEND-03; Q56 |
+| 2.3.2 | Bottom-up: the employee creates KPIs, links them up; the manager approves, may add or edit; both flows in parallel | BR-KPI-12; PEND-01; Q44, Q45 |
+| 2.3.3 | HR records and locks after the manager — automatic or manual by configuration; HR may send it back to the manager | BR-KPI-12, 14; PEND-02; Q46 |
+| 2.4 | Annual target split into quarters (even or typed in); quarters tracked cumulatively | BR-KPI-11; PEND-04, 05; Q50, Q51 |
+| 2.5 | The employee enters the actual with evidence; the system computes the %; the manager decides; HR records, edits ad hoc | BR-KPI-16, 17; PEND-06, 07, 08; Q47, Q48, Q49 |
+| 2.6 | Historical data import (e.g. 10 years of Excel) by C&B / HR, low priority | PEND-12; Q57 |
+| 2.7 | Dashboards for leadership (BSC by company / Khối / unit), managers (direct reports), HR (forms, overdue, results); filters by month, quarter, 6 months; cumulative | BR-KPI-83…88; PEND-13; Q58 |
+| 2.8 | Phase 1 = item 1 (quarterly and annual KPI), item 4 (monthly continuous evaluation + dashboard), item 3 (probation evaluation); Phase 2 = 360, Bell Curve, OD, competency; pilot at two companies | BR-KPI-22; PEND-09, 10; Q3, Q52, Q53 |
+| 4 | Action items: job-title list and payout conversion table from chị Phương (Q2); direct vs Khối manager (Trang, Q56); Phase 1 estimate and timeline; study the Udu (VinAIA) system | Q2, Q44, Q56 |
 
 ### Email template for KPI
 

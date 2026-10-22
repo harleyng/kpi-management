@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-10-22 — The 22/10 meeting's decisions are recorded as pending changes, not as current rules
+
+**Decision.** (product owner) The system design / Phase 1 scope meeting (NoteX, 22/10/2026) is
+recorded in `business-rules.md` §12 as **PEND-01…13**, with its open points as `ASSUMPTION Q44`–`Q58`
+(§8). The headline changes: top-down and bottom-up registration in parallel; record-and-lock by HR,
+automatic or manual by configuration; the employee enters the actual and the system computes the %; the
+manager decides the result and HR only records it; annual targets split into quarters, tracked
+cumulatively; formal evaluation quarterly and annual, monthly continuous; probation evaluation in P1;
+manual data only; role dashboards. Each affected BR carries a *Pending* note; the rules themselves are
+unchanged.
+
+**Why.** `business-rules.md` is what the code enforces and what agents read as truth. Rewriting
+BR-KPI-12/16/17 now would describe a prototype that does not exist: a QA test written from the new text
+would fail against the screens, and the demo would contradict the docs. Several points also conflict
+with each other or with the seed (the minutes' quarter example sums to 17.5 tỷ against a 15 tỷ year,
+Q50; a Khối with KPIs vs Q40's "Khối has no plan"), so they need answers before they become rules.
+
+**Consequence.** Building a PEND item = move its text into the BR it names, drop the note and the §12
+row, and answer its Qs. PEND-03, 10 and 12 touch fixtures or add a form type — Large. Two items were already partly built on 2026-10-21 and are marked so: PEND-03 (cascade to the
+nearest planned units) and PEND-11 (actuals by hand and Excel; the product owner kept Excel, which
+resolves Q54).
+
+**Updated alongside.** `business-rules.md` (header, *Pending* notes on BR-KPI-07, 11, 12, 16, 17, 22,
+§8 Q2/Q3/Q33/Q40 + Q44–Q58, new §12); `docs/flows/new-flow.md` (§4G, §5 change table, §6 questions,
+§7 entry); `docs/source-map.md` (the meeting as a source, its section map).
+
+---
+
 ## 2026-10-21 — Phase 1 records actuals by hand and by Excel import only; the API sync is a later phase
 
 **Decision.** (product owner) P1 has no API and no integration with other systems: actuals come from manual
