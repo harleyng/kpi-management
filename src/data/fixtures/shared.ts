@@ -14,6 +14,7 @@ import {
   type WorkflowStep,
 } from '@/data/types';
 import { defaultRolePermissionRows } from '@/lib/permissionRules';
+import { DEFAULT_WORK_SCORING } from '@/lib/workRules';
 import {
   CALC_METHODS,
   DATA_SOURCES,
@@ -159,6 +160,12 @@ export function addLibrary(
     kpi: (code) => need(kpis, code, 'KPI'),
     spec: (code) => need(specs, code, 'KPI'),
   };
+}
+
+// ─── Monthly work scoring (PEND-14, ASSUMPTION Q62: CMC's 70 / 30 / 80 on a 0–100 scale) ──────
+
+export function addWorkScoring(s: SeedRows, id: IdFn): void {
+  s.add('WorkScoringConfig', { id: id('WorkScoringConfig'), ...DEFAULT_WORK_SCORING });
 }
 
 // ─── Workflows ─────────────────────────────────────────────────────────────────────────────────

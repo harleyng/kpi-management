@@ -50,11 +50,17 @@ import type {
   UserRole,
   WorkflowStep,
   WorkflowTemplate,
+  WorkPlan,
+  WorkResult,
+  WorkReview,
+  WorkReviewItem,
+  WorkScoringConfig,
+  WorkTask,
 } from '@/data/types';
 
 /**
- * The tenant-scoped collections — one per P1 table (`ENTITY_NAMES` minus `Tenant`) plus the audit
- * log. Names are the `EntityName`s, so an `entity.changed` event names its collection directly.
+ * The tenant-scoped collections — one per P1 table (`ENTITY_NAMES` minus `Tenant`), the monthly
+ * work tables (PEND-14) and the audit log. Names are the `EntityName`s, so an `entity.changed` event names its collection directly.
  * `Tenant` and `Permission` are the only GLOBAL collections (not partitioned by tenant).
  */
 export interface CollectionRows {
@@ -106,6 +112,12 @@ export interface CollectionRows {
   FileObject: FileObject;
   NotificationTemplate: NotificationTemplate;
   Notification: KpiNotification;
+  WorkScoringConfig: WorkScoringConfig;
+  WorkPlan: WorkPlan;
+  WorkTask: WorkTask;
+  WorkReview: WorkReview;
+  WorkReviewItem: WorkReviewItem;
+  WorkResult: WorkResult;
   AuditLog: AuditLog;
 }
 
@@ -122,7 +134,10 @@ const ORDER: Record<CollectionName, number> = {
   DataMapping: 28, SyncRun: 29, FileObject: 30, ImportBatch: 31, GoalActual: 32, Evidence: 33,
   WorkflowTemplate: 34, WorkflowStep: 35, FormLaunchRule: 36, FormLaunch: 37, FormInstance: 38,
   FormStepAction: 39, EvaluationItem: 40, Delegation: 41, GoalChangeItem: 42, PeriodResult: 43,
-  ResultDetail: 44, PayrollExport: 45, NotificationTemplate: 46, Notification: 47, AuditLog: 48,
+  ResultDetail: 44, PayrollExport: 45, NotificationTemplate: 46, Notification: 47,
+  // Monthly work (PEND-14): after the forms they hang on.
+  WorkScoringConfig: 48, WorkPlan: 49, WorkTask: 50, WorkReview: 51, WorkReviewItem: 52, WorkResult: 53,
+  AuditLog: 54,
 };
 
 export const COLLECTION_NAMES: readonly CollectionName[] = (Object.keys(ORDER) as CollectionName[]).sort(

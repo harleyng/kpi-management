@@ -89,10 +89,12 @@ describe('scheduler.runDue — the first tick at SEED_NOW is what the seed story
     expect(report.overdueHandled).toEqual([{ formId: formId('GC:open'), stepId: before.form.currentStepId, behaviour: 'REMIND' }]);
 
     // Reminders: every step whose deadline is 04-07 (remindDaysBefore 1) — T03 at step 1, E015/E016
-    // at the manager, E020/E038 at HR, and E040's re-entered registration at HR.
+    // at the manager, E020/E038 at HR, and E040's re-entered registration at HR; the monthly work
+    // reviews of T03 likewise (two at step 1, E017's at the manager since 04-03), and E016's April
+    // work plan at the manager since 04-04.
     const t03Open = (await gateway.forms.listForms(S, { periodId: T03, status: 'Open' }, { limit: 500 })).items.map((f) => f.id);
-    expect(t03Open).toHaveLength(20);
-    const expected = [...t03Open, ...['E015', 'E016', 'E020', 'E038'].map((c) => formId(`EVAL:T03:${c}`)), formId('GS:E040')];
+    expect(t03Open).toHaveLength(22);
+    const expected = [...t03Open, ...['E015', 'E016', 'E020', 'E038'].map((c) => formId(`EVAL:T03:${c}`)), formId('GS:E040'), formId('WR:T03:E017'), formId('WP:T04:E016')];
     expect(report.remindersDue.map((r) => r.formId).sort()).toEqual(expected.sort());
 
     const after = await snapshotOf(gateway, formId('GC:open'));
@@ -310,8 +312,9 @@ describe('proxy and delegation (BR-KPI-21)', () => {
     const inbox = (await gateway.forms.listInbox(S, u('E006'))).map((f) => f.id);
     expect(inbox).toEqual(expect.arrayContaining([formId('EVAL:T03:E015'), formId('EVAL:T03:E016'), formId('GS:E017'), formId('GS:E018')]));
     expect(inbox).not.toContain(formId('EVAL:T03:E017')); // at E017's own step
-    expect((await gateway.forms.listInbox(S, u('E016'))).map((f) => f.id)).toEqual([]);
-    expect((await gateway.forms.listInbox(S, u('E017'))).map((f) => f.id)).toEqual([formId('EVAL:T03:E017')]);
+    expect(inbox).toEqual(expect.arrayContaining([formId('WR:T03:E017'), formId('WP:T04:E016')]));
+    expect((await gateway.forms.listInbox(S, u('E016'))).map((f) => f.id)).toEqual([formId('WR:T03:E016')]);
+    expect((await gateway.forms.listInbox(S, u('E017'))).map((f) => f.id).sort()).toEqual([formId('EVAL:T03:E017'), formId('WP:T04:E017')].sort());
   });
 });
 

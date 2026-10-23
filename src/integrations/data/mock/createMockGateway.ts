@@ -14,6 +14,7 @@ import { platformGroup } from './groups/platform';
 import { resultsGroup } from './groups/results';
 import { schedulerGroup } from './groups/scheduler';
 import { systemGroup } from './groups/system';
+import { workGroup } from './groups/work';
 import type { StorageLike } from './persistence';
 import { Runtime, type Registry } from './runtime';
 
@@ -73,6 +74,7 @@ export function createMockGateway(options: MockGatewayOptions = {}): MockDataGat
     actuals: actualsGroup(rt),
     forms: formsGroup(rt),
     results: resultsGroup(rt),
+    work: workGroup(rt),
     system: systemGroup(rt),
     scheduler: schedulerGroup(rt),
     events: {

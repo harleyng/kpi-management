@@ -622,7 +622,9 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Sync run | Running · Succeeded · PartiallyFailed · Failed | D7 |
 | Import type | Actual · GoalPlan · OrgData · Library | ERD |
 | Import batch | Validating · Committed · Rejected | ERD |
-| Form type | GOAL_SETTING · GOAL_CHANGE · KPI_EVAL (P2 adds PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360) | ERD |
+| Form type | GOAL_SETTING · GOAL_CHANGE · KPI_EVAL · WORK_PLAN · WORK_REVIEW (P2 adds PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360). `WORK_FORM_TYPES` = the last two (monthly work, PEND-14): period forms on a `WorkPlan` (`FormInstance.workPlanId`), never on a Goal Plan; they do not move yet (`checkAction` → ERR-KPI-04 `WORK_FORM_NOT_BUILT` except HR's CANCEL, until 8.2 / 8.3) and are never started by hand | ERD + D10 |
+| Work plan | Draft · Submitted · Returned · Locked — the Goal Plan set without `Approved` (`WORK_PLAN_STATUSES`, Goal Plan labels): the manager's approval IS the lock. Mirrors its WORK_PLAN form; the sync is `forms.act` from 8.2 — until then only the launch (Draft) and the seed write it, a known gap | D10 |
+| Work task progress | NotStarted · InProgress · Done · Cancelled (Chưa bắt đầu · Đang thực hiện · Hoàn thành · Đã hủy) — `Cancelled` only through `work.cancelWorkTask` (manager, reason, Q64) | D10, HR guide p. 26 |
 | Actor rule | SELF · DIRECT_MANAGER · MANAGER_L2 · HR · CNB · ROLE | ERD |
 | Step action | SUBMIT · APPROVE · EDIT · RETURN · CANCEL · AUTO_FORWARD · AUTO_LOCK — EDIT is never recorded (BR-KPI-23) | ERD + CANCEL, AUTO_LOCK (D7) |
 | Overdue behaviour | AUTO_FORWARD · REMIND · LOCK | ERD + LOCK (BR-KPI-13) |
@@ -639,7 +641,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Notification channel | InApp · Email (P1 sends in-app only) | ERD |
 | Notification | Queued · Sent · Read · Failed | ERD |
 | Audit action | CREATE · UPDATE · DELETE · LOCK · UNLOCK | ERD |
-| Entity name | the 49 P1 entities, each labelled for the audit log (`ENTITY_NAME_LABEL`) | ERD + D1/D5/D7 |
+| Entity name | the 49 P1 entities and the 6 monthly-work entities (D10), each labelled for the audit log (`ENTITY_NAME_LABEL`) | ERD + D1/D5/D7/D10 |
 | Delegation state — **derived, never stored** | Upcoming · Active · Expired · Revoked (Sắp hiệu lực · Đang hiệu lực · Hết hạn · Đã thu hồi) — from the dates (tenant zone, inclusive) and `revokedAt`, against the gateway clock (`formViewRules.delegationState`) | T5, BR-KPI-21 |
 
 **Derived flags shown beside a status, never a status** (labels in `src/components/shared/statusTones.ts`):
@@ -827,9 +829,11 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q64 | A task cancelled mid-month: dropped from KQcv with the weights redistributed, or kept with 0? | The manager cancels it with a reason; it drops out of KQcv and the remaining weights are normalised to 100. Every task cancelled → no KQcv (`null`, never 0) | PEND-14 |
 | Q65 | Deadlines: plan by which day of month M; review by which day of month M+1? | Plan: employee by day 3, manager by day 5 of month M; review: the existing evaluation deadline (day 13 of M+1) | PEND-14 |
 | Q66 | Does someone who joins or leaves mid-month get forms? | Yes, if employed on the launch day; nothing prorated by working days (like Q13) | PEND-14 |
+| Q68 | May a monthly task run across months (carried-over work)? | Yes: a task must overlap the month, not lie inside it (`workRules.planSubmitIssues` `DATES_OUTSIDE_PERIOD` only for a task wholly outside) | PEND-14 |
+| Q69 | Who gets a monthly work review when the month's plan was never approved, or has no live task? | Nobody: the review launch skips a plan that is not Locked (`NO_APPROVED_PLAN`) or has no live task (`NO_WORK_TASKS`) — once a review exists the task list is frozen, so it could never be fixed or scored. HR approves or completes the plan first, then launches that person's review | PEND-14 |
 | Q67 | A goal split by quarter only: what is a month's target? (Today the annual target — wrong for a SUM KPI) | SUM → the quarter's target ÷ the quarter's months; AVG / LAST → the quarter's target | PEND-04, BR-KPI-11 |
 
-**Status after Đợt 0 (2026-10-23).** Q2, Q44–Q67 have no answer yet from HR, C&B, BA or the product owner.
+**Status after Đợt 0 (2026-10-23).** Q2, Q44–Q69 have no answer yet from HR, C&B, BA or the product owner.
 Each change builds on the **Default in use** above and cites it as `ASSUMPTION Qn` in the rule it writes, so
 no step waits; an answer that differs is a change to that rule (Flow/Spec). Q2 stays on the sample scale until
 chị Phương sends the real conversion table. Q59–Q66 detail and the steps they block: `docs/plans/KPI_monthly_work_plan.md` §4 (Plan B).
@@ -1014,7 +1018,7 @@ no source and are Syntra decisions (`docs/source-map.md`).*
 The business confirmed these in the system design meeting (NoteX, 22/10/2026 — `docs/source-map.md`;
 proposal and diagrams: `docs/flows/new-flow.md` §4G). **None is in the prototype yet**: until a change
 is built, the rule it names stays authoritative. Building one moves its text into that rule, removes the
-*Pending* note there, and deletes the row here. Open points are `ASSUMPTION Q44`–`Q67` (§8). Lanes per `CLAUDE.md`: Workflow = workflow-expert + system-architect; KPI Rules =
+*Pending* note there, and deletes the row here. Open points are `ASSUMPTION Q44`–`Q69` (§8). Lanes per `CLAUDE.md`: Workflow = workflow-expert + system-architect; KPI Rules =
 hr-performance-expert + qa. Rollout order, design and test cases per item: `docs/plans/KPI_update_plan_2210.md`;
 the merge order of the two streams: `docs/plans/KPI_plan_A_kpi.md` §2.
 
@@ -1029,7 +1033,7 @@ the merge order of the two streams: `docs/plans/KPI_plan_A_kpi.md` §2.
 | PEND-10 | **Probation evaluation** (thử việc → chính thức) moves into P1 (item 3, after items 1 and 4) | `FORM_TYPES` (`PROBATION_EVAL`, P2 today) | Q53 | Large |
 | PEND-12 | **Historical data import** (e.g. 10 years of Excel) by C&B / HR — low priority | — (new) | Q57 | Large |
 | PEND-13 | **Role dashboards**: leadership (BSC by company / Khối / unit), manager (direct reports' KPIs, registration status, results), HR (registration forms, overdue forms, results by period); filters by month, quarter and 6 months, with cumulative figures | BR-KPI-83…88 | Q51, Q58 | Medium |
-| PEND-14 | **Monthly work (P1 item 4)**: at the start of the month the employee (or manager) lists weighted tasks and the manager approves; at the end both score each task (KQcv, 70%) and discipline (KLcv, 30%), Hsht = 70% × KQcv + 30% × KLcv, below 80 the manager decides Hsnv with a reason; HR records or imports scores. Tracked, not paid (Q52). Plan: `docs/plans/KPI_monthly_work_plan.md` (Plan B). *Scoring rules built 2026-10-23 (B0):* `src/lib/workRules.ts` — task weights (±0.01, cancelled tasks normalised out, Q64), KQcv, Hsht, Hsnv required strictly below the threshold, final score (Q61), the tenant's scoring settings (Q62); no entity, form or screen yet (8.1–8.6) | `Q10`; BR-KPI-19, 22; new BR-KPI-91… | Q59–Q66 | Large (new module) |
+| PEND-14 | **Monthly work (P1 item 4)**: at the start of the month the employee (or manager) lists weighted tasks and the manager approves; at the end both score each task (KQcv, 70%) and discipline (KLcv, 30%), Hsht = 70% × KQcv + 30% × KLcv, below 80 the manager decides Hsnv with a reason; HR records or imports scores. Tracked, not paid (Q52). Plan: `docs/plans/KPI_monthly_work_plan.md` (Plan B). *Scoring rules built 2026-10-23 (B0):* `src/lib/workRules.ts` — task weights (±0.01, cancelled tasks normalised out, Q64), KQcv, Hsht, Hsnv required strictly below the threshold, final score (Q61), the tenant's scoring settings (Q62). *Data built 2026-10-23 (B1, merged at turn 2):* six entities (D10), the `work` gateway group, launch-side creation (a WORK_PLAN / WORK_REVIEW launch names the subject's month plan, created Draft; a review takes one item per live task), the rest of `workRules` — `planSubmitIssues` (a task overlaps the month, Q68), `taskEditBlockers` (before approval: edit at the step that allows EDIT; after: only the manager's cancel with a reason and progress; frozen once the review exists, everything once the result is recorded), `progressIssues` (`Done` = 100%, `NotStarted` = 0%), `linkedGoalIssues` (own Locked plan, same cycle), `reviewSubmitIssues` (0 is a score; Hsnv only in MANAGER / FINAL), `workResultOf` — the Kinh doanh pilot seed, hooks. After the pre-merge review: a delegate of the manager (a WORK_PLAN delegation) or HR as proxy cancels and tracks FOR the manager, both named (BR-KPI-21); a cancelled task is never removed; a review launches only for a Locked plan with a live task (Q69); a monthly workflow needs ≥ 2 steps, the employee's among them, and never ends on the employee's step; `listWorkTasksOfPlans` reads a team's month in one call. Left: moving the forms (`forms.act`: WorkPlan status, WorkResult on completion, column prefill — 8.2 / 8.3), screens, `PERIOD_START` and score import (8.4), dashboard (8.5) | `Q10`; BR-KPI-19, 22; new BR-KPI-91… | Q59–Q66, Q68, Q69 | Large (new module) |
 
 **Scope (plan level).** Phase 1 = item 1 (quarterly and annual KPI assignment and evaluation), item 4
 (monthly continuous evaluation and the dashboard), item 3 (probation evaluation); build 1 and 4 first.

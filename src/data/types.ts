@@ -873,14 +873,23 @@ export interface Evidence extends TenantScoped {
 
 // ═══ G5 · Quy trình phê duyệt & đánh giá ═══════════════════════════════════════════════════════
 
-/** ERD `WORKFLOW_TEMPLATE.form_type`. P2 adds PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360. */
-export const FORM_TYPES = ['GOAL_SETTING', 'GOAL_CHANGE', 'KPI_EVAL'] as const;
+/**
+ * ERD `WORKFLOW_TEMPLATE.form_type`. P2 adds PROBATION_EVAL, CONTRACT_EVAL, REVIEW_360.
+ * WORK_PLAN / WORK_REVIEW — monthly work (PEND-14, D-W1): the month's task list at the start of the
+ * month, its scoring at the start of the next. Their forms carry `workPlanId`, never `goalPlanId`.
+ */
+export const FORM_TYPES = ['GOAL_SETTING', 'GOAL_CHANGE', 'KPI_EVAL', 'WORK_PLAN', 'WORK_REVIEW'] as const;
 export type FormType = (typeof FORM_TYPES)[number];
 export const FORM_TYPE_LABEL: Readonly<Record<FormType, string>> = {
   GOAL_SETTING: 'Đăng ký KPI',
   GOAL_CHANGE: 'Điều chỉnh KPI',
   KPI_EVAL: 'Đánh giá KPI',
+  WORK_PLAN: 'Kế hoạch công việc tháng',
+  WORK_REVIEW: 'Đánh giá công việc tháng',
 };
+/** The monthly-work form types (PEND-14): period forms on a `WorkPlan`, not on a Goal Plan. */
+export const WORK_FORM_TYPES = ['WORK_PLAN', 'WORK_REVIEW'] as const satisfies readonly FormType[];
+export const isWorkFormType = (t: FormType): t is (typeof WORK_FORM_TYPES)[number] => (WORK_FORM_TYPES as readonly FormType[]).includes(t);
 
 /** ERD `WORKFLOW_TEMPLATE`. */
 export interface WorkflowTemplate extends TenantScoped {
@@ -1008,6 +1017,8 @@ export interface FormInstance extends TenantScoped {
   formType: FormType;
   subjectEmployeeId: Id;
   goalPlanId: Id | null;
+  /** The month's `WorkPlan` — set exactly on WORK_PLAN / WORK_REVIEW forms (PEND-14). */
+  workPlanId: Id | null;
   periodId: Id | null;
   /** `null` once the form is Completed or Cancelled. */
   currentStepId: Id | null;
@@ -1420,6 +1431,7 @@ export const ENTITY_NAMES = [
   'Delegation', 'GoalChangeItem', 'FormLaunch', 'FormLaunchRule',
   'RatingScale', 'RatingLevel', 'PayoutRule', 'PeriodResult', 'ResultDetail', 'PayrollExport',
   'FileObject', 'NotificationTemplate', 'Notification',
+  'WorkPlan', 'WorkTask', 'WorkReview', 'WorkReviewItem', 'WorkResult', 'WorkScoringConfig',
 ] as const;
 export type EntityName = (typeof ENTITY_NAMES)[number];
 /** What the audit log (WBS 4.8.4) calls each entity — glossary terms (business-rules.md §0). */
@@ -1473,7 +1485,148 @@ export const ENTITY_NAME_LABEL: Readonly<Record<EntityName, string>> = {
   FileObject: 'Tệp đính kèm',
   NotificationTemplate: 'Mẫu thông báo',
   Notification: 'Thông báo',
+  WorkPlan: 'Kế hoạch công việc tháng',
+  WorkTask: 'Công việc tháng',
+  WorkReview: 'Đánh giá công việc tháng',
+  WorkReviewItem: 'Điểm công việc',
+  WorkResult: 'Kết quả công việc tháng',
+  WorkScoringConfig: 'Cấu hình chấm công việc tháng',
 };
+
+// ═══ G8 · Công việc tháng (PEND-14, Plan B step 8.1) ═══════════════════════════════════════════
+// Not in the 67-table ERD: CMC's "Kế hoạch công việc tháng" (HR guide pp. 13, 25–26; NV pp. 67–73;
+// QL pp. 120–136). A separate model from Goal Plans (D-W2): a task has no library, method or target.
+
+/**
+ * `WorkTask.progressStatus` — "trạng thái thực hiện" (HR p. 26). `Cancelled` is set only by
+ * `work.cancelWorkTask` (the manager, with a reason, after approval — `ASSUMPTION Q64`); never by
+ * a progress update.
+ */
+export const WORK_TASK_STATUSES = ['NotStarted', 'InProgress', 'Done', 'Cancelled'] as const;
+export type WorkTaskStatus = (typeof WORK_TASK_STATUSES)[number];
+export const WORK_TASK_INITIAL_STATUS: WorkTaskStatus = 'NotStarted';
+export const WORK_TASK_STATUS_LABEL: Readonly<Record<WorkTaskStatus, string>> = {
+  NotStarted: 'Chưa bắt đầu',
+  InProgress: 'Đang thực hiện',
+  Done: 'Hoàn thành',
+  Cancelled: 'Đã hủy',
+};
+
+/**
+ * `WorkPlan.status` — the Goal Plan set without `Approved`: the manager's approval IS the lock
+ * (plan §6), so a work plan goes Draft → Submitted / Returned → Locked. Labels are the Goal Plan's.
+ * Synced from its WORK_PLAN form by `forms.act` from step 8.2 on; until then only the seed and the
+ * launch (Draft) write it.
+ */
+export const WORK_PLAN_STATUSES = ['Draft', 'Submitted', 'Returned', 'Locked'] as const satisfies readonly GoalPlanStatus[];
+export type WorkPlanStatus = (typeof WORK_PLAN_STATUSES)[number];
+export const WORK_PLAN_INITIAL_STATUS: WorkPlanStatus = 'Draft';
+
+/**
+ * One employee's task list for one month (a `Month` period). Created when a WORK_PLAN (or, failing
+ * that, a WORK_REVIEW) form is launched for the month; Locked when the manager approves
+ * (`approvedAt` / `approvedBy`). Unique per (employee, period).
+ */
+export interface WorkPlan extends TenantScoped {
+  employeeId: Id;
+  periodId: Id;
+  status: WorkPlanStatus;
+  approvedAt: IsoDateTime | null;
+  approvedBy: Id | null;
+}
+
+/**
+ * One task of a month (HR pp. 25–26). Before approval tasks are edited freely at the step that allows
+ * EDIT; after, only progress changes and the manager's cancellation with a reason (never a hard
+ * delete: review items and the audit log point at it). Once the month's review exists the list is
+ * frozen (`workRules.taskEditBlockers`). `weight` is the task's % of
+ * the month; a cancelled task carries none (`workRules.effectiveWeights`).
+ */
+export interface WorkTask extends TenantScoped {
+  workPlanId: Id;
+  sortOrder: number;
+  name: string;
+  /** "Sản phẩm / quy trình". */
+  product: string | null;
+  description: string | null;
+  /** "Đơn vị đo" as free text — a task has no library unit. */
+  unitText: string | null;
+  weight: number;
+  startDate: IsoDate;
+  dueDate: IsoDate;
+  /** "% hoàn thành", 0–100; tracking only, never a score. */
+  progressPct: number;
+  progressStatus: WorkTaskStatus;
+  note: string | null;
+  visibility: GoalVisibility;
+  /** Optional link to a KPI of the employee's own Locked Goal Plan (`ASSUMPTION Q63`); no effect on scores. */
+  linkedGoalId: Id | null;
+  createdBy: Id;
+  cancelledAt: IsoDateTime | null;
+  cancelledBy: Id | null;
+  cancelReason: string | null;
+}
+
+/**
+ * The discipline part (KLcv) and the Hsnv decision of one WORK_REVIEW form, by column like
+ * `EvaluationItem`. Hsnv exists only in the MANAGER and FINAL columns: the employee never decides it.
+ * One per form.
+ */
+export interface WorkReview extends TenantScoped {
+  formId: Id;
+  workPlanId: Id;
+  selfDisciplineScore: number | null;
+  selfComment: string | null;
+  managerDisciplineScore: number | null;
+  managerComment: string | null;
+  managerHsnv: number | null;
+  managerHsnvReason: string | null;
+  finalDisciplineScore: number | null;
+  finalComment: string | null;
+  finalHsnv: number | null;
+  finalHsnvReason: string | null;
+}
+
+/** One task's score on one WORK_REVIEW form, by column (KQcv input). Unique per (form, task). */
+export interface WorkReviewItem extends TenantScoped {
+  formId: Id;
+  taskId: Id;
+  selfScore: number | null;
+  selfComment: string | null;
+  managerScore: number | null;
+  managerComment: string | null;
+  finalScore: number | null;
+  finalComment: string | null;
+}
+
+/**
+ * The recorded month — a SNAPSHOT taken by `workRules.workResultOf` from the completed review's FINAL
+ * column (like `PeriodResult`). A month without a row is "tạm tính". Never paid (D-W7). Unique per
+ * (employee, period).
+ */
+export interface WorkResult extends TenantScoped {
+  employeeId: Id;
+  periodId: Id;
+  workPlanId: Id;
+  formId: Id;
+  kqcv: number | null;
+  klcv: number | null;
+  hsht: number | null;
+  /** Set only when Hsht was below the threshold. */
+  hsnv: number | null;
+  hsnvReason: string | null;
+  finalScore: number | null;
+  recordedAt: IsoDateTime;
+}
+
+/** The tenant's monthly-work scoring settings (`ASSUMPTION Q62`) — at most one row per tenant. */
+export interface WorkScoringConfig extends TenantScoped {
+  resultWeight: number;
+  disciplineWeight: number;
+  hsnvThreshold: number;
+  scoreMin: number;
+  scoreMax: number;
+}
 
 /** ERD `AUDIT_LOG` — append-only (BR-KPI-14 lock history lives here). */
 export interface AuditLog extends TenantScoped {

@@ -8,7 +8,8 @@
 The seven Phase 2 tracks (T1–T7, `docs/plans/KPI_repo_plan.md` §6.3) run **in parallel** because
 they all read the same seed — no track waits for another track's screens.
 
-**Frozen at Gate 1 (2026-10-19), `SEED_VERSION` = `2027-04-06.G1`.** `freeze.test.ts` pins the seed
+**Frozen at Gate 1 (2026-10-19), `SEED_VERSION` = `2027-04-06.G1`; re-frozen 2026-10-23 by Plan A's A1
+(evaluation items) and by Plan B 8.1 (monthly work, 55 entities): `SEED_VERSION` = `2027-04-06.A1.B1`.** `freeze.test.ts` pins the seed
 hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49). A failing
 freeze test means a fixture or the `DataGateway` contract changed — a **Large** change:
 1. `system-architect` reviews it;
@@ -127,6 +128,17 @@ history produces; `seed.test.ts` checks that only the one named form is overdue 
 - **Rating** "Thang mẫu A+/A/B/C/D (giả định Q2)": A+ [110,120] 120% · A [100,110) 100% · B [90,100)
   80% · C [70,90) 50% · D [0,70) 0%; Kinh doanh pays 130% for A+ (an OrgUnit payout rule). The 2026
   scale is Inactive.
+- **Monthly work** (PEND-14, `syntra/work.ts`, `work.ts`) — the Kinh doanh pilot (manager E006; E015,
+  E016, E017; E018 from April), launched by HR by hand each month for the department's staff (unit KDBH,
+  staff job levels — the head's own month is not in the pilot). **T02 recorded**: plans approved 02-03, reviews Completed 03-07,
+  results produced by `workRules.workResultOf` — E017's Hsht 62.3 < 80 with the manager's Hsnv 70 and a
+  reason. **T03 under review** (launched 04-01, step-1 deadline 04-07): E015 self-scores saved (Open), E016
+  Open, E017 at the manager since 04-03; E018 (hired 03-15) had no March plan, so the review launch skipped
+  her (`ASSUMPTION Q69`); E016's bid task was cancelled 03-15 with a reason. **T04 planning** (launched
+  04-01, due 04-08): E015 Locked, E016 Submitted 04-04 (at the manager, reminded from 04-06), E017 Returned
+  04-05 (step 1); E018's plan launched on its own on 04-05 like her registration — Draft at step 1, two tasks,
+  60% of the weight. One scoring config per tenant (70/30/80). Demo Co: D003's T01 planned, reviewed,
+  recorded; T02 planned and Locked (not yet reviewed).
 - **System.** In-app notifications for the T03 launch, waiting forms, two returns and one reminder;
   two e-mails (Queued, Failed — P1 sends no e-mail); the audit trail of every lock, auto-lock, unlock,
   cancellation and the revoked delegation.

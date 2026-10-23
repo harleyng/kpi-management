@@ -40,6 +40,7 @@ import type {
   UserRole,
   WorkflowStep,
 } from '@/data/types';
+import { isWorkFormType } from '@/data/types';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { canSubmit, type CanSubmitInput } from './formRules';
 import { cycleAllowsLaunch } from './cycleRules';
@@ -63,8 +64,8 @@ const lastStepNo = (steps: readonly WorkflowStep[]) => Math.max(...steps.map((s)
  * What `saveWorkflow` refuses (ERR-KPI-06, `ref` = the step): steps numbered 1…n; at least one way
  * forward per step; RETURN never on step 1 and only backwards; AUTO_FORWARD never on the last step;
  * LOCK only on registration (a GOAL_CHANGE plan is already locked and an evaluation has no plan to
- * lock, so the form could never be released); registration needs ≥ 2 steps including the owner's;
- * a ROLE step names its role.
+ * lock, so the form could never be released); registration and monthly work need ≥ 2 steps including
+ * the owner's, and monthly work never ends on the employee's step; a ROLE step names its role.
  */
 export function validateWorkflow(formType: FormType, steps: readonly WorkflowStep[]): RuleIssue[] {
   if (steps.length === 0) return [ruleIssue('ERR-KPI-06', null, 'STEPS_REQUIRED')];
@@ -83,10 +84,13 @@ export function validateWorkflow(formType: FormType, steps: readonly WorkflowSte
     if (step.remindDaysBefore !== null && !(Number.isInteger(step.remindDaysBefore) && step.remindDaysBefore >= 0)) bad(step, 'REMIND_INVALID');
     if (step.actorRule === 'ROLE' && step.actorRoleId === null) bad(step, 'ROLE_REQUIRED');
   });
-  if (formType === 'GOAL_SETTING') {
+  if (formType === 'GOAL_SETTING' || isWorkFormType(formType)) {
     if (n < 2) bad(null, 'TOO_FEW_STEPS');
     if (!sorted.some((s) => s.actorRule === 'SELF')) bad(null, 'OWNER_STEP_REQUIRED');
   }
+  // Monthly work: completing the form locks the plan / records the month, so the employee never
+  // takes the last step — no one approves or scores their own month (PEND-14).
+  if (isWorkFormType(formType) && sorted[n - 1].actorRule === 'SELF') bad(sorted[n - 1], 'SELF_LAST_STEP');
   return issues;
 }
 
@@ -454,6 +458,9 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
   if (form.currentStepId !== input.expectedStepId) return refuse('ERR-KPI-04', 'STALE_STEP');
   const step = steps.find((s) => s.id === form.currentStepId && s.workflowId === form.workflowId);
   if (!step) return refuse('ERR-KPI-04', 'STEP_UNKNOWN');
+  // Monthly work (PEND-14): moving a WORK_PLAN / WORK_REVIEW form must also move its WorkPlan and
+  // record its WorkResult — wired in steps 8.2 / 8.3. Until then only HR's CANCEL goes through.
+  if (isWorkFormType(form.formType) && action !== 'CANCEL') return refuse('ERR-KPI-04', 'WORK_FORM_NOT_BUILT');
   if (action !== 'CANCEL' && isFrozen(form, step, input.plan)) return refuse('ERR-KPI-04', 'FROZEN');
 
   const who = entitlement(form, step, action, input.actor, { ...input.entitlement, clock });
@@ -670,11 +677,17 @@ export function validateLaunch(
   const issues: RuleIssue[] = [];
   const bad = (detail: string) => issues.push(ruleIssue('ERR-KPI-06', null, detail));
   if (launch.formType === 'GOAL_CHANGE') bad('NOT_LAUNCHABLE');
-  if (launch.formType === 'KPI_EVAL' && launch.periodId === null) bad('PERIOD_REQUIRED');
+  if ((launch.formType === 'KPI_EVAL' || isWorkFormType(launch.formType)) && launch.periodId === null) bad('PERIOD_REQUIRED');
   if (launch.formType === 'GOAL_SETTING' && launch.cycleId === null) bad('CYCLE_REQUIRED');
   if (!Number.isInteger(launch.dueDays) || launch.dueDays < 0) bad('DUE_DAYS_INVALID');
   if (launch.recipientMode === 'FILTER' && launch.recipientFilter === null) bad('FILTER_REQUIRED');
   return issues;
+}
+
+/** A monthly-work launch is for one month (PEND-14): its period must be a `Month` (ERR-KPI-06 `MONTH_REQUIRED`). */
+export function launchPeriodIssues(formType: FormType, period: Pick<CyclePeriod, 'periodType'> | null): RuleIssue[] {
+  if (!isWorkFormType(formType) || period === null || period.periodType === 'Month') return [];
+  return [ruleIssue('ERR-KPI-06', 'periodId', 'MONTH_REQUIRED')];
 }
 
 /** One-off SCHEDULED launches whose time has come. */
@@ -682,7 +695,7 @@ export function dueScheduledLaunches(launches: readonly FormLaunch[], clock: Clo
   return launches.filter((l) => l.status === 'Scheduled' && Date.parse(l.scheduledAt) <= Date.parse(clock.now));
 }
 
-export type RecipientSkipReason = 'ALREADY_HAS_FORM' | 'NO_APPROVED_PLAN' | 'NO_PRIMARY_ASSIGNMENT' | 'NOT_EMPLOYED';
+export type RecipientSkipReason = 'ALREADY_HAS_FORM' | 'NO_APPROVED_PLAN' | 'NO_PRIMARY_ASSIGNMENT' | 'NOT_EMPLOYED' | 'NO_WORK_TASKS';
 
 export interface RecipientContext {
   employees: readonly Employee[];
@@ -695,6 +708,13 @@ export interface RecipientContext {
   period: CyclePeriod | null;
   /** The day the launch fires, in the tenant's zone. */
   launchDate: IsoDate;
+  /**
+   * WORK_REVIEW: each employee's month plan — its status and number of live (not cancelled) tasks.
+   * A month is reviewed only when its plan is Locked (`NO_APPROVED_PLAN`) with at least one live task
+   * (`NO_WORK_TASKS`) — `ASSUMPTION Q69`: once a review exists the list is frozen, so an unapproved or
+   * empty plan could never be fixed or scored. Missing = no plan.
+   */
+  workPlans?: ReadonlyMap<Id, { status: GoalPlanStatus; liveTasks: number }>;
 }
 
 export interface Recipients {
@@ -711,7 +731,8 @@ export interface Recipients {
  * - ALL, or FILTER: AND across fields, OR within one, an empty list = any; units with their children
  *   when asked; position and job level from the primary assignment;
  * - skipped (and reported): no primary assignment, already has a non-cancelled form of this type for
- *   this period (KPI_EVAL) / this cycle (GOAL_SETTING), an evaluation without an Approved/Locked plan.
+ *   this period (KPI_EVAL) / this cycle (GOAL_SETTING), an evaluation without an Approved/Locked plan,
+ *   a monthly work review for a month whose plan is not Locked or has no live task (`ASSUMPTION Q69`).
  * People excluded by the filter or not employed are left out silently, unless named by hand.
  */
 export function resolveRecipients(launch: Pick<FormLaunch, 'formType' | 'cycleId' | 'periodId' | 'recipientMode' | 'recipientFilter'>, ctx: RecipientContext): Recipients {
@@ -719,6 +740,10 @@ export function resolveRecipients(launch: Pick<FormLaunch, 'formType' | 'cycleId
   const filter = launch.recipientMode === 'FILTER' ? launch.recipientFilter : null;
   const named = new Set(filter?.employeeIds ?? []);
   const evaluation = launch.formType === 'KPI_EVAL';
+  // Period forms: one per subject and period. Monthly work (PEND-14) needs no KPI plan; its plan is
+  // for whoever works on the launch day (`ASSUMPTION Q66`), its review for whoever worked in the month.
+  const periodForm = evaluation || isWorkFormType(launch.formType);
+  const workedInPeriod = evaluation || launch.formType === 'WORK_REVIEW';
   const unitSet = filter && filter.orgUnitIds.length
     ? new Set(filter.orgUnitIds.flatMap((id) => (filter.includeChildUnits ? [...descendantUnitIds(ctx.units, id)] : [id])))
     : null;
@@ -730,14 +755,14 @@ export function resolveRecipients(launch: Pick<FormLaunch, 'formType' | 'cycleId
 
   for (const e of ctx.employees) {
     const skip = (reason: RecipientSkipReason) => out.skipped.push({ employeeId: e.id, reason });
-    const employed = evaluation
+    const employed = workedInPeriod
       ? ctx.period !== null && isEmployedDuring(e, ctx.period.startDate, ctx.period.endDate)
       : isEmployedOn(e, ctx.launchDate);
     if (!employed) {
       if (named.has(e.id)) skip('NOT_EMPLOYED');
       continue;
     }
-    const refDate = evaluation && ctx.period
+    const refDate = workedInPeriod && ctx.period
       ? minDate(e.leftOn !== null && e.leftOn < ctx.period.endDate ? e.leftOn : ctx.period.endDate, ctx.launchDate)
       : ctx.launchDate;
     const primary = primaryAssignmentOn(e.id, ctx.assignments, refDate);
@@ -761,11 +786,22 @@ export function resolveRecipients(launch: Pick<FormLaunch, 'formType' | 'cycleId
         f.subjectEmployeeId === e.id &&
         f.formType === launch.formType &&
         f.status !== 'Cancelled' &&
-        (evaluation ? f.periodId === launch.periodId : f.goalPlanId !== null && planCycle.get(f.goalPlanId) === cycleId),
+        (periodForm ? f.periodId === launch.periodId : f.goalPlanId !== null && planCycle.get(f.goalPlanId) === cycleId),
     );
     if (duplicate) {
       skip('ALREADY_HAS_FORM');
       continue;
+    }
+    if (launch.formType === 'WORK_REVIEW') {
+      const month = ctx.workPlans?.get(e.id);
+      if (month?.status !== 'Locked') {
+        skip('NO_APPROVED_PLAN');
+        continue;
+      }
+      if (month.liveTasks === 0) {
+        skip('NO_WORK_TASKS');
+        continue;
+      }
     }
     const plan = planOf(e.id);
     if (evaluation && (plan === null || (plan.status !== 'Approved' && plan.status !== 'Locked'))) {
@@ -875,7 +911,7 @@ export function canStartForm(input: Pick<FormInstance, 'subjectEmployeeId' | 'go
   const issues: RuleIssue[] = [];
   const bad = (ref: string | null, detail: string) => issues.push(ruleIssue('ERR-KPI-06', ref, detail));
   const { formType, plan } = ctx;
-  if (formType === 'KPI_EVAL') return [ruleIssue('ERR-KPI-06', 'workflowId', 'NOT_STARTABLE')];
+  if (formType === 'KPI_EVAL' || isWorkFormType(formType)) return [ruleIssue('ERR-KPI-06', 'workflowId', 'NOT_STARTABLE')];
   if (plan === null || input.goalPlanId !== plan.id) bad('goalPlanId', 'PLAN_REQUIRED');
   if (input.periodId !== null) bad('periodId', 'PERIOD_NOT_ALLOWED');
   if (!isIsoDate(input.dueDate) || input.dueDate < todayOf(ctx.clock)) bad('dueDate', 'DUE_DATE_INVALID');

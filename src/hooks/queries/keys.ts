@@ -49,6 +49,11 @@ export const KEY_ROOTS = {
   ratingScales: ['RatingScale', 'RatingLevel', 'PayoutRule'],
   results: ['PeriodResult', 'ResultDetail'],
   payrollExports: ['PayrollExport'],
+  // G8 · monthly work (PEND-14)
+  workPlans: ['WorkPlan', 'WorkTask'],
+  workReviews: ['WorkReview', 'WorkReviewItem'],
+  workResults: ['WorkResult'],
+  workScoring: ['WorkScoringConfig'],
   // G7
   files: ['FileObject'],
   notificationTemplates: ['NotificationTemplate'],

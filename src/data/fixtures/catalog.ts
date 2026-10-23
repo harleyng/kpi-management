@@ -249,7 +249,29 @@ export const WORKFLOWS: readonly { key: FormType; name: string; steps: readonly 
       { name: 'HR ghi nhận kết quả', actorRule: 'HR', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 2, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: 'FINAL', requiresComment: false },
     ],
   },
+  // Monthly work (PEND-14, plan §6–§7). Sample SLAs: the plan is due 7 days after its launch on day 1
+  // (`ASSUMPTION Q65` proposes day 5); the review runs like the KPI evaluation (6 / 4 / 2 days).
+  {
+    key: 'WORK_PLAN',
+    name: 'Kế hoạch công việc tháng (2 bước)',
+    steps: [
+      { name: 'Nhân viên lập kế hoạch', actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 3, onOverdue: 'AUTO_FORWARD', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
+      { name: 'Quản lý duyệt kế hoạch', actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 3, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
+    ],
+  },
+  {
+    key: 'WORK_REVIEW',
+    name: 'Đánh giá công việc tháng (3 bước)',
+    steps: [
+      { name: 'Tự đánh giá công việc', actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 6, onOverdue: 'AUTO_FORWARD', remindDaysBefore: 1, evaluationColumn: 'SELF', requiresComment: false },
+      { name: 'Quản lý đánh giá công việc', actorRule: 'DIRECT_MANAGER', allowedActions: ['SUBMIT', 'RETURN', 'EDIT'], slaDays: 4, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: 'MANAGER', requiresComment: false },
+      { name: 'HR ghi nhận kết quả', actorRule: 'HR', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 2, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: 'FINAL', requiresComment: false },
+    ],
+  },
 ];
+
+/** The monthly work plan is due 7 days after its launch on day 1 (sample, `ASSUMPTION Q65`). */
+export const WORK_PLAN_DUE_DAYS = 7;
 
 /** The monthly evaluation launches itself: PERIOD_END + 1 day, due 12 days later (SLAs sum to 12). */
 export const EVAL_DUE_DAYS = 12;

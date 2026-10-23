@@ -11,10 +11,14 @@
  *
  * As everywhere in `src/lib`, a missing score is `null`, never 0 (BR-KPI-32), and a task the manager
  * cancelled mid-month drops out of KQcv with the remaining weights normalised to 100 (`ASSUMPTION Q64`).
- * A task's link to a KPI (`linkedGoalId`, Q63) never touches the score.
+ * A task's link to a KPI (`linkedGoalId`, Q63) never touches the score, and neither does its
+ * visibility. Nothing here rounds: the screens round for display.
+ *
+ * Step 8.1 adds the rules the gateway refuses with: what blocks sending a plan, who may change a
+ * task when, what blocks sending a review column, and the month's result snapshot.
  */
 
-import type { Id } from '@/data/types';
+import type { CyclePeriod, EvaluationColumn, Goal, GoalPlan, Id, WorkReview, WorkReviewItem, WorkTaskStatus } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { isWeightComplete } from './goalPlanRules';
 
@@ -178,4 +182,231 @@ export function hsnvIssues(hshtScore: number | null, hsnv: number | null, reason
 export function finalWorkScore(hshtScore: number | null, hsnv: number | null, config: WorkScoring): number | null {
   if (hshtScore === null) return null;
   return hsnvRequired(hshtScore, config) ? hsnv : hshtScore;
+}
+
+// ─── Sending a plan ────────────────────────────────────────────────────────────────────────────
+
+/** The task fields the plan check reads — a `WorkTask` satisfies it. */
+export interface PlannedTask extends WeightedTask {
+  name: string;
+  startDate: string;
+  dueDate: string;
+}
+
+/**
+ * What blocks sending the month's plan (ERR-KPI-06, `ref` = the task): no live task (`PLAN_EMPTY`);
+ * the weights (`taskWeightIssues`); a blank name (`NAME_REQUIRED`); a due date before the start
+ * (`DATES_ORDER`); a task that does not overlap the month at all (`DATES_OUTSIDE_PERIOD`). A task may
+ * run across months — carried-over work starts before the month (`ASSUMPTION Q68`).
+ */
+export function planSubmitIssues(tasks: readonly PlannedTask[], period: Pick<CyclePeriod, 'startDate' | 'endDate'>): RuleIssue[] {
+  const live = liveTasks(tasks);
+  if (live.length === 0) return [ruleIssue('ERR-KPI-06', null, 'PLAN_EMPTY')];
+  const issues: RuleIssue[] = [];
+  for (const t of live) {
+    if (t.name.trim() === '') issues.push(ruleIssue('ERR-KPI-06', t.id, 'NAME_REQUIRED'));
+    if (t.dueDate < t.startDate) issues.push(ruleIssue('ERR-KPI-06', t.id, 'DATES_ORDER'));
+    else if (t.startDate > period.endDate || t.dueDate < period.startDate) issues.push(ruleIssue('ERR-KPI-06', t.id, 'DATES_OUTSIDE_PERIOD'));
+  }
+  return [...issues, ...taskWeightIssues(tasks)];
+}
+
+// ─── Who may change a task, when ───────────────────────────────────────────────────────────────
+
+/** ADD / UPDATE / REMOVE edit the list (before approval); CANCEL and PROGRESS act on one task after it. */
+export type TaskEdit = 'ADD' | 'UPDATE' | 'REMOVE' | 'CANCEL' | 'PROGRESS';
+
+export interface TaskEditContext {
+  planStatus: GoalPlan['status'];
+  /**
+   * Whether the actor may EDIT at the open WORK_PLAN form's current step — `null` = yes, else the
+   * workflow's refusal (`workflowRules.editRefusal`, 04 state / 05 entitlement). No open form → an
+   * ERR-KPI-04 issue.
+   */
+  editAtStep: RuleIssue | null;
+  /** The actor is the plan's employee. */
+  isSubject: boolean;
+  /** The actor is the employee's direct manager today. */
+  isManager: boolean;
+  /**
+   * The actor may act FOR the direct manager on an approved plan (BR-KPI-21): a delegate holding a
+   * WORK_PLAN delegation from the manager valid today, or HR with the proxy right over the employee.
+   * The write then names the manager as the person acted for.
+   */
+  mayActForManager: boolean;
+  /** A WORK_REVIEW form exists for the month: the task list is frozen (its items were taken). */
+  reviewLaunched: boolean;
+  /** The month's `WorkResult` is recorded: nothing about its tasks changes. */
+  resultRecorded: boolean;
+}
+
+/**
+ * Who may change what (plan §6, CMC QL pp. 126–127):
+ * - before approval (not Locked): ADD / UPDATE / REMOVE by whoever may EDIT at the WORK_PLAN form's
+ *   current step; there is nothing to cancel or to track yet (`NOT_APPROVED`);
+ * - after approval (Locked): the list is fixed (`PLAN_LOCKED`) — only the manager cancels a live task
+ *   with a reason (`ASSUMPTION Q64`), and the employee or the manager updates progress;
+ * - once the month's review exists, the list is frozen for every edit but PROGRESS
+ *   (`REVIEW_LAUNCHED`); once its result is recorded, for every edit (`RESULT_RECORDED`).
+ */
+export function taskEditBlockers(
+  ctx: TaskEditContext,
+  edit: TaskEdit,
+  task: { id?: Id; cancelledAt: string | null } | null = null,
+  reason: string | null = null,
+): RuleIssue[] {
+  const ref = task?.id ?? null;
+  const refuse = (code: 'ERR-KPI-04' | 'ERR-KPI-05' | 'ERR-KPI-06', detail: string) => [ruleIssue(code, ref, detail)];
+  if (ctx.resultRecorded) return refuse('ERR-KPI-04', 'RESULT_RECORDED');
+  if (ctx.reviewLaunched && edit !== 'PROGRESS') return refuse('ERR-KPI-04', 'REVIEW_LAUNCHED');
+  // A cancelled task stays, struck through: never edited, tracked or removed (review items and the log point at it).
+  if (task?.cancelledAt && edit !== 'ADD') return refuse('ERR-KPI-04', 'TASK_CANCELLED');
+  if (ctx.planStatus !== 'Locked') {
+    if (edit === 'CANCEL' || edit === 'PROGRESS') return refuse('ERR-KPI-04', 'NOT_APPROVED');
+    return ctx.editAtStep ? [{ ...ctx.editAtStep, ref }] : [];
+  }
+  if (edit === 'PROGRESS') return ctx.isSubject || ctx.isManager || ctx.mayActForManager ? [] : refuse('ERR-KPI-05', 'NOT_SUBJECT_OR_MANAGER');
+  if (edit === 'CANCEL') {
+    if (!ctx.isManager && !ctx.mayActForManager) return refuse('ERR-KPI-05', 'MANAGER_ONLY');
+    return blank(reason) ? refuse('ERR-KPI-06', 'CANCEL_REASON_REQUIRED') : [];
+  }
+  return refuse('ERR-KPI-04', 'PLAN_LOCKED');
+}
+
+/**
+ * A progress update (ERR-KPI-06): 0–100 %; `Cancelled` only through a cancellation; the status agrees
+ * with the % — `Done` is 100, `NotStarted` is 0 (`STATUS_MISMATCH`). `InProgress` may be anywhere.
+ */
+export function progressIssues(progressPct: number, progressStatus: WorkTaskStatus): RuleIssue[] {
+  const issues: RuleIssue[] = [];
+  const inRange = Number.isFinite(progressPct) && progressPct >= 0 && progressPct <= 100;
+  if (!inRange) issues.push(ruleIssue('ERR-KPI-06', 'progressPct', 'PROGRESS_OUT_OF_RANGE'));
+  if (progressStatus === 'Cancelled') issues.push(ruleIssue('ERR-KPI-06', 'progressStatus', 'CANCEL_BY_PROGRESS'));
+  else if (inRange && ((progressStatus === 'Done' && progressPct !== 100) || (progressStatus === 'NotStarted' && progressPct !== 0))) {
+    issues.push(ruleIssue('ERR-KPI-06', 'progressStatus', 'STATUS_MISMATCH'));
+  }
+  return issues;
+}
+
+/**
+ * A task's link to a KPI (`ASSUMPTION Q63`): an Active goal of the employee's OWN Employee plan,
+ * Locked, in the cycle the month belongs to — else ERR-KPI-06 `LINKED_GOAL_INVALID`. `null` = no link.
+ */
+export function linkedGoalIssues(
+  goal: Pick<Goal, 'id' | 'status'> | null,
+  plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeId' | 'status' | 'cycleId'> | null,
+  employeeId: Id,
+  period: Pick<CyclePeriod, 'cycleId'>,
+): RuleIssue[] {
+  if (goal === null) return [];
+  const ok =
+    goal.status === 'Active' &&
+    plan !== null &&
+    plan.ownerType === 'Employee' &&
+    plan.ownerEmployeeId === employeeId &&
+    plan.status === 'Locked' &&
+    plan.cycleId === period.cycleId;
+  return ok ? [] : [ruleIssue('ERR-KPI-06', 'linkedGoalId', 'LINKED_GOAL_INVALID')];
+}
+
+// ─── A review column ───────────────────────────────────────────────────────────────────────────
+
+const ITEM_SCORE = { SELF: 'selfScore', MANAGER: 'managerScore', FINAL: 'finalScore' } as const satisfies Record<EvaluationColumn, keyof WorkReviewItem>;
+const DISCIPLINE = { SELF: 'selfDisciplineScore', MANAGER: 'managerDisciplineScore', FINAL: 'finalDisciplineScore' } as const satisfies Record<EvaluationColumn, keyof WorkReview>;
+const HSNV = { MANAGER: ['managerHsnv', 'managerHsnvReason'], FINAL: ['finalHsnv', 'finalHsnvReason'] } as const;
+
+/** The review's columns by name — what "Lưu nháp" may write at a step of that column. */
+export const WORK_REVIEW_COLUMN_FIELDS = {
+  SELF: { discipline: 'selfDisciplineScore', comment: 'selfComment', hsnv: null, hsnvReason: null, score: 'selfScore', itemComment: 'selfComment' },
+  MANAGER: { discipline: 'managerDisciplineScore', comment: 'managerComment', hsnv: 'managerHsnv', hsnvReason: 'managerHsnvReason', score: 'managerScore', itemComment: 'managerComment' },
+  FINAL: { discipline: 'finalDisciplineScore', comment: 'finalComment', hsnv: 'finalHsnv', hsnvReason: 'finalHsnvReason', score: 'finalScore', itemComment: 'finalComment' },
+} as const satisfies Record<EvaluationColumn, Record<string, string | null>>;
+
+/** One column's scores as KQcv reads them. Items of cancelled tasks are kept and ignored. */
+export function columnScores(items: readonly WorkReviewItem[], column: EvaluationColumn): TaskScore[] {
+  return items.map((i) => ({ taskId: i.taskId, score: i[ITEM_SCORE[column]] }));
+}
+
+/** KQcv, KLcv and Hsht of one column. */
+export function columnTotals(
+  column: EvaluationColumn,
+  review: WorkReview,
+  items: readonly WorkReviewItem[],
+  tasks: readonly WeightedTask[],
+  config: WorkScoring,
+): { kqcv: number | null; klcv: number | null; hsht: number | null } {
+  const k = kqcv(tasks, columnScores(items, column));
+  const klcv = review[DISCIPLINE[column]];
+  return { kqcv: k, klcv, hsht: hsht(k, klcv, config) };
+}
+
+/**
+ * What blocks sending a review column (ERR-KPI-06, `ref` = the task / field): every live task has a
+ * score in the column (`TASK_SCORE_REQUIRED` — a live task with no item counts as unscored), and
+ * KLcv is set (`DISCIPLINE_REQUIRED`); every score on the scale; at MANAGER / FINAL, the column's Hsnv
+ * and reason when its Hsht is below the threshold. No live task → `PLAN_EMPTY`. A score of 0 is a score.
+ */
+export function reviewSubmitIssues(
+  column: EvaluationColumn,
+  review: WorkReview,
+  items: readonly WorkReviewItem[],
+  tasks: readonly WeightedTask[],
+  config: WorkScoring,
+): RuleIssue[] {
+  const live = liveTasks(tasks);
+  if (live.length === 0) return [ruleIssue('ERR-KPI-06', null, 'PLAN_EMPTY')];
+  const issues: RuleIssue[] = [];
+  const byTask = new Map(items.map((i) => [i.taskId, i[ITEM_SCORE[column]]]));
+  for (const t of live) {
+    const score = byTask.get(t.id) ?? null;
+    if (score === null) issues.push(ruleIssue('ERR-KPI-06', t.id, 'TASK_SCORE_REQUIRED'));
+    else {
+      const range = workScoreIssue(score, config, t.id);
+      if (range) issues.push(range);
+    }
+  }
+  const klcv = review[DISCIPLINE[column]];
+  if (klcv === null) issues.push(ruleIssue('ERR-KPI-06', DISCIPLINE[column], 'DISCIPLINE_REQUIRED'));
+  else {
+    const range = workScoreIssue(klcv, config, DISCIPLINE[column]);
+    if (range) issues.push(range);
+  }
+  if (column !== 'SELF' && issues.length === 0) {
+    const [hsnvField, reasonField] = HSNV[column];
+    const { hsht: h } = columnTotals(column, review, items, tasks, config);
+    issues.push(
+      ...hsnvIssues(h, review[hsnvField], review[reasonField], config).map((i) => ({ ...i, ref: i.ref === 'hsnv' ? hsnvField : reasonField })),
+    );
+  }
+  return issues;
+}
+
+// ─── The month's result ────────────────────────────────────────────────────────────────────────
+
+export interface WorkResultScores {
+  kqcv: number | null;
+  klcv: number | null;
+  hsht: number | null;
+  hsnv: number | null;
+  hsnvReason: string | null;
+  finalScore: number | null;
+}
+
+/**
+ * The month's result from the FINAL column — what a `WorkResult` stores. Hsnv (and its reason) is
+ * kept only when Hsht requires it: a draft Hsnv left on the review after a rescoring lifted Hsht is
+ * not part of the result (it stays on the review row). Hsnv may be above Hsht — it is the manager's
+ * decision (`ASSUMPTION Q61`). A required Hsnv still missing → `finalScore` null: not recordable.
+ */
+export function workResultOf(review: WorkReview, items: readonly WorkReviewItem[], tasks: readonly WeightedTask[], config: WorkScoring): WorkResultScores {
+  const { kqcv: k, klcv, hsht: h } = columnTotals('FINAL', review, items, tasks, config);
+  const required = hsnvRequired(h, config);
+  return {
+    kqcv: k,
+    klcv,
+    hsht: h,
+    hsnv: required ? review.finalHsnv : null,
+    hsnvReason: required ? review.finalHsnvReason : null,
+    finalScore: finalWorkScore(h, review.finalHsnv, config),
+  };
 }

@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { AccessDenied } from '@/components/layout/AccessDenied';
+import { InlineNotice } from '@/components/shared/InlineNotice';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { FormStatusBadge, OverdueBadge } from '@/components/shared/StatusBadge';
@@ -14,6 +15,7 @@ import { useFormDetail } from '@/components/forms/useFormDetail';
 import { useSession } from '@/contexts/useSession';
 import { errorSpecOf, KpiError } from '@/lib/errorCatalog';
 import { formatDate } from '@/lib/utils';
+import { isWorkFormType } from '@/data/types';
 
 /**
  * One form (phiếu) — `/forms/:formId`, reached from the inbox, the team list, HR's list and links
@@ -72,6 +74,11 @@ export default function FormDetailPage() {
       <EvaluationFormBody detail={detail} title={title} />
     ) : form.formType === 'GOAL_SETTING' ? (
       <GoalPlanFormBody detail={detail} title={title} />
+    ) : isWorkFormType(form.formType) ? (
+      // Monthly work (PEND-14): the form bodies arrive with Plan B steps 8.2 / 8.3.
+      <InlineNotice tone="info" title="Nội dung phiếu công việc tháng đang được xây dựng">
+        Phiếu đã được tạo và lưu đầy đủ. Màn hình lập kế hoạch và chấm điểm công việc tháng sẽ có ở bản cập nhật tới.
+      </InlineNotice>
     ) : (
       <GoalChangeFormBody detail={detail} title={title} />
     );

@@ -94,6 +94,15 @@ const reg = registrationSteps();
 describe('validateWorkflow', () => {
   it('accepts the default registration and evaluation workflows', () => {
     expect(validateWorkflow('GOAL_SETTING', reg)).toEqual([]);
+    // The monthly plan, bottom-up and top-down (manager assigns → employee → manager approves).
+    expect(validateWorkflow('WORK_PLAN', [step({ stepNo: 1 }), step({ stepNo: 2, actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN'] })])).toEqual([]);
+    expect(
+      validateWorkflow('WORK_PLAN', [
+        step({ stepNo: 1, actorRule: 'DIRECT_MANAGER' }),
+        step({ stepNo: 2 }),
+        step({ stepNo: 3, actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN'] }),
+      ]),
+    ).toEqual([]);
     expect(validateWorkflow('KPI_EVAL', evaluationSteps())).toEqual([]);
   });
 
@@ -111,6 +120,11 @@ describe('validateWorkflow', () => {
     ['KPI_EVAL', [step({ stepNo: 1, actorRule: 'ROLE', actorRoleId: null })], 'ROLE_REQUIRED'],
     ['KPI_EVAL', [step({ stepNo: 1, slaDays: -1 })], 'SLA_INVALID'],
     ['KPI_EVAL', [], 'STEPS_REQUIRED'],
+    // Monthly work (PEND-14): nobody approves or scores their own month.
+    ['WORK_PLAN', [step({ stepNo: 1 })], 'TOO_FEW_STEPS'],
+    ['WORK_PLAN', [step({ stepNo: 1, actorRule: 'DIRECT_MANAGER' }), step({ stepNo: 2, actorRule: 'HR', allowedActions: ['APPROVE'] })], 'OWNER_STEP_REQUIRED'],
+    ['WORK_PLAN', [step({ stepNo: 1, actorRule: 'DIRECT_MANAGER' }), step({ stepNo: 2, actorRule: 'SELF', allowedActions: ['SUBMIT'] })], 'SELF_LAST_STEP'],
+    ['WORK_REVIEW', [step({ stepNo: 1 }), step({ stepNo: 2, actorRule: 'SELF', allowedActions: ['SUBMIT'] })], 'SELF_LAST_STEP'],
   ] as const)('%s %# → %s', (formType, steps, detail) => {
     expect(details(formType, steps)).toContain(detail);
   });
@@ -667,6 +681,29 @@ describe('launches (BR-KPI-19, D5)', () => {
       expect(r.subjects).not.toContain('leaver'); // gone by the launch day
       expect(r.skipped).toContainEqual({ employeeId: 'a', reason: 'ALREADY_HAS_FORM' });
       expect(r.needsDraftPlan.sort()).toEqual(['b', 'boss', 'noplan']);
+    });
+
+    it('monthly work review: only a Locked plan with a live task is reviewed (ASSUMPTION Q69)', () => {
+      const workCtx = {
+        ...ctx,
+        existingForms: [],
+        workPlans: new Map([
+          ['a', { status: 'Locked' as const, liveTasks: 3 }],
+          ['b', { status: 'Submitted' as const, liveTasks: 2 }],
+          ['boss', { status: 'Locked' as const, liveTasks: 0 }],
+        ]),
+      };
+      const r = resolveRecipients(launch({ formType: 'WORK_REVIEW' }), workCtx);
+      expect(r.subjects).toEqual(['a']);
+      expect(r.skipped).toEqual(
+        expect.arrayContaining([
+          { employeeId: 'b', reason: 'NO_APPROVED_PLAN' },
+          { employeeId: 'boss', reason: 'NO_WORK_TASKS' },
+          { employeeId: 'noplan', reason: 'NO_APPROVED_PLAN' },
+        ]),
+      );
+      // The monthly plan itself needs no KPI plan and no prior plan of the month.
+      expect(resolveRecipients(launch({ formType: 'WORK_PLAN' }), { ...workCtx, launchDate: '2027-01-02' }).subjects).toContain('noplan');
     });
   });
 

@@ -1,6 +1,8 @@
 import type { CollectionName, RowOf } from '@/data/fixtures/types';
 import {
   GOAL_PLAN_INITIAL_STATUS,
+  isWorkFormType,
+  WORK_PLAN_INITIAL_STATUS,
   type EvaluationItem,
   type FormInstance,
   type FormLaunch,
@@ -8,6 +10,7 @@ import {
   type GoalPlan,
   type Id,
   type WorkflowStep,
+  type WorkPlan,
 } from '@/data/types';
 import { entryBlockers, isResultFinalised } from '@/lib/actualRules';
 import { KpiError, toKpiError, type RuleIssue } from '@/lib/errorCatalog';
@@ -208,7 +211,9 @@ export function setPlanStatus(tx: Tx, plan: GoalPlan, to: GoalPlan['status'], re
  * `resolveRecipients`; a Draft Employee plan for a registration subject who has none; one form per
  * subject at step 1 (due = launch date + `dueDays`); a registration moves its plan to step 1's status
  * (a Locked plan stays Locked — its form is then frozen until HR unlocks it); an evaluation gets one
- * item per Active goal with the CURRENT actual as its read-only snapshot (BR-KPI-17). The launch
+ * item per Active goal with the CURRENT actual as its read-only snapshot (BR-KPI-17). Monthly work
+ * (PEND-14): a WORK_PLAN or WORK_REVIEW form names the subject's `WorkPlan` for the month, created
+ * Draft when there is none; a review also gets its `WorkReview` and one item per live task. The launch
  * becomes Launched; `form.launched` is emitted. The skipped recipients are returned (the event type
  * has no field for them).
  */
@@ -228,6 +233,7 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
     plans: tx.all('GoalPlan'),
     period,
     launchDate: todayOf(clock),
+    workPlans: launch.formType === 'WORK_REVIEW' && period ? workPlansOf(tx, period.id) : undefined,
   });
 
   for (const employeeId of recipients.needsDraftPlan) {
@@ -250,8 +256,10 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
   const evalCtx = launch.formType === 'KPI_EVAL' && period ? actualContextOf(tx, period) : null;
   const dueDate = launchDueDate(clock.now, launch.dueDays, clock.tz);
   const formIds: Id[] = [];
+  const work = isWorkFormType(launch.formType);
   for (const subjectEmployeeId of recipients.subjects) {
-    const plan = plans.find((p) => p.ownerEmployeeId === subjectEmployeeId) ?? null;
+    const plan = work ? null : (plans.find((p) => p.ownerEmployeeId === subjectEmployeeId) ?? null);
+    const workPlan = work && period ? workPlanFor(tx, subjectEmployeeId, period.id) : null;
     const form: FormInstance = {
       id: newId(),
       tenantId: tx.tenantId,
@@ -259,7 +267,8 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
       formType: launch.formType,
       subjectEmployeeId,
       goalPlanId: plan?.id ?? null,
-      periodId: launch.formType === 'KPI_EVAL' ? launch.periodId : null,
+      workPlanId: workPlan?.id ?? null,
+      periodId: launch.formType === 'KPI_EVAL' || work ? launch.periodId : null,
       currentStepId: first.id,
       currentStepEnteredAt: clock.now,
       overdueHandledAt: null,
@@ -271,6 +280,7 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
     tx.insert('FormInstance', form);
     formIds.push(form.id);
 
+    if (launch.formType === 'WORK_REVIEW' && workPlan) addWorkReview(tx, form, workPlan);
     if (launch.formType === 'GOAL_SETTING' && plan && plan.status !== 'Locked') {
       setPlanStatus(tx, tx.get('GoalPlan', plan.id), planStatusOnEnterStep(first.stepNo, steps, false));
     }
@@ -402,4 +412,65 @@ export function recordFormActuals(tx: Tx, form: FormInstance): { written: Id[]; 
     tx.emit({ type: 'actuals.recorded', periodId: period.id, goalIds: done.written, sourceType: 'FORM', batchId: null, syncRunId: null });
   }
   return done;
+}
+
+/** Each employee's month plan as `resolveRecipients` reads it for a review: status and live tasks. */
+function workPlansOf(tx: Tx, periodId: Id): Map<Id, { status: WorkPlan['status']; liveTasks: number }> {
+  const plans = tx.all('WorkPlan').filter((p) => p.periodId === periodId);
+  const live = new Map<Id, number>();
+  for (const t of tx.all('WorkTask')) if (t.cancelledAt === null) live.set(t.workPlanId, (live.get(t.workPlanId) ?? 0) + 1);
+  return new Map(plans.map((p) => [p.employeeId, { status: p.status, liveTasks: live.get(p.id) ?? 0 }]));
+}
+
+/** The subject's work plan for the month, created Draft when there is none (one per employee and period). */
+function workPlanFor(tx: Tx, employeeId: Id, periodId: Id): WorkPlan {
+  const existing = tx.all('WorkPlan').find((p) => p.employeeId === employeeId && p.periodId === periodId);
+  if (existing) return existing;
+  return tx.insert('WorkPlan', {
+    id: newId(),
+    tenantId: tx.tenantId,
+    employeeId,
+    periodId,
+    status: WORK_PLAN_INITIAL_STATUS,
+    approvedAt: null,
+    approvedBy: null,
+  });
+}
+
+/** A review form's discipline row and one empty item per live task of the plan (cancelled tasks are not scored). */
+function addWorkReview(tx: Tx, form: FormInstance, workPlan: WorkPlan): void {
+  tx.insert('WorkReview', {
+    id: newId(),
+    tenantId: tx.tenantId,
+    formId: form.id,
+    workPlanId: workPlan.id,
+    selfDisciplineScore: null,
+    selfComment: null,
+    managerDisciplineScore: null,
+    managerComment: null,
+    managerHsnv: null,
+    managerHsnvReason: null,
+    finalDisciplineScore: null,
+    finalComment: null,
+    finalHsnv: null,
+    finalHsnvReason: null,
+  });
+  const tasks = tx
+    .all('WorkTask')
+    .filter((t) => t.workPlanId === workPlan.id && t.cancelledAt === null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const task of tasks) {
+    tx.insert('WorkReviewItem', {
+      id: newId(),
+      tenantId: tx.tenantId,
+      formId: form.id,
+      taskId: task.id,
+      selfScore: null,
+      selfComment: null,
+      managerScore: null,
+      managerComment: null,
+      finalScore: null,
+      finalComment: null,
+    });
+  }
 }

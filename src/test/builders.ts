@@ -166,7 +166,7 @@ export function evaluationSteps(): WorkflowStep[] {
 
 export const form = (o: Partial<FormInstance> = {}): FormInstance => ({
   id: 'f1', tenantId: TENANT, workflowId: 'wf1', formType: 'KPI_EVAL', subjectEmployeeId: 'e1',
-  goalPlanId: 'plan1', periodId: 'T01', currentStepId: 's1',
+  goalPlanId: 'plan1', workPlanId: null, periodId: 'T01', currentStepId: 's1',
   currentStepEnteredAt: '2027-02-01T01:00:00.000Z', overdueHandledAt: null, status: 'Open',
   dueDate: '2027-02-08', launchedAt: '2027-02-01T01:00:00.000Z', launchId: null, ...o,
 });

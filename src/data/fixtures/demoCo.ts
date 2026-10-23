@@ -1,8 +1,9 @@
-import type { Goal, Id, RoleCode, Tenant } from '@/data/types';
+import type { CyclePeriod, Goal, Id, RoleCode, Tenant } from '@/data/types';
 import { targetForPeriod } from '@/lib/calcRules';
 import { idsFor, seedId } from './ids';
 import { ResultScript } from './results';
-import { addLibrary, addNotificationTemplates, addRating, addRoles, addWorkflows, goalFromKpi, SeedRows } from './shared';
+import { addLibrary, addNotificationTemplates, addRating, addRoles, addWorkflows, addWorkScoring, goalFromKpi, SeedRows } from './shared';
+import { workSeed } from './work';
 import { vn } from './timeline';
 import type { TenantSeed } from './types';
 
@@ -107,7 +108,7 @@ export function buildDemoCo(): TenantSeed {
   const rule = s.add('FormLaunchRule', { id: id('FormLaunchRule', 1), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng tháng', triggerEvent: 'PERIOD_END', periodType: 'Month', offsetDays: 1, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, isActive: true });
   const launch = s.add('FormLaunch', { id: id('FormLaunch', 'T01'), workflowId: wf.id('KPI_EVAL'), formType: 'KPI_EVAL', name: 'Đánh giá KPI tháng 01/2027', timing: 'RECURRING', scheduledAt: vn('2027-02-01 09:00'), launchRuleId: rule.id, cycleId, periodId: t01.id, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, status: 'Launched', launchedAt: vn('2027-02-01 09:00'), createdBy: null, createdAt: vn('2027-02-01 09:00') });
   const form = (key: string, f: { type: 'GOAL_SETTING' | 'GOAL_CHANGE' | 'KPI_EVAL'; periodId: Id | null; launchId: Id | null; at: string; due: string }) =>
-    s.add('FormInstance', { id: id('FormInstance', key), workflowId: wf.id(f.type), formType: f.type, subjectEmployeeId: id('Employee', 'D003'), goalPlanId: staffPlan.id, periodId: f.periodId, currentStepId: null, currentStepEnteredAt: null, overdueHandledAt: null, status: 'Completed', dueDate: f.due, launchedAt: f.at, launchId: f.launchId });
+    s.add('FormInstance', { id: id('FormInstance', key), workflowId: wf.id(f.type), formType: f.type, subjectEmployeeId: id('Employee', 'D003'), goalPlanId: staffPlan.id, workPlanId: null, periodId: f.periodId, currentStepId: null, currentStepEnteredAt: null, overdueHandledAt: null, status: 'Completed', dueDate: f.due, launchedAt: f.at, launchId: f.launchId });
   const step = (formId: Id, type: 'GOAL_SETTING' | 'GOAL_CHANGE' | 'KPI_EVAL', n: number, by: string, action: 'SUBMIT' | 'APPROVE', at: string, delegationId: Id | null = null, onBehalfOf: string | null = null) =>
     s.add('FormStepAction', { id: id('FormStepAction', formId, n), formId, stepId: wf.step(type, n).id, actorUserId: user(by), onBehalfOfUserId: onBehalfOf ? user(onBehalfOf) : null, delegationId, action, comment: null, actedAt: at });
 
@@ -135,6 +136,35 @@ export function buildDemoCo(): TenantSeed {
   // ─── System ─────────────────────────────────────────────────────────────────────────────────
   s.add('Notification', { id: id('Notification', 1), templateId: templateOf('FORM_LAUNCHED'), eventCode: 'FORM_LAUNCHED', recipientUserId: user('D003'), refType: 'Launch', refId: launch.id, subject: 'Đợt Đánh giá KPI tháng 01/2027 đã bắt đầu', body: 'Hạn hoàn thành: 13/02/2027.', status: 'Read', createdAt: vn('2027-02-01 09:00'), sentAt: vn('2027-02-01 09:00'), readAt: vn('2027-02-01 10:00') });
   s.add('AuditLog', { id: id('AuditLog', 1), userId: user('D004'), onBehalfOfUserId: null, entityName: 'GoalPlan', entityId: staffPlan.id, action: 'LOCK', beforeData: { status: 'Approved' }, afterData: { status: 'Locked' }, reason: null, createdAt: vn('2027-01-11 15:00') });
+
+  // ─── Monthly work (PEND-14): D003's January, planned, reviewed and recorded ───────────────────
+  addWorkScoring(s, id);
+  const periodOf = (label: string) => s.rows.CyclePeriod.find((p) => p.label === label) as CyclePeriod;
+  const w = workSeed({ s, id, wf, user, employee: (code) => id('Employee', code), period: periodOf });
+  const all = { by: 'D004', cycleId, filter: null };
+  const wpT01 = w.launch('WP-T01', { ...all, type: 'WORK_PLAN', name: 'Kế hoạch công việc tháng 01/2027', month: 'T01', at: vn('2027-01-04 09:00'), dueDays: 7 });
+  const wrT01 = w.launch('WR-T01', { ...all, type: 'WORK_REVIEW', name: 'Đánh giá công việc tháng 01/2027', month: 'T01', at: vn('2027-02-01 09:00'), dueDays: 12 });
+  w.plan('D003', 'T01', 'Locked', { at: vn('2027-01-06 15:00'), by: 'D002' }, [
+    { name: 'Mở rộng 3 đại lý mới', weight: 70, unitText: 'đại lý', progressPct: 100, progressStatus: 'Done' },
+    { name: 'Báo cáo thị trường tháng', weight: 30, progressPct: 100, progressStatus: 'Done' },
+  ]);
+  const wp = w.form('WP:T01:D003', { type: 'WORK_PLAN', code: 'D003', month: 'T01', launch: wpT01, due: '2027-01-11', status: 'Completed', step: null, enteredAt: null });
+  w.act(wp, 1, 'D003', 'SUBMIT', vn('2027-01-05 10:00'));
+  w.act(wp, 2, 'D002', 'APPROVE', vn('2027-01-06 15:00'));
+  const wr = w.form('WR:T01:D003', { type: 'WORK_REVIEW', code: 'D003', month: 'T01', launch: wrT01, due: '2027-02-13', status: 'Completed', step: null, enteredAt: null });
+  w.act(wr, 1, 'D003', 'SUBMIT', vn('2027-02-03 11:00'));
+  w.act(wr, 2, 'D002', 'SUBMIT', vn('2027-02-05 11:00'));
+  w.act(wr, 3, 'D004', 'APPROVE', vn('2027-02-07 11:00'));
+  w.review(wr, { tasks: [[90, 85, 85], [100, 95, 95]], discipline: [90, 90, 90] }, vn('2027-02-07 11:00'));
+  // February approved, not yet reviewed: what the tenant-isolation tests launch a review on.
+  const wpT02 = w.launch('WP-T02', { ...all, type: 'WORK_PLAN', name: 'Kế hoạch công việc tháng 02/2027', month: 'T02', at: vn('2027-02-01 09:00'), dueDays: 7 });
+  w.plan('D003', 'T02', 'Locked', { at: vn('2027-02-03 15:00'), by: 'D002' }, [
+    { name: 'Ký hợp đồng với 2 đại lý mới', weight: 60, unitText: 'đại lý', progressPct: 50, progressStatus: 'InProgress' },
+    { name: 'Báo cáo thị trường tháng', weight: 40, progressPct: 100, progressStatus: 'Done' },
+  ]);
+  const wp2 = w.form('WP:T02:D003', { type: 'WORK_PLAN', code: 'D003', month: 'T02', launch: wpT02, due: '2027-02-08', status: 'Completed', step: null, enteredAt: null });
+  w.act(wp2, 1, 'D003', 'SUBMIT', vn('2027-02-02 10:00'));
+  w.act(wp2, 2, 'D002', 'APPROVE', vn('2027-02-03 15:00'));
 
   // ─── Results (through resultRules, like Syntra's): T01 calculated and finalised on its deadline ─
   const results = new ResultScript(s, id);

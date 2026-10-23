@@ -152,7 +152,7 @@ components/pages → React Query hooks (src/hooks/queries/*) → getDataGateway(
 - **Contract** — `src/integrations/data/types.ts`, fixed in Phase 1.1 (reviewed by system-architect,
   cto and workflow-expert). Groups: `clock` · `platform` (tenants) · `org` (G1) · `library` (G2) ·
   `goals` (G3) · `actuals` (G4) · `forms` (G5 + D5 launches + GOAL_CHANGE items) · `results` (G6) ·
-  `system` (G7) · `scheduler` · `events` · optional `dev` (mock only).
+  `work` (G8 · monthly work, PEND-14 / D10) · `system` (G7) · `scheduler` · `events` · optional `dev` (mock only).
 - **Selection** — `getDataGateway()` in `index.ts` reads `VITE_DATA_ADAPTER` (build-time): unset/`mock` →
   mock, `supabase` → the stub (throws "not implemented"), anything else → throws. Tested in
   `index.test.ts`.
@@ -336,9 +336,10 @@ history that replays; launches, delegations, notifications, audit; results T01 L
 is **2027-04-06 09:00 +07**; the scheduler last ran 2027-04-01 09:00. Ids come from `seedId`.
 
 **Frozen at Gate 1 (2026-10-19)** as the contract between tracks: `src/data/fixtures/freeze.test.ts` pins
-the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49);
-`SEED_VERSION` is `2027-04-06.A1` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
-results). A failing freeze test is a **Large** change: system-architect
+the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (55);
+`SEED_VERSION` is `2027-04-06.A1.B1` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
+results; then by Plan B 8.1: the `work` group, six monthly-work entities, the Kinh doanh monthly-work pilot). A
+failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4
 `Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (`EMPTY_UNTIL_WIRED`: T6 wired the
@@ -369,6 +370,7 @@ delta Phase 5 applies when it writes the SQL schema.
 | D7 | Columns the P1 screens or the review needed: `EMPLOYEE.left_on`; `USER_ACCOUNT.display_name`; `CALC_METHOD.name`; `KPI_DEFINITION.category_tag` (Q5); `KGI.target_value/unit_id` (Q9); `GOAL.description/formula_text/target_type/roll_up_from_children (Q8)/replaces_goal_id/sort_order`; `SYNC_RUN.period_id`; `IMPORT_BATCH.cycle_id/rows/errors` (json); `GOAL_ACTUAL.note`; `WORKFLOW_STEP.name/return_to_step_no/remind_days_before`; `FORM_INSTANCE.form_type/current_step_entered_at/overdue_handled_at`; `FORM_STEP_ACTION.delegation_id`; `EVALUATION_ITEM.actual_text_snapshot/final_comment`; `DELEGATION.revoked_at`; `NOTIFICATION.event_code/subject/body/created_at/read_at`; `AUDIT_LOG.on_behalf_of_user_id/reason`. New table `GOAL_CHANGE_ITEM`. New enum values: Goal Plan `Returned`, step actions `CANCEL`/`AUTO_LOCK`, overdue `LOCK`, notification `STEP_ASSIGNED`; `KPI_ALERT` deferred to Phase 3 | Plan §5 screens; Phase 1.1 reviews |
 | D8 | ERD Vietnamese enum values become English codes with Vietnamese label maps (Khoi → Division, Thử việc → Probation, GĐ → Director…) | Code is English; the screen reads only the label maps |
 | D9 | `EVALUATION_ITEM.actual_value/actual_text` (the actual on the form), `actual_entered_by`, `submitted_actual_value/submitted_actual_text`, `target_snapshot` (the period's target); `GOAL_ACTUAL.source_type` adds `FORM` — `DATA_SOURCE.source_type` does not (`ACTUAL_SOURCE_TYPES` vs `SOURCE_TYPES`; the ERD shares one `source_type`) | 22/10 meeting, PEND-06/07/08 (A1, 2026-10-23) |
+| D10 | Monthly work (PEND-14, Plan B 8.1), group G8, not in the ERD: `WORK_PLAN` (employee, Month period, status ⊂ Goal Plan set without Approved, approved_at/by; unique per employee and period) · `WORK_TASK` (plan, sort_order, name, product, description, unit_text, weight, start/due date, progress_pct, progress_status, note, visibility = Goal visibility set, linked_goal_id, created_by, cancelled_at/by, cancel_reason) · `WORK_REVIEW` (form 1–1, plan, KLcv + comment per SELF / MANAGER / FINAL column, Hsnv + reason in MANAGER / FINAL) · `WORK_REVIEW_ITEM` (form, task, score + comment per column) · `WORK_RESULT` (employee, period, plan, form, kqcv, klcv, hsht, hsnv, hsnv_reason, final_score, recorded_at — a snapshot, no status: no row = "tạm tính") · `WORK_SCORING_CONFIG` (one per tenant). `FORM_INSTANCE.work_plan_id` (set exactly on WORK_PLAN / WORK_REVIEW). Form types `WORK_PLAN`, `WORK_REVIEW`. Cross-row checks in `schema.ts`: a review's plan is its form's, an item's task is in its form's plan, a result's plan and form match its employee and period | CMC PMGM HR pp. 13, 25–26; NV pp. 67–73; QL pp. 120–136; `KPI_monthly_work_plan.md` D-W2 |
 
 ## Phases (plan §6)
 

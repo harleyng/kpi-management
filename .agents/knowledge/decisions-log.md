@@ -6,6 +6,65 @@
 
 ---
 
+## 2026-10-23 — Plan B, B1 pre-merge review: closing the dead ends before the contract freezes
+
+**Decision.** system-architect's pre-merge review (approve with changes) and workflow-expert's B2 review found
+two months that could never finish and a few gaps, fixed in B1 because the contract and seed freeze at merge:
+- A **review launches only for a Locked plan with at least one live task** (`resolveRecipients`,
+  `NO_APPROVED_PLAN` / new `NO_WORK_TASKS`, `ASSUMPTION Q69`). Once a review exists the list is frozen, so a
+  review on an unapproved or empty plan was a dead end (only HR's cancel left). This replaces plan §7's
+  "the manager approves quickly on the form". The seed's E018 March review is gone; her April plan is now the
+  seed's Draft plan, launched on its own on 04-05 like her registration.
+- **Monthly workflows**: ≥ 2 steps, the employee's among them, never ending on the employee's step
+  (`validateWorkflow` `SELF_LAST_STEP`) — otherwise an employee could lock their own plan.
+- **Acting for the manager** on an approved plan: a WORK_PLAN delegate of the manager, or HR with `form.proxy`,
+  cancels and tracks; the write names the manager as the person acted for (BR-KPI-21).
+- A cancelled task is never removed (`TASK_CANCELLED` for REMOVE); progress status agrees with the %
+  (`Done` = 100, `NotStarted` = 0, `STATUS_MISMATCH`); one patch per review item.
+- `schema.ts`: task status / visibility in their sets, `cancelledBy` / `cancelReason` with `cancelledAt`,
+  `approvedBy` needs `approvedAt` (a system approval may leave `approvedBy` empty), no `goalPlanId` on a
+  monthly form.
+- `work.listWorkTasksOfPlans` — a team's month in one read (no N+1 on `/team/work`).
+- Seed: E016's April plan sent 04-04 (inside step 1's SLA); Demo Co's February plan Locked (what the
+  isolation tests review). Freeze re-taken (`2027-04-06.A1.B1`).
+
+Deferred with a note: the score import contract and `PERIOD_START` (8.4); a private task is stored, not
+enforced on reads (reads are tenant-wide until Phase 5 RLS — B2 decides the screen behaviour).
+
+**Why.** A month that can be launched but never closed is a silent failure the prototype must not teach HR.
+Fixing it after merge would be a second Large change on the shared seed.
+
+**Updated alongside.** `business-rules.md` §8 (Q69), §12 (PEND-14); `src/data/fixtures/README.md`;
+`KPI_plan_B_monthly_work.md` §3.
+
+---
+
+## 2026-10-23 — Plan B, B1: monthly work data layer; forms do not move until 8.2 / 8.3
+
+**Decision.** Six entities in a new group G8 (D10 — D9 is A1's; the ERD file untouched): `WorkPlan` (status = the Goal Plan
+set without `Approved`, `WORK_PLAN_STATUSES`), `WorkTask` (visibility reuses the Goal visibility set rather than
+a twin `TASK_VISIBILITIES`), `WorkReview` (Hsnv only in MANAGER / FINAL), `WorkReviewItem`, `WorkResult` (a
+snapshot with **no status** — no row = "tạm tính"), `WorkScoringConfig` (one per tenant; the read returns
+`null` when none and the hook applies `DEFAULT_WORK_SCORING` — no sentinel row). `FormInstance.workPlanId`;
+form types WORK_PLAN / WORK_REVIEW. A new `work` gateway group edits content; a launch creates the month's plan
+(Draft) and, for a review, the review row and one item per live task. Moving the forms stays with 8.2 / 8.3:
+`checkAction` refuses WORK_* with `WORK_FORM_NOT_BUILT` (HR's CANCEL passes), `formStanding` offers no move,
+`canSubmit` answers the same. Task edits (`taskEditBlockers`): before approval at the step that allows EDIT;
+after it only the manager's cancel with a reason and progress — **no ADD after approval** (not in CMC);
+frozen once the review exists (its items were taken), everything frozen once the result is recorded. A task
+must overlap its month, not lie inside it (`ASSUMPTION Q68`). `PERIOD_START` waits for 8.4 (a trigger the
+scheduler ignored would be a silent failure). Seed: the Kinh doanh pilot across T02–T04; the freeze re-taken
+(`2027-04-06.B1`, 55 entities, 12 `work.*` methods); the seed size budget 1.5 M → 1.6 M characters.
+system-architect and hr-performance-expert: approved with changes, all applied.
+
+**Why.** The plan puts data before forms; refusing what is not wired is louder than a form that moves while
+its plan and result stay behind. Cross-row checks in `schema.ts` (review ↔ form ↔ plan ↔ employee / period)
+stand in for the database's foreign keys and RLS.
+
+**Updated alongside.** `business-rules.md` §5, §8 (Q68), §12 (PEND-14); `architecture.md` (data layer, freeze,
+D10); `component-registry.md`; `src/data/fixtures/README.md`; `KPI_plan_B_monthly_work.md` §3.
+
+---
 ## 2026-10-23 — PEND-11: FORMULA is hidden from new picks, never deleted
 
 **Decision.** `libraryRules.RETIRED_METHOD_TYPES = ['FORMULA']`; `pickableMethodTypes` / `pickableMethods` filter

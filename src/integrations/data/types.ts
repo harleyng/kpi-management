@@ -121,6 +121,14 @@ import type {
   UserRole,
   WorkflowStep,
   WorkflowTemplate,
+  WorkPlan,
+  WorkPlanStatus,
+  WorkResult,
+  WorkReview,
+  WorkReviewItem,
+  WorkScoringConfig,
+  WorkTask,
+  WorkTaskStatus,
 } from '@/data/types';
 
 export type DataAdapterName = 'mock' | 'supabase';
@@ -258,6 +266,17 @@ export interface PeriodResultFilter {
   status?: PeriodResultStatus;
 }
 
+export interface WorkPlanFilter {
+  periodId?: Id;
+  employeeIds?: readonly Id[];
+  status?: WorkPlanStatus;
+}
+
+export interface WorkResultFilter {
+  periodIds?: readonly Id[];
+  employeeIds?: readonly Id[];
+}
+
 export interface AuditLogFilter {
   entityName?: EntityName;
   entityId?: Id;
@@ -308,6 +327,35 @@ export interface EvaluationItemPatch {
   finalAchievementPct?: number | null;
   finalComment?: string | null;
 }
+
+/** A task as "Thêm việc" / "Sửa" sends it: only the columns a person types. `id` = update that task. */
+export type WorkTaskInput = Pick<
+  WorkTask,
+  'name' | 'product' | 'description' | 'unitText' | 'weight' | 'startDate' | 'dueDate' | 'visibility' | 'linkedGoalId'
+> & { id?: Id };
+
+/** "Cập nhật tiến độ" on an approved plan (`workRules.progressIssues`). */
+export interface WorkTaskProgressInput {
+  progressPct: number;
+  progressStatus: WorkTaskStatus;
+  note: string | null;
+}
+
+/**
+ * "Lưu nháp" on a WORK_REVIEW form — only the current step's column (`workRules.WORK_REVIEW_COLUMN_FIELDS`).
+ * A key left `undefined` leaves the cell untouched; `null` clears it; `0` is a score. Hsnv exists only
+ * in the MANAGER and FINAL columns.
+ */
+export interface WorkReviewPatch {
+  disciplineScore?: number | null;
+  comment?: string | null;
+  hsnv?: number | null;
+  hsnvReason?: string | null;
+  items?: readonly { itemId: Id; score?: number | null; comment?: string | null }[];
+}
+
+/** The tenant's scoring settings as HR saves them (one row per tenant). */
+export type WorkScoringInput = Pick<WorkScoringConfig, 'resultWeight' | 'disciplineWeight' | 'hsnvThreshold' | 'scoreMin' | 'scoreMax'>;
 
 /**
  * Acting on a form's current step.
@@ -794,6 +842,41 @@ export interface SystemGateway {
 }
 
 /**
+ * G8 · Công việc tháng (PEND-14, Plan B). Scores come from `workRules`, never the caller. Moving a
+ * WORK_PLAN / WORK_REVIEW form (and with it the plan's status and the month's `WorkResult`) is
+ * `forms.act` — wired in steps 8.2 / 8.3; the methods here edit the content.
+ */
+export interface WorkGateway {
+  listWorkPlans(tenantId: Id, filter?: WorkPlanFilter): Promise<WorkPlan[]>;
+  getWorkPlan(tenantId: Id, workPlanId: Id): Promise<WorkPlan>;
+  /** In `sortOrder`; cancelled tasks included (they show struck through). */
+  listWorkTasks(tenantId: Id, workPlanId: Id): Promise<WorkTask[]>;
+  /** The tasks of several plans at once (a team's month, a dashboard) — by plan, then `sortOrder`. Unknown ids match nothing. */
+  listWorkTasksOfPlans(tenantId: Id, workPlanIds: readonly Id[]): Promise<WorkTask[]>;
+  /** The WORK_REVIEW form's discipline / Hsnv row. ERR-KPI-02 for any other form. */
+  getWorkReview(tenantId: Id, formId: Id): Promise<WorkReview>;
+  listWorkReviewItems(tenantId: Id, formId: Id): Promise<WorkReviewItem[]>;
+  listWorkResults(tenantId: Id, filter?: WorkResultFilter): Promise<WorkResult[]>;
+  /** The tenant's settings, or `null` when HR has saved none — the screen then uses `DEFAULT_WORK_SCORING`. */
+  getWorkScoringConfig(tenantId: Id): Promise<WorkScoringConfig | null>;
+
+  /**
+   * Saves the plan's task list, matched BY ID (`ChildInput` semantics): an input with an `id` updates
+   * that task, one without adds a task, a stored task missing from the list is removed. Each change
+   * passes `workRules.taskEditBlockers` — in practice only before approval, by whoever may EDIT at the
+   * WORK_PLAN form's current step. An `id` that is not one of the plan's tasks is ERR-KPI-06.
+   */
+  saveWorkTasks(tenantId: Id, actorUserId: Id, workPlanId: Id, tasks: readonly WorkTaskInput[]): Promise<WorkTask[]>;
+  /** The manager cancels a task of an approved plan, with a reason (`ASSUMPTION Q64`); it drops out of KQcv. */
+  cancelWorkTask(tenantId: Id, actorUserId: Id, taskId: Id, reason: string): Promise<WorkTask>;
+  /** The employee or the manager updates a task's progress on an approved plan. */
+  updateTaskProgress(tenantId: Id, actorUserId: Id, taskId: Id, input: WorkTaskProgressInput): Promise<WorkTask>;
+  /** "Lưu nháp" — the current step's column only; no step change, no action recorded. */
+  saveWorkReview(tenantId: Id, actorUserId: Id, formId: Id, patch: WorkReviewPatch): Promise<{ review: WorkReview; items: WorkReviewItem[] }>;
+  saveWorkScoringConfig(tenantId: Id, actorUserId: Id, input: WorkScoringInput): Promise<WorkScoringConfig>;
+}
+
+/**
  * The clock-driven jobs: due SCHEDULED launches, recurring rules (D5), deadline reminders and
  * overdue steps (BR-KPI-13), all as of `clock.now()`. The mock runs it when asked (the dev toolbar);
  * a real backend runs it on a cron. Idempotent: an overdue step is handled once per entry
@@ -842,6 +925,7 @@ export interface DataGateway {
   readonly actuals: ActualsGateway;
   readonly forms: FormsGateway;
   readonly results: ResultsGateway;
+  readonly work: WorkGateway;
   readonly system: SystemGateway;
   readonly scheduler: SchedulerGateway;
   readonly events: EventsGateway;
@@ -858,6 +942,7 @@ export const GATEWAY_GROUPS = [
   'actuals',
   'forms',
   'results',
+  'work',
   'system',
   'scheduler',
   'events',

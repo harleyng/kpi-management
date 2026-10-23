@@ -134,7 +134,7 @@ sequenceDiagram
   dòng mới ở bảng §5 ("Kế hoạch việc tháng trên Excel / email" → "phiếu tự khởi chạy, điểm tự tính"), PEND-14 ở
   bảng thay đổi, Q59–Q66 ở §6.
 - [ ] `docs/source-map.md`: PMGM.08 đổi từ *Out (Q10)* sang *In (PEND-14)*; thêm các trang HR / NV / QL ở §2.
-- [ ] `docs/erd/kpi_erd.mermaid`: bảng `WORK_PLAN`, `WORK_TASK`, `WORK_REVIEW`, `WORK_RESULT` (8.1).
+- [x] ~~`docs/erd/kpi_erd.mermaid`~~ → ghi thành độ lệch **D10** ở `.agents/knowledge/architecture.md` (file ERD không sửa cho các độ lệch — quy ước Phase 1.1), gồm cả `WORK_REVIEW_ITEM`, `WORK_SCORING_CONFIG` (8.1).
 - [ ] `docs/plans/KPI_repo_plan.md` §1: P1 gồm mục 4 = công việc tháng (cùng việc tài liệu của đợt 0).
 
 **Xong khi.** Product owner trả lời Q59 (ít nhất); PEND-14 có trong §12; `npm run guides:check` không đổi.

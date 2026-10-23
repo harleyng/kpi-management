@@ -1,5 +1,5 @@
 import type { CollectionName } from '@/data/fixtures/types';
-import type { NotificationRefType } from '@/data/types';
+import { GOAL_VISIBILITIES, WORK_PLAN_STATUSES, WORK_TASK_STATUSES, type NotificationRefType } from '@/data/types';
 
 /**
  * The mock's table definitions — what a database would hold as columns, foreign keys, unique
@@ -378,8 +378,18 @@ export const SCHEMA: Readonly<Record<CollectionName, CollectionSpec>> = {
       ref('periodId', 'CyclePeriod'),
       ref('currentStepId', 'WorkflowStep'),
       ref('launchId', 'FormLaunch'),
+      ref('workPlanId', 'WorkPlan'),
     ],
-    checks: [sameParent('currentStepId', 'WorkflowStep', 'workflowId', (row) => row.workflowId)],
+    checks: [
+      sameParent('currentStepId', 'WorkflowStep', 'workflowId', (row) => row.workflowId),
+      setIff('workPlanId', (r) => r.formType === 'WORK_PLAN' || r.formType === 'WORK_REVIEW', 'the form is WORK_PLAN or WORK_REVIEW'),
+      (row) => ((row.formType === 'WORK_PLAN' || row.formType === 'WORK_REVIEW') && row.goalPlanId !== null ? 'a monthly work form has no goalPlanId' : null),
+      (row, ctx) => {
+        const plan = typeof row.workPlanId === 'string' ? ctx.find('WorkPlan', row.workPlanId) : undefined;
+        if (!plan) return null;
+        return plan.employeeId === row.subjectEmployeeId && plan.periodId === row.periodId ? null : "workPlanId is not the subject's plan for the form's period";
+      },
+    ],
   },
   FormStepAction: {
     writable: [],
@@ -478,6 +488,79 @@ export const SCHEMA: Readonly<Record<CollectionName, CollectionSpec>> = {
         const target = NOTIFICATION_REF_COLLECTION[row.refType as NotificationRefType];
         if (!target) return 'unknown refType';
         return ctx.find(target, row.refId as string) ? null : `refId not found in ${target}`;
+      },
+    ],
+  },
+  // ─── Monthly work (PEND-14) ────────────────────────────────────────────────────────────────
+  WorkScoringConfig: {
+    writable: ['resultWeight', 'disciplineWeight', 'hsnvThreshold', 'scoreMin', 'scoreMax'],
+    refs: [],
+    collectionChecks: [(rows) => (rows.length > 1 ? 'a tenant has at most one scoring config' : null)],
+  },
+  WorkPlan: {
+    writable: [],
+    refs: [owner('employeeId', 'Employee'), owner('periodId', 'CyclePeriod'), ref('approvedBy', 'UserAccount')],
+    unique: [{ fields: ['employeeId', 'periodId'] }],
+    checks: [
+      (row) => (WORK_PLAN_STATUSES.includes(row.status as never) ? null : 'status is not a work plan status'),
+      (row, ctx) => (ctx.find('CyclePeriod', row.periodId as string)?.periodType === 'Month' ? null : 'a work plan is for a Month period'),
+      setIff('approvedAt', (r) => r.status === 'Locked', 'the plan is Locked'),
+      // A system approval (an automatic step) leaves `approvedBy` empty; a person's never comes without `approvedAt`.
+      (row) => (row.approvedBy !== null && row.approvedAt === null ? 'approvedBy needs approvedAt' : null),
+    ],
+  },
+  WorkTask: {
+    writable: ['name', 'product', 'description', 'unitText', 'weight', 'startDate', 'dueDate', 'visibility', 'linkedGoalId'],
+    refs: [
+      owner('workPlanId', 'WorkPlan', 'cascade'),
+      ref('linkedGoalId', 'Goal'),
+      ref('createdBy', 'UserAccount'),
+      ref('cancelledBy', 'UserAccount'),
+    ],
+    checks: [
+      nonNegative('weight'),
+      ordered('startDate', 'dueDate'),
+      (row) => {
+        const pct = n(row.progressPct);
+        return pct !== null && pct >= 0 && pct <= 100 ? null : 'progressPct must be 0–100';
+      },
+      setIff('cancelledAt', (r) => r.progressStatus === 'Cancelled', 'progressStatus is Cancelled'),
+      setIff('cancelledBy', (r) => r.cancelledAt !== null, 'cancelledAt is set'),
+      setIff('cancelReason', (r) => r.cancelledAt !== null, 'cancelledAt is set'),
+      (row) => (WORK_TASK_STATUSES.includes(row.progressStatus as never) ? null : 'progressStatus is not a work task status'),
+      (row) => (GOAL_VISIBILITIES.includes(row.visibility as never) ? null : 'visibility is not a visibility'),
+    ],
+  },
+  WorkReview: {
+    writable: [],
+    refs: [owner('formId', 'FormInstance', 'cascade'), owner('workPlanId', 'WorkPlan')],
+    unique: [{ fields: ['formId'] }],
+    checks: [
+      (row, ctx) => {
+        const form = ctx.find('FormInstance', row.formId as string);
+        if (!form) return null;
+        if (form.formType !== 'WORK_REVIEW') return 'formId is not a WORK_REVIEW form';
+        return form.workPlanId === row.workPlanId ? null : "workPlanId is not the form's work plan";
+      },
+    ],
+  },
+  WorkReviewItem: {
+    writable: [],
+    refs: [owner('formId', 'FormInstance', 'cascade'), owner('taskId', 'WorkTask')],
+    unique: [{ fields: ['formId', 'taskId'] }],
+    checks: [sameParent('taskId', 'WorkTask', 'workPlanId', (row, ctx) => ctx.find('FormInstance', row.formId as string)?.workPlanId)],
+  },
+  WorkResult: {
+    writable: [],
+    refs: [owner('employeeId', 'Employee'), owner('periodId', 'CyclePeriod'), owner('workPlanId', 'WorkPlan'), owner('formId', 'FormInstance')],
+    unique: [{ fields: ['employeeId', 'periodId'] }],
+    checks: [
+      (row, ctx) => {
+        const plan = ctx.find('WorkPlan', row.workPlanId as string);
+        if (plan && (plan.employeeId !== row.employeeId || plan.periodId !== row.periodId)) return 'workPlanId is not this employee and period';
+        const form = ctx.find('FormInstance', row.formId as string);
+        if (form && (form.formType !== 'WORK_REVIEW' || form.workPlanId !== row.workPlanId)) return "formId is not the plan's WORK_REVIEW form";
+        return null;
       },
     ],
   },

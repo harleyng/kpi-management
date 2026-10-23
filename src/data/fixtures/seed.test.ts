@@ -13,6 +13,8 @@ import {
   RECORD_STATUSES,
   SYNC_RUN_STATUSES,
   TENANT_STATUSES,
+  WORK_PLAN_STATUSES,
+  WORK_TASK_STATUSES,
   type FormInstance,
   type WorkflowStep,
 } from '@/data/types';
@@ -21,6 +23,7 @@ import { isWeightComplete } from '@/lib/goalPlanRules';
 import { ratingFor } from '@/lib/ratingRules';
 import { currentLinesOf, finalizeCheck } from '@/lib/resultRules';
 import { ratedScore, roundScore } from '@/lib/scoreRules';
+import { DEFAULT_WORK_SCORING, taskWeightIssues, workResultOf } from '@/lib/workRules';
 import { validateTransaction } from '@/integrations/data/mock/integrity';
 import { POLYMORPHIC_ID_COLUMNS, SCHEMA } from '@/integrations/data/mock/schema';
 import { keyOf, TenantData, Tx, type GlobalData } from '@/integrations/data/mock/store';
@@ -99,7 +102,8 @@ describe('seed — structure', () => {
   });
 
   it('stays under the size budget (localStorage holds about 5 M characters)', () => {
-    // 1.5 M until A1 (2026-10-23): the evaluation items' form actual, target and submitted actual added ~20 k.
+    // 1.5 M until 2026-10-23: A1's evaluation items (form actual, target, submitted actual) added ~20 k and
+    // Plan B 8.1's monthly-work seed more; still a third of what localStorage holds.
     expect(JSON.stringify(seed).length).toBeLessThan(1_600_000);
   });
 });
@@ -122,6 +126,8 @@ const STATE_SETS: { name: string; values: readonly string[]; seen: (t: TenantSee
   { name: 'Launch', values: LAUNCH_STATUSES, seen: (t) => rows(t, 'FormLaunch').map((r) => r.status) },
   { name: 'Period result', values: PERIOD_RESULT_STATUSES, seen: (t) => rows(t, 'PeriodResult').map((r) => r.status) },
   { name: 'Notification', values: NOTIFICATION_STATUSES, seen: (t) => rows(t, 'Notification').map((r) => r.status) },
+  { name: 'Work plan', values: WORK_PLAN_STATUSES, seen: (t) => rows(t, 'WorkPlan').map((r) => r.status) },
+  { name: 'Work task', values: WORK_TASK_STATUSES, seen: (t) => rows(t, 'WorkTask').map((r) => r.progressStatus) },
 ];
 
 /** Temporary exemptions — each says why, and what removes it. */
@@ -425,5 +431,62 @@ describe('seed — period results (produced by resultRules, BR-KPI-40…43)', ()
     expect(code(crossing?.totalScore as number)).toBe('B');
     expect(code((crossing?.totalScore as number) - (crossing?.adjustmentPct as number))).toBe('C');
     expect(crossing?.payoutPct).toBe(80);
+  });
+});
+
+describe('seed — monthly work (PEND-14, Plan B 8.1)', () => {
+  it.each([['Syntra'], ['Demo Co']])('every plan past Draft was sent at 100 ± 0.01 (a later cancellation drops out of KQcv, Q64) (%s)', (name) => {
+    const t = name === 'Syntra' ? syntra : demo;
+    for (const plan of rows(t, 'WorkPlan').filter((p) => p.status !== 'Draft')) {
+      const asSent = rows(t, 'WorkTask').filter((x) => x.workPlanId === plan.id).map((x) => ({ ...x, cancelledAt: null }));
+      expect(taskWeightIssues(asSent), plan.id).toEqual([]);
+    }
+  });
+
+  it.each([['Syntra'], ['Demo Co']])('every WorkResult is what workRules.workResultOf makes of its review (%s)', (name) => {
+    const t = name === 'Syntra' ? syntra : demo;
+    expect(rows(t, 'WorkResult').length).toBeGreaterThan(0);
+    for (const r of rows(t, 'WorkResult')) {
+      const review = rows(t, 'WorkReview').find((x) => x.formId === r.formId);
+      expect(review, r.id).toBeDefined();
+      const items = rows(t, 'WorkReviewItem').filter((i) => i.formId === r.formId);
+      const tasks = rows(t, 'WorkTask').filter((x) => x.workPlanId === r.workPlanId);
+      const expected = workResultOf(review as never, items, tasks, DEFAULT_WORK_SCORING);
+      for (const key of ['kqcv', 'klcv', 'hsht', 'hsnv', 'finalScore'] as const) expect(r[key] as number, `${r.id}.${key}`).toBeCloseTo(expected[key] as number, 9);
+      expect(r.hsnvReason).toBe(expected.hsnvReason);
+      expect(rows(t, 'FormInstance').find((f) => f.id === r.formId)?.status).toBe('Completed');
+    }
+  });
+
+  it('has the cases 8.2–8.5 need: a recorded month below 80 with Hsnv, a cancelled task, a Draft plan being written', () => {
+    const below = rows(syntra, 'WorkResult').filter((r) => (r.hsht as number) < DEFAULT_WORK_SCORING.hsnvThreshold);
+    expect(below.length).toBe(1);
+    expect(below[0].hsnv).not.toBeNull();
+    expect(below[0].hsnvReason).toBeTruthy();
+    expect(rows(syntra, 'WorkTask').some((x) => x.cancelledAt !== null && x.cancelReason)).toBe(true);
+    const writing = rows(syntra, 'WorkPlan').filter(
+      (p) => p.status === 'Draft' && rows(syntra, 'FormInstance').some((f) => f.workPlanId === p.id && f.formType === 'WORK_PLAN' && f.status === 'Open'),
+    );
+    expect(writing.length).toBe(1);
+  });
+
+  it.each([['Syntra'], ['Demo Co']])('a review exists only on a Locked plan with a live task (ASSUMPTION Q69) (%s)', (name) => {
+    const t = name === 'Syntra' ? syntra : demo;
+    for (const review of rows(t, 'WorkReview')) {
+      expect(rows(t, 'WorkPlan').find((p) => p.id === review.workPlanId)?.status, review.id).toBe('Locked');
+      expect(rows(t, 'WorkReviewItem').some((i) => i.formId === review.formId), review.id).toBe(true);
+    }
+  });
+
+  it('a review form has one review row; its items are the plan\'s tasks live at launch', () => {
+    for (const f of rows(syntra, 'FormInstance').filter((x) => x.formType === 'WORK_REVIEW')) {
+      expect(rows(syntra, 'WorkReview').filter((r) => r.formId === f.id), f.id).toHaveLength(1);
+      const live = rows(syntra, 'WorkTask').filter((x) => x.workPlanId === f.workPlanId && (x.cancelledAt === null || x.cancelledAt > f.launchedAt));
+      expect(rows(syntra, 'WorkReviewItem').filter((i) => i.formId === f.id).map((i) => i.taskId).sort(), f.id).toEqual(live.map((x) => x.id).sort());
+    }
+  });
+
+  it('every tenant has its scoring config', () => {
+    for (const t of seed.tenants) expect(rows(t, 'WorkScoringConfig')).toHaveLength(1);
   });
 });

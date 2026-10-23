@@ -91,6 +91,9 @@ const LIST_READS: Record<string, Read> = {
   'system.listNotificationTemplates': (gw) => gw.system.listNotificationTemplates(D),
   'system.listNotifications': (gw) => gw.system.listNotifications(D, DEMO.user(DEMO.personas.employee), {}, { limit: 500 }),
   'system.listAuditLog': (gw) => gw.system.listAuditLog(D, {}, { limit: 500 }),
+  'work.listWorkPlans': (gw) => gw.work.listWorkPlans(D),
+  'work.listWorkResults': (gw) => gw.work.listWorkResults(D),
+  'work.listWorkTasksOfPlans': (gw) => gw.work.listWorkTasksOfPlans(D, demo.rows.WorkPlan.map((p) => p.id)),
 };
 
 // ─── Reads by id: another tenant's id answers ERR-KPI-02 exactly like a missing one ──────────────
@@ -115,6 +118,10 @@ const ID_READS: Record<string, [CollectionName, ById]> = {
   'results.listResultDetails': ['Goal', (gw, id) => gw.results.listResultDetails(D, id)],
   'system.getFile': ['FileObject', (gw, id) => gw.system.getFile(D, id)],
   'system.getFileUrl': ['FileObject', (gw, id) => gw.system.getFileUrl(D, id)],
+  'work.getWorkPlan': ['WorkPlan', (gw, id) => gw.work.getWorkPlan(D, id)],
+  'work.listWorkTasks': ['WorkPlan', (gw, id) => gw.work.listWorkTasks(D, id)],
+  'work.getWorkReview': ['FormInstance', (gw, id) => gw.work.getWorkReview(D, id)],
+  'work.listWorkReviewItems': ['FormInstance', (gw, id) => gw.work.listWorkReviewItems(D, id)],
 };
 
 // ─── Writes that name a row by id: another tenant's row answers ERR-KPI-02 like a missing one ────
@@ -314,6 +321,46 @@ const T4_PAYLOAD_REFS: [string, CollectionName, ById][] = [
 ];
 const T4_COVERED = new Set([...T4_ID_CALLS, ...T4_PAYLOAD_REFS].map(([name]) => name.split(' ')[0]));
 
+// ═══ Plan B — monthly work (PEND-14, step 8.1) ═══════════════════════════════════════════════════
+const demoWorkPlan = DEMO.id('WorkPlan', 'D003', 'T01');
+const demoTask = DEMO.id('WorkTask', 'D003', 'T01', 1);
+const demoTaskRows = () => demo.rows.WorkTask.filter((t) => t.workPlanId === demoWorkPlan);
+const taskInput = (o: Record<string, unknown> = {}) => ({
+  name: 'Việc mới', product: null, description: null, unitText: null, weight: 10, startDate: '2027-01-01', dueDate: '2027-01-31', visibility: 'PUBLIC', linkedGoalId: null, ...o,
+});
+/** An open review in Demo Co (T02, launched now): D003 may save her own column. */
+const openReviews = new WeakMap<DataGateway, Promise<string>>();
+function openDemoReview(gw: DataGateway): Promise<string> {
+  const known = openReviews.get(gw);
+  if (known) return known;
+  const opened = (async () => {
+    const launch = await gw.forms.createLaunch(D, demoActor, { ...filterWith('employeeIds', DEMO.employee('D003')), workflowId: demoWorkflow('WORK_REVIEW'), periodId: demoT02 });
+    const forms = (await gw.forms.listForms(D, { launchId: launch.id })).items;
+    expect(forms).toHaveLength(1);
+    return forms[0].id;
+  })();
+  openReviews.set(gw, opened);
+  return opened;
+}
+
+const WORK_ID_CALLS: [string, CollectionName, ById][] = [
+  ['work.saveWorkTasks workPlanId', 'WorkPlan', (gw, id) => gw.work.saveWorkTasks(D, demoActor, id, [])],
+  ['work.cancelWorkTask taskId', 'WorkTask', (gw, id) => gw.work.cancelWorkTask(D, demoActor, id, 'Lý do')],
+  ['work.updateTaskProgress taskId', 'WorkTask', (gw, id) => gw.work.updateTaskProgress(D, demoActor, id, { progressPct: 50, progressStatus: 'InProgress', note: null })],
+  ['work.saveWorkReview formId', 'FormInstance', (gw, id) => gw.work.saveWorkReview(D, demoActor, id, {})],
+];
+const WORK_PAYLOAD_REFS: [string, CollectionName, ById][] = [
+  // Another tenant's task id in the list is "not a task of this plan" — exactly like an unknown id.
+  ['work.saveWorkTasks tasks[].id', 'WorkTask', (gw, id) => gw.work.saveWorkTasks(D, demoActor, demoWorkPlan, [...demoTaskRows(), { ...taskInput(), id }] as never)],
+  ['work.saveWorkTasks tasks[].linkedGoalId', 'Goal', (gw, id) => gw.work.saveWorkTasks(D, demoActor, demoWorkPlan, [...demoTaskRows(), taskInput({ linkedGoalId: id })] as never)],
+  ['work.saveWorkReview items[].itemId', 'WorkReviewItem', async (gw, id) => gw.work.saveWorkReview(D, DEMO.user('D003'), await openDemoReview(gw), { items: [{ itemId: id, score: 50 }] })],
+];
+const WORK_COVERED = new Set([
+  ...[...WORK_ID_CALLS, ...WORK_PAYLOAD_REFS].map(([name]) => name.split(' ')[0]),
+  'work.getWorkScoringConfig', // one row per tenant, no id: its own case below
+  'work.saveWorkScoringConfig', // no reference in its payload: its own case below
+]);
+
 describe('tenant isolation — coverage', () => {
   it('covers every method of the contract', () => {
     const { gateway } = newGateway();
@@ -327,6 +374,7 @@ describe('tenant isolation — coverage', () => {
       ...OTHER,
       ...WORKFLOW_COVERED,
       ...T4_COVERED,
+      ...WORK_COVERED,
     ]);
     const missing = [...gateway.registry.methods.keys()].filter((m) => !covered.has(m));
     expect(missing).toEqual([]);
@@ -591,5 +639,48 @@ describe('tenant isolation — Track T4 (the import framework and the API sync)'
     expect(foreignIdsIn(run)).toEqual([]);
     expect(foreignIdsIn(await gateway.actuals.listActuals(D, { currentOnly: false }))).toEqual([]);
     expect(await gateway.actuals.listActuals(S, { currentOnly: false })).toEqual(syntraBefore);
+  });
+});
+
+describe('tenant isolation — Plan B monthly work (PEND-14)', () => {
+  it.each(WORK_ID_CALLS)('%s = a Syntra id answers like a missing id (ERR-KPI-02)', async (_, c, call) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-02');
+  });
+
+  it.each(WORK_PAYLOAD_REFS)('%s = a Syntra id is refused like a missing id (ERR-KPI-06)', async (_, c, call) => {
+    const { gateway } = newGateway();
+    await expectSameAsMissing((id) => call(gateway, id), sId(c), 'ERR-KPI-06');
+  });
+
+  it('filters naming Syntra people or periods match nothing in Demo Co', async () => {
+    const { gateway } = newGateway();
+    expect(await gateway.work.listWorkPlans(D, { employeeIds: [sId('Employee')] })).toEqual([]);
+    expect(await gateway.work.listWorkPlans(D, { periodId: sId('CyclePeriod') })).toEqual([]);
+    expect(await gateway.work.listWorkResults(D, { employeeIds: syntra.rows.WorkResult.map((r) => r.employeeId) })).toEqual([]);
+    expect(await gateway.work.listWorkTasksOfPlans(D, syntra.rows.WorkPlan.map((p) => p.id))).toEqual([]);
+  });
+
+  it('each tenant reads its own scoring config; saving Demo Co\'s leaves Syntra\'s as it was', async () => {
+    const { gateway } = newGateway();
+    const syntraBefore = await gateway.work.getWorkScoringConfig(S);
+    expect(foreignIdsIn(await gateway.work.getWorkScoringConfig(D))).toEqual([]);
+    const saved = await gateway.work.saveWorkScoringConfig(D, demoActor, { resultWeight: 60, disciplineWeight: 40, hsnvThreshold: 75, scoreMin: 0, scoreMax: 100 });
+    expect(saved.tenantId).toBe(D);
+    expect(await gateway.work.getWorkScoringConfig(S)).toEqual(syntraBefore);
+  });
+
+  it('a Syntra actor cannot write monthly work in Demo Co (ERR-KPI-05)', async () => {
+    const { gateway } = newGateway();
+    const syntraHr = SYNTRA.user(SYNTRA.personas.hr);
+    for (const call of [
+      gateway.work.saveWorkTasks(D, syntraHr, demoWorkPlan, []),
+      gateway.work.cancelWorkTask(D, syntraHr, demoTask, 'Lý do'),
+      gateway.work.updateTaskProgress(D, syntraHr, demoTask, { progressPct: 1, progressStatus: 'InProgress', note: null }),
+      gateway.work.saveWorkReview(D, syntraHr, demoForm('WR:T01:D003'), {}),
+      gateway.work.saveWorkScoringConfig(D, syntraHr, { resultWeight: 70, disciplineWeight: 30, hsnvThreshold: 80, scoreMin: 0, scoreMax: 100 }),
+    ]) {
+      expect((await rejection(call)).code).toBe('ERR-KPI-05');
+    }
   });
 });

@@ -39,6 +39,7 @@ const LABELLED_SETS: [string, readonly string[], Record<string, string>][] = [
   ['IMPORT_TYPES', domain.IMPORT_TYPES, domain.IMPORT_TYPE_LABEL],
   ['IMPORT_BATCH_STATUSES', domain.IMPORT_BATCH_STATUSES, domain.IMPORT_BATCH_STATUS_LABEL],
   ['FORM_TYPES', domain.FORM_TYPES, domain.FORM_TYPE_LABEL],
+  ['WORK_TASK_STATUSES', domain.WORK_TASK_STATUSES, domain.WORK_TASK_STATUS_LABEL],
   ['ACTOR_RULES', domain.ACTOR_RULES, domain.ACTOR_RULE_LABEL],
   ['STEP_ACTIONS', domain.STEP_ACTIONS, domain.STEP_ACTION_LABEL],
   ['OVERDUE_BEHAVIOURS', domain.OVERDUE_BEHAVIOURS, domain.OVERDUE_BEHAVIOUR_LABEL],
@@ -61,7 +62,8 @@ const LABELLED_SETS: [string, readonly string[], Record<string, string>][] = [
 ];
 
 /** Sets that are never shown as a status on their own — a subset, or developer-facing names. */
-const UNLABELLED_SETS = ['ALLOWED_STEP_ACTIONS', 'PERSON_FORM_ACTIONS', 'NOTIFICATION_LANGUAGES', 'NOTIFICATION_REF_TYPES'];
+// WORK_FORM_TYPES and WORK_PLAN_STATUSES are subsets labelled by FORM_TYPE_LABEL / GOAL_PLAN_STATUS_LABEL.
+const UNLABELLED_SETS = ['ALLOWED_STEP_ACTIONS', 'PERSON_FORM_ACTIONS', 'NOTIFICATION_LANGUAGES', 'NOTIFICATION_REF_TYPES', 'WORK_FORM_TYPES', 'WORK_PLAN_STATUSES'];
 
 describe('state sets', () => {
   it('pairs every exported set with a label map, or lists it as deliberately unlabelled', () => {
@@ -107,7 +109,13 @@ describe('state sets', () => {
     expect(domain.CALC_METHOD_TYPES).toEqual(['RATIO_UP', 'RATIO_DOWN', 'TIERED', 'BINARY', 'FORMULA', 'LEVELS']);
   });
 
-  it('keeps P2 form types out of P1', () => {
-    expect(domain.FORM_TYPES).toEqual(['GOAL_SETTING', 'GOAL_CHANGE', 'KPI_EVAL']);
+  it('keeps P2 form types out of P1 (monthly work is P1 item 4, PEND-14)', () => {
+    expect(domain.FORM_TYPES).toEqual(['GOAL_SETTING', 'GOAL_CHANGE', 'KPI_EVAL', 'WORK_PLAN', 'WORK_REVIEW']);
+    for (const t of domain.WORK_FORM_TYPES) expect(domain.isWorkFormType(t)).toBe(true);
+  });
+
+  it('a work plan never takes the Goal Plan status it does not use (approval is the lock)', () => {
+    expect(domain.WORK_PLAN_STATUSES).not.toContain('Approved');
+    for (const s of domain.WORK_PLAN_STATUSES) expect(domain.GOAL_PLAN_STATUSES).toContain(s);
   });
 });

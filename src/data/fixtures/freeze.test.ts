@@ -15,9 +15,11 @@ import { buildSeed, SEED_VERSION } from './index';
  *   5. log it with /log-decision.
  */
 const FROZEN = {
-  seedVersion: '2027-04-06.A1',
-  seedHash: '8ab04a6fae10a',
-  entityCount: 49,
+  // Re-frozen 2026-10-23 by Plan A's A1 (evaluation items), then for Plan B step 8.1 (PEND-14): six
+  // monthly-work entities, the Kinh doanh pilot seed, a review only on a Locked plan with a live task (Q69).
+  seedVersion: '2027-04-06.A1.B1',
+  seedHash: '9ae52055a1180',
+  entityCount: 55,
 } as const;
 
 /** `group.method:kind[:permission]` — the gateway surface and each write's declared authorization. */
@@ -149,6 +151,20 @@ const FROZEN_CONTRACT: readonly string[] = [
   'system.recordNotification:system',
   'system.saveNotificationTemplate:write:notification.manage',
   'system.uploadFile:write:evidence.upload',
+  // Plan B step 8.1 (PEND-14, 2026-10-23): monthly work.
+  'work.cancelWorkTask:write:workflow',
+  'work.getWorkPlan:read',
+  'work.getWorkReview:read',
+  'work.getWorkScoringConfig:read',
+  'work.listWorkPlans:read',
+  'work.listWorkResults:read',
+  'work.listWorkReviewItems:read',
+  'work.listWorkTasks:read',
+  'work.listWorkTasksOfPlans:read',
+  'work.saveWorkReview:write:workflow',
+  'work.saveWorkScoringConfig:write:cycle.manage',
+  'work.saveWorkTasks:write:workflow',
+  'work.updateTaskProgress:write:workflow',
 ];
 
 /** JSON with object keys sorted, so the hash depends on the data, not on insertion order. */

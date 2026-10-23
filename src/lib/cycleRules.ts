@@ -98,7 +98,7 @@ export function canLockPeriod(c: Pick<PerformanceCycle, 'status'>): Decision {
 
 /**
  * Which forms a cycle accepts (launches and forms started by hand), ERR-KPI-04 otherwise:
- * registration while Planning or Active; evaluation while Active or Evaluating; an adjustment
+ * registration while Planning or Active; evaluation and monthly work while Active or Evaluating; an adjustment
  * at any time before the cycle is Closed.
  */
 export function cycleAllowsLaunch(c: Pick<PerformanceCycle, 'status'>, formType: FormType): Decision {
@@ -106,6 +106,9 @@ export function cycleAllowsLaunch(c: Pick<PerformanceCycle, 'status'>, formType:
     GOAL_SETTING: ['Planning', 'Active'],
     KPI_EVAL: ['Active', 'Evaluating'],
     GOAL_CHANGE: ['Planning', 'Active', 'Evaluating'],
+    // Monthly work (PEND-14) runs on the cycle's months, like the evaluation.
+    WORK_PLAN: ['Active', 'Evaluating'],
+    WORK_REVIEW: ['Active', 'Evaluating'],
   };
   return allowed[formType].includes(c.status) ? allow : refuse('ERR-KPI-04');
 }

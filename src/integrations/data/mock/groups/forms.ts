@@ -16,6 +16,7 @@ import {
   editableColumn,
   isInInbox,
   isTerminal,
+  launchPeriodIssues,
   launchTimingIssues,
   resolveStepActors,
   stepDeadline,
@@ -119,7 +120,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
         createdBy: tx.ctx.actorUserId,
         createdAt: tx.now,
       };
-      throwIssues([...validateLaunch(launch), ...launchTimingIssues(launch, clock)]);
+      throwIssues([...validateLaunch(launch), ...launchPeriodIssues(launch.formType, period), ...launchTimingIssues(launch, clock)]);
       if (period && cycle && period.cycleId !== cycle.id) throw new KpiError('ERR-KPI-06', 'FormLaunch.periodId belongs to another cycle');
       const target = cycle ?? (period ? tx.get('PerformanceCycle', period.cycleId) : null);
       if (target) throwDecision(cycleAllowsLaunch(target, launch.formType), `cycle ${target.id} does not accept ${launch.formType} now`);
@@ -175,6 +176,7 @@ export function formsGroup(rt: Runtime): FormsGateway {
           formType: workflow.formType,
           subjectEmployeeId: input.subjectEmployeeId,
           goalPlanId: input.goalPlanId,
+          workPlanId: null,
           periodId: input.periodId,
           currentStepId: first.id,
           currentStepEnteredAt: tx.now,

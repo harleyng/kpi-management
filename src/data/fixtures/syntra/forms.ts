@@ -84,6 +84,7 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
       formType: f.type,
       subjectEmployeeId: org.employeeId(f.subject),
       goalPlanId: g.plan(f.planOwner).id,
+      workPlanId: null,
       periodId: f.periodLabel ? g.period(f.periodLabel).id : null,
       currentStepId: f.step === null ? null : wf.step(f.type, f.step).id,
       currentStepEnteredAt: f.enteredAt,

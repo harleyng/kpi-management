@@ -1,6 +1,6 @@
 import type { Tenant } from '@/data/types';
 import { idsFor, seedId } from '../ids';
-import { addLibrary, addNotificationTemplates, addRating, addWorkflows, SeedRows } from '../shared';
+import { addLibrary, addNotificationTemplates, addRating, addWorkflows, addWorkScoring, SeedRows } from '../shared';
 import { vn } from '../timeline';
 import type { TenantSeed } from '../types';
 import { buildActuals } from './actuals';
@@ -9,6 +9,7 @@ import { buildGoals } from './goals';
 import { buildOrg } from './org';
 import { buildResults } from './results';
 import { buildSystem } from './system';
+import { buildWork } from './work';
 
 /** Syntra — the full tenant (plan §6.4). Its story is in `src/data/fixtures/README.md`. */
 export const SYNTRA_TENANT_ID = seedId('tenant', 'SYNTRA');
@@ -51,6 +52,8 @@ export function buildSyntra(): TenantSeed {
   const goals = buildGoals(s, id, org, lib, rating.scaleId, oldScaleId);
   const actuals = buildActuals(s, id, org, lib, goals);
   const forms = buildForms(s, id, org, goals, actuals, wf);
+  addWorkScoring(s, id);
+  buildWork(s, id, org, goals, wf);
   const templateOf = addNotificationTemplates(s, id);
   buildSystem(s, id, org, goals, forms, templateOf);
   // Last: results are computed from everything above, through resultRules (never typed in).

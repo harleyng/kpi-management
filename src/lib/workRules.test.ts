@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { WorkReview, WorkReviewItem } from '@/data/types';
 import {
+  columnTotals,
+  linkedGoalIssues,
+  planSubmitIssues,
+  progressIssues,
+  reviewSubmitIssues,
+  taskEditBlockers,
+  workResultOf,
+  type TaskEditContext,
   DEFAULT_WORK_SCORING,
   effectiveWeights,
   finalWorkScore,
@@ -238,5 +247,226 @@ describe('workScoringIssues — the tenant’s settings', () => {
   it('the threshold must sit on the scale, and the scale must be a range', () => {
     expect(issuesOf({ hsnvThreshold: 120 })).toEqual(['ERR-KPI-06:THRESHOLD_OUT_OF_RANGE']);
     expect(issuesOf({ scoreMin: 100, scoreMax: 100 })).toEqual(['ERR-KPI-06:SCALE_INVALID']);
+  });
+});
+
+// ─── Step 8.1: plan submit, task edits, review submit, the result snapshot ────────────────────
+
+const MARCH = { startDate: '2027-03-01', endDate: '2027-03-31' };
+const planned = (id: string, weight: number, o: Partial<{ name: string; startDate: string; dueDate: string; cancelledAt: string | null }> = {}) => ({
+  id, weight, cancelledAt: null, name: `Việc ${id}`, startDate: '2027-03-01', dueDate: '2027-03-31', ...o,
+});
+
+describe('planSubmitIssues — what blocks sending the month\'s plan', () => {
+  it('a complete plan passes', () => {
+    expect(planSubmitIssues([planned('a', 60), planned('b', 40)], MARCH)).toEqual([]);
+  });
+
+  it('no live task → PLAN_EMPTY (all cancelled counts as empty)', () => {
+    expect(details(planSubmitIssues([], MARCH))).toEqual(['ERR-KPI-06:PLAN_EMPTY']);
+    expect(details(planSubmitIssues([planned('a', 100, { cancelledAt: '2027-03-10T00:00:00Z' })], MARCH))).toEqual(['ERR-KPI-06:PLAN_EMPTY']);
+  });
+
+  it('a blank name, reversed dates, a task wholly outside the month, and the weights', () => {
+    const issues = planSubmitIssues(
+      [planned('a', 50, { name: '  ' }), planned('b', 20, { startDate: '2027-03-20', dueDate: '2027-03-10' }), planned('c', 20, { startDate: '2027-04-01', dueDate: '2027-04-10' })],
+      MARCH,
+    );
+    expect(issues.map((i) => `${i.ref}:${i.detail ?? i.code}`)).toEqual(['a:NAME_REQUIRED', 'b:DATES_ORDER', 'c:DATES_OUTSIDE_PERIOD', 'null:ERR-KPI-07']);
+  });
+
+  it('a task carried over from last month (overlapping the month) is fine (ASSUMPTION Q68)', () => {
+    expect(planSubmitIssues([planned('a', 100, { startDate: '2027-02-15', dueDate: '2027-03-10' })], MARCH)).toEqual([]);
+  });
+});
+
+const ctx = (o: Partial<TaskEditContext> = {}): TaskEditContext => ({
+  planStatus: 'Draft', editAtStep: null, isSubject: true, isManager: false, mayActForManager: false, reviewLaunched: false, resultRecorded: false, ...o,
+});
+type TaskRef = { id: string; cancelledAt: string | null };
+const live: TaskRef = { id: 't1', cancelledAt: null };
+const gone: TaskRef = { id: 't1', cancelledAt: '2027-03-10T00:00:00Z' };
+const blockers = (c: TaskEditContext, edit: Parameters<typeof taskEditBlockers>[1], t: TaskRef | null = live, reason: string | null = null) =>
+  details(taskEditBlockers(c, edit, t, reason));
+
+describe('taskEditBlockers — who may change a task, when (plan §6)', () => {
+  it('before approval: the list is edited at the step that allows EDIT; nothing to cancel or track yet', () => {
+    for (const edit of ['ADD', 'UPDATE', 'REMOVE'] as const) expect(blockers(ctx(), edit)).toEqual([]);
+    const notYours = ctx({ editAtStep: { code: 'ERR-KPI-05', ref: null, detail: 'NOT_ENTITLED', data: null } });
+    expect(blockers(notYours, 'ADD', null)).toEqual(['ERR-KPI-05:NOT_ENTITLED']);
+    expect(blockers(ctx({ isManager: true }), 'CANCEL', live, 'Lý do')).toEqual(['ERR-KPI-04:NOT_APPROVED']);
+    expect(blockers(ctx(), 'PROGRESS')).toEqual(['ERR-KPI-04:NOT_APPROVED']);
+  });
+
+  it('after approval: the list is fixed — no ADD, UPDATE or REMOVE, even for the manager', () => {
+    for (const edit of ['ADD', 'UPDATE', 'REMOVE'] as const) {
+      expect(blockers(ctx({ planStatus: 'Locked', isManager: true, isSubject: false }), edit)).toEqual(['ERR-KPI-04:PLAN_LOCKED']);
+    }
+  });
+
+  it('after approval: only the manager cancels, and only with a reason (Q64)', () => {
+    const locked = ctx({ planStatus: 'Locked' });
+    expect(blockers(locked, 'CANCEL', live, 'Lý do')).toEqual(['ERR-KPI-05:MANAGER_ONLY']);
+    const manager = ctx({ planStatus: 'Locked', isSubject: false, isManager: true });
+    expect(blockers(manager, 'CANCEL', live, '   ')).toEqual(['ERR-KPI-06:CANCEL_REASON_REQUIRED']);
+    expect(blockers(manager, 'CANCEL', live, 'Khách hàng dừng dự án')).toEqual([]);
+    expect(blockers(manager, 'CANCEL', gone, 'Lý do')).toEqual(['ERR-KPI-04:TASK_CANCELLED']);
+  });
+
+  it("a delegate of the manager, or HR as proxy, acts for the manager: cancels and tracks (BR-KPI-21)", () => {
+    const forManager = ctx({ planStatus: 'Locked', isSubject: false, mayActForManager: true });
+    expect(blockers(forManager, 'CANCEL', live, 'Lý do')).toEqual([]);
+    expect(blockers(forManager, 'PROGRESS')).toEqual([]);
+  });
+
+  it('a cancelled task is never removed, even before a review exists', () => {
+    expect(blockers(ctx({ planStatus: 'Locked', isManager: true }), 'REMOVE', gone)).toEqual(['ERR-KPI-04:TASK_CANCELLED']);
+  });
+
+  it('after approval: the employee or the manager updates progress — nobody else, never on a cancelled task', () => {
+    expect(blockers(ctx({ planStatus: 'Locked' }), 'PROGRESS')).toEqual([]);
+    expect(blockers(ctx({ planStatus: 'Locked', isSubject: false, isManager: true }), 'PROGRESS')).toEqual([]);
+    expect(blockers(ctx({ planStatus: 'Locked', isSubject: false }), 'PROGRESS')).toEqual(['ERR-KPI-05:NOT_SUBJECT_OR_MANAGER']);
+    expect(blockers(ctx({ planStatus: 'Locked' }), 'PROGRESS', gone)).toEqual(['ERR-KPI-04:TASK_CANCELLED']);
+  });
+
+  it('once the review exists the list is frozen (its items were taken); progress still moves', () => {
+    const reviewed = ctx({ planStatus: 'Locked', isManager: true, reviewLaunched: true });
+    expect(blockers(reviewed, 'CANCEL', live, 'Lý do')).toEqual(['ERR-KPI-04:REVIEW_LAUNCHED']);
+    expect(blockers(ctx({ reviewLaunched: true }), 'ADD', null)).toEqual(['ERR-KPI-04:REVIEW_LAUNCHED']);
+    expect(blockers(reviewed, 'PROGRESS')).toEqual([]);
+  });
+
+  it('once the result is recorded nothing changes', () => {
+    for (const edit of ['ADD', 'UPDATE', 'REMOVE', 'CANCEL', 'PROGRESS'] as const) {
+      expect(blockers(ctx({ planStatus: 'Locked', isManager: true, resultRecorded: true }), edit, live, 'Lý do')).toEqual(['ERR-KPI-04:RESULT_RECORDED']);
+    }
+  });
+});
+
+describe('progressIssues and linkedGoalIssues', () => {
+  it('progress is 0–100 and never sets Cancelled', () => {
+    expect(progressIssues(0, 'NotStarted')).toEqual([]);
+    expect(progressIssues(100, 'Done')).toEqual([]);
+    expect(details(progressIssues(101, 'InProgress'))).toEqual(['ERR-KPI-06:PROGRESS_OUT_OF_RANGE']);
+    expect(details(progressIssues(-1, 'InProgress'))).toEqual(['ERR-KPI-06:PROGRESS_OUT_OF_RANGE']);
+    expect(details(progressIssues(50, 'Cancelled'))).toEqual(['ERR-KPI-06:CANCEL_BY_PROGRESS']);
+  });
+
+  it('the status agrees with the %: Done is 100, NotStarted is 0, InProgress anywhere', () => {
+    expect(details(progressIssues(30, 'Done'))).toEqual(['ERR-KPI-06:STATUS_MISMATCH']);
+    expect(details(progressIssues(80, 'NotStarted'))).toEqual(['ERR-KPI-06:STATUS_MISMATCH']);
+    expect(progressIssues(0, 'InProgress')).toEqual([]);
+    expect(progressIssues(100, 'InProgress')).toEqual([]);
+  });
+
+  it('a KPI link: an Active goal of the employee\'s own Locked plan in the month\'s cycle (Q63)', () => {
+    const goal = { id: 'g1', status: 'Active' as const };
+    const plan = { ownerType: 'Employee' as const, ownerEmployeeId: 'e1', status: 'Locked' as const, cycleId: 'c2027' };
+    const month = { cycleId: 'c2027' };
+    expect(linkedGoalIssues(null, null, 'e1', month)).toEqual([]);
+    expect(linkedGoalIssues(goal, plan, 'e1', month)).toEqual([]);
+    for (const [g, p, e, m] of [
+      [{ ...goal, status: 'Cancelled' as const }, plan, 'e1', month],
+      [goal, { ...plan, ownerEmployeeId: 'e2' }, 'e1', month],
+      [goal, { ...plan, status: 'Draft' as const }, 'e1', month],
+      [goal, { ...plan, ownerType: 'OrgUnit' as const }, 'e1', month],
+      [goal, plan, 'e1', { cycleId: 'c2028' }],
+    ] as const) {
+      expect(details(linkedGoalIssues(g, p, e, m))).toEqual(['ERR-KPI-06:LINKED_GOAL_INVALID']);
+    }
+  });
+});
+
+const reviewRow = (o: Partial<WorkReview> = {}): WorkReview => ({
+  id: 'r1', tenantId: 't', formId: 'f1', workPlanId: 'p1',
+  selfDisciplineScore: null, selfComment: null,
+  managerDisciplineScore: null, managerComment: null, managerHsnv: null, managerHsnvReason: null,
+  finalDisciplineScore: null, finalComment: null, finalHsnv: null, finalHsnvReason: null, ...o,
+});
+const item = (taskId: string, o: Partial<WorkReviewItem> = {}): WorkReviewItem => ({
+  id: `i-${taskId}`, tenantId: 't', formId: 'f1', taskId, selfScore: null, selfComment: null, managerScore: null, managerComment: null, finalScore: null, finalComment: null, ...o,
+});
+/** Tasks 50 / 30 / 20 (plus a PRIVATE one cancelled mid-month — visibility never matters). */
+const tasks = [task('a', 50), task('b', 30), task('c', 20)];
+
+describe('reviewSubmitIssues — what blocks sending a review column', () => {
+  const scored = (col: 'managerScore' | 'selfScore' | 'finalScore', values: [number | null, number | null, number | null]) =>
+    ['a', 'b', 'c'].map((t, i) => item(t, { [col]: values[i] }));
+
+  it('every live task scored and KLcv set → ok; a score of 0 is a score', () => {
+    expect(reviewSubmitIssues('SELF', reviewRow({ selfDisciplineScore: 0 }), scored('selfScore', [100, 0, 50]), tasks, cfg)).toEqual([]);
+  });
+
+  it('a missing score, a missing item and a missing KLcv each block', () => {
+    const items = scored('selfScore', [100, null, 50]).filter((i) => i.taskId !== 'c');
+    expect(reviewSubmitIssues('SELF', reviewRow(), items, tasks, cfg).map((i) => `${i.ref}:${i.detail}`)).toEqual([
+      'b:TASK_SCORE_REQUIRED',
+      'c:TASK_SCORE_REQUIRED',
+      'selfDisciplineScore:DISCIPLINE_REQUIRED',
+    ]);
+  });
+
+  it('a score off the scale blocks; a cancelled task\'s item is kept and ignored', () => {
+    const withCancelled = [...tasks, task('x', 25, '2027-03-10T00:00:00Z')];
+    const items = [...scored('selfScore', [101, 80, 80]), item('x', { selfScore: null })];
+    expect(details(reviewSubmitIssues('SELF', reviewRow({ selfDisciplineScore: 80 }), items, withCancelled, cfg))).toEqual(['ERR-KPI-06:SCORE_OUT_OF_RANGE']);
+  });
+
+  it('all tasks cancelled → PLAN_EMPTY, and KQcv is null', () => {
+    const allGone = [task('a', 100, '2027-03-10T00:00:00Z')];
+    expect(details(reviewSubmitIssues('MANAGER', reviewRow(), [], allGone, cfg))).toEqual(['ERR-KPI-06:PLAN_EMPTY']);
+    expect(columnTotals('MANAGER', reviewRow({ managerDisciplineScore: 90 }), [], allGone, cfg).kqcv).toBeNull();
+  });
+
+  it('MANAGER: Hsht exactly 80 needs no Hsnv; 79.99 needs Hsnv and a reason', () => {
+    // KQcv 80, KLcv 80 → Hsht 80.
+    expect(reviewSubmitIssues('MANAGER', reviewRow({ managerDisciplineScore: 80 }), scored('managerScore', [80, 80, 80]), tasks, cfg)).toEqual([]);
+    // KQcv 80, KLcv 79.9666… → Hsht 79.99.
+    const low = reviewRow({ managerDisciplineScore: 79.96666666666667 });
+    expect(reviewSubmitIssues('MANAGER', low, scored('managerScore', [80, 80, 80]), tasks, cfg).map((i) => `${i.ref}:${i.detail}`)).toEqual([
+      'managerHsnv:HSNV_REQUIRED',
+      'managerHsnvReason:HSNV_REASON_REQUIRED',
+    ]);
+    expect(reviewSubmitIssues('MANAGER', { ...low, managerHsnv: 85, managerHsnvReason: 'Hỗ trợ dự án gấp' }, scored('managerScore', [80, 80, 80]), tasks, cfg)).toEqual([]);
+  });
+
+  it('SELF never asks for Hsnv, however low', () => {
+    expect(reviewSubmitIssues('SELF', reviewRow({ selfDisciplineScore: 10 }), scored('selfScore', [10, 10, 10]), tasks, cfg)).toEqual([]);
+  });
+});
+
+describe('workResultOf — the month\'s snapshot from the FINAL column', () => {
+  const final = (values: [number, number, number], klcv: number, o: Partial<WorkReview> = {}) => ({
+    review: reviewRow({ finalDisciplineScore: klcv, ...o }),
+    items: ['a', 'b', 'c'].map((t, i) => item(t, { finalScore: values[i] })),
+  });
+
+  it('3 tasks 50/30/20 scored 100/80/0, KLcv 90 → KQcv 74, Hsht 78.8 → Hsnv required', () => {
+    const { review, items } = final([100, 80, 0], 90, { finalHsnv: 82, finalHsnvReason: 'Việc c bị hoãn do khách hàng' });
+    const r = workResultOf(review, items, tasks, cfg);
+    expect(r.kqcv).toBeCloseTo(74, 9);
+    expect(r.hsht).toBeCloseTo(78.8, 9);
+    expect(r).toMatchObject({ klcv: 90, hsnv: 82, hsnvReason: 'Việc c bị hoãn do khách hàng', finalScore: 82 });
+  });
+
+  it('Hsnv may be above Hsht — the manager\'s decision (Q61)', () => {
+    const { review, items } = final([60, 60, 60], 60, { finalHsnv: 95, finalHsnvReason: 'Lý do' });
+    expect(workResultOf(review, items, tasks, cfg).finalScore).toBe(95);
+  });
+
+  it('a required Hsnv still missing → finalScore null (not recordable)', () => {
+    const { review, items } = final([60, 60, 60], 60);
+    expect(workResultOf(review, items, tasks, cfg)).toMatchObject({ hsnv: null, finalScore: null });
+  });
+
+  it('a draft Hsnv left after a rescoring lifted Hsht is not part of the result', () => {
+    const { review, items } = final([90, 90, 90], 90, { finalHsnv: 70, finalHsnvReason: 'Cũ' });
+    expect(workResultOf(review, items, tasks, cfg)).toMatchObject({ hsht: 90, hsnv: null, hsnvReason: null, finalScore: 90 });
+  });
+
+  it('a 60 / 40 tenant weighs KQcv and KLcv its way (Q62)', () => {
+    const { review, items } = final([100, 100, 100], 50);
+    expect(workResultOf(review, items, tasks, { ...cfg, resultWeight: 60, disciplineWeight: 40 }).hsht).toBeCloseTo(80, 9);
   });
 });

@@ -29,7 +29,9 @@ export const columnComment = (item: EvaluationItem, column: EvaluationColumn): s
 export type CanSubmitInput =
   | { formType: 'KPI_EVAL'; step: WorkflowStep; items: readonly EvaluationItem[]; goals: readonly Goal[] }
   | { formType: 'GOAL_SETTING'; stepNo: number; steps: readonly WorkflowStep[]; goals: readonly Goal[]; kgis: readonly Kgi[] }
-  | { formType: 'GOAL_CHANGE'; goals: readonly Goal[]; changeItems: readonly GoalChangeItem[]; kgis: readonly Kgi[] };
+  | { formType: 'GOAL_CHANGE'; goals: readonly Goal[]; changeItems: readonly GoalChangeItem[]; kgis: readonly Kgi[] }
+  /** Monthly work (PEND-14): the content checks are `workRules.planSubmitIssues` / `reviewSubmitIssues`, wired with `forms.act` in 8.2 / 8.3. */
+  | { formType: 'WORK_PLAN' | 'WORK_REVIEW' };
 
 export type CanSubmitResult = { ok: true } | { ok: false; issues: RuleIssue[] };
 
@@ -212,6 +214,7 @@ export function formActualIssues(
  * - GOAL_SETTING — from the owner's step on, the plan passes `submitIssues` (100%, 5–8 goals, every
  *   goal measurable). Before it (the manager cascading at step 1) the plan is still being built.
  * - GOAL_CHANGE — the proposal is well-formed and the plan AFTER it still passes `submitIssues`.
+ * - WORK_PLAN / WORK_REVIEW — not wired yet (ERR-KPI-04 `WORK_FORM_NOT_BUILT`, steps 8.2 / 8.3).
  */
 export function canSubmit(input: CanSubmitInput): CanSubmitResult {
   switch (input.formType) {
@@ -244,6 +247,9 @@ export function canSubmit(input: CanSubmitInput): CanSubmitResult {
       if (itemIssues.length) return result(itemIssues);
       return result(submitIssues(planAfterChanges([...input.goals], input.changeItems), input.kgis).blocking);
     }
+    case 'WORK_PLAN':
+    case 'WORK_REVIEW':
+      return result([ruleIssue('ERR-KPI-04', null, 'WORK_FORM_NOT_BUILT')]);
   }
 }
 

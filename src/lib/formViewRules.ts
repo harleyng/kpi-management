@@ -32,6 +32,7 @@ import type {
   PersonFormAction,
   WorkflowStep,
 } from '@/data/types';
+import { isWorkFormType } from '@/data/types';
 import type { CanSubmitInput } from './formRules';
 import { todayOf, type Clock } from './isoDate';
 import type { SessionDirectory } from './sessionRules';
@@ -112,6 +113,9 @@ export function submitCheckInput(
       return { formType: 'GOAL_SETTING', stepNo: step.stepNo, steps, goals: planGoals, kgis };
     case 'GOAL_CHANGE':
       return { formType: 'GOAL_CHANGE', goals: planGoals, changeItems: rows.changeItems.filter((i) => i.formId === form.id), kgis };
+    case 'WORK_PLAN':
+    case 'WORK_REVIEW':
+      return { formType: form.formType };
   }
 }
 
@@ -228,10 +232,13 @@ export function formStanding(input: FormStandingInput): FormStanding {
   if (frozen) return { ...entitled, readOnlyReason: 'FROZEN' };
 
   const n = Math.max(...steps.map((s) => s.stepNo));
-  const moves = STEP_ACTIONS_SHOWN.filter(
-    // A non-blank comment stands in for the one the dialog will ask for: only the step decides here.
-    (action) => TRANSITIONS[action].refusal(step, form, n, '—') === null,
-  );
+  // Monthly work forms do not move yet (`checkAction` refuses WORK_FORM_NOT_BUILT until 8.2 / 8.3): offer no move.
+  const moves = isWorkFormType(form.formType)
+    ? []
+    : STEP_ACTIONS_SHOWN.filter(
+        // A non-blank comment stands in for the one the dialog will ask for: only the step decides here.
+        (action) => TRANSITIONS[action].refusal(step, form, n, '—') === null,
+      );
   const canEdit = editRefusal(form, steps, plan ?? null, standing, ctx) === null;
   return {
     ...entitled,
