@@ -134,16 +134,18 @@ sequenceDiagram
   participant QL as Quản lý trực tiếp
   participant HR as HR / C&B
   SYS->>NV: Tự khởi chạy ngày 1 hằng tháng, hạn 7 ngày
-  NV->>QL: B1. Tự đánh giá % từng chỉ tiêu + giải trình + bằng chứng
+  NV->>QL: B1. Nhập số thực tế từng chỉ tiêu + giải trình + bằng chứng — hệ thống tính %
   Note over NV,QL: Quá hạn → phiếu tự chuyển sang quản lý (SF4C PMGM.09)
-  QL->>HR: B2. Chấm % và nhận xét
+  QL->>HR: B2. Quyết định % (mặc định = % hệ thống tính; chấm khác thì nhận xét)
   QL-->>NV: (hoặc trả lại B1)
-  HR->>SYS: B3. Chốt % cuối cùng
+  HR->>SYS: B3. Ghi nhận kết quả của quản lý (sửa trường hợp đặc biệt, có lý do)
   SYS->>SYS: Tính điểm có trọng số → xếp loại → % lương
 ```
 
-- Số **thực tế** trên phiếu lấy từ dữ liệu đã nhập (tay, Excel) và **chỉ đọc**.
-- Phiếu chỉ gửi được khi mọi chỉ tiêu ở bước hiện tại đã có điểm (và nhận xét nếu bắt buộc).
+- Số **thực tế** trên phiếu bắt đầu bằng số đã ghi nhận của kỳ (tay, Excel; phiếu quý cộng các tháng); nhân viên
+  nhập lại ở B1, quản lý sửa được ở B2 (cập nhật 22/10, PEND-06 — xem mục 4G).
+- Phiếu gửi được khi mọi chỉ tiêu ở bước hiện tại đã có điểm (B2, B3) và nhận xét / lý do khi bắt buộc; ở B1 %
+  do hệ thống tính, chỉ tiêu chưa có số vẫn gửi được (tổng "tạm tính").
 - Quá hạn chỉ xử lý **một lần mỗi bước**: nhắc hạn không lặp lại liên tục. Nếu bước được cấu hình
   **khóa** khi quá hạn, phiếu dừng tại bước đó; HR mở khóa Goal Plan phải nhập **hạn mới**, bước chạy lại
   từ lúc mở khóa.
@@ -368,7 +370,7 @@ sequenceDiagram
   chưa) và với **mục tiêu năm** (đi được bao nhiêu phần của năm). *Đã làm 23/10 (B0):* phần tính
   (`cumulativeRules.ts`); chưa hiện trên màn hình (Đợt 4).
 
-### Đánh giá KPI: nhân viên nhập kết quả, hệ thống tính % (PEND-06, 07, 08)
+### Đánh giá KPI: nhân viên nhập kết quả, hệ thống tính % (PEND-06, 07, 08 — đã làm 23/10)
 
 ```mermaid
 sequenceDiagram
@@ -387,9 +389,15 @@ sequenceDiagram
   SYS->>SYS: Tính điểm có trọng số → xếp loại → % lương
 ```
 
-- Số **thực tế do nhân viên nhập** trên phiếu, không còn chỉ đọc (thay mục 4 và Q33; xem Q48).
-- **% hoàn thành do hệ thống tính**, nhân viên không tự gõ % (Q49).
-- **Quản lý trực tiếp quyết định** kết quả. **HR không duyệt**, chỉ ghi nhận; sửa trong trường hợp đặc biệt (Q47).
+- Số **thực tế do nhân viên nhập** trên phiếu, không còn chỉ đọc (thay mục 4 và Q33; xem Q48). Quản lý được sửa
+  số ở B2, kèm nhận xét. Phiếu tháng hoàn thành thì số đã sửa trên phiếu thành số thực tế hiện hành, nguồn
+  "Phiếu đánh giá"; phiếu quý giữ số trên phiếu (số quý luôn cộng từ các tháng).
+- **% hoàn thành do hệ thống tính** từ số trên phiếu và **mục tiêu của kỳ** (phiếu quý dùng mục tiêu quý, không
+  dùng mục tiêu năm); nhân viên không tự gõ % (Q49). Không có số → không có %, không phải 0.
+- **Quản lý trực tiếp quyết định** kết quả: % mặc định bằng % hệ thống tính; chấm khác thì bắt buộc nhận xét.
+  **HR không duyệt**, chỉ ghi nhận (bước "HR ghi nhận kết quả", cột HR mặc định bằng cột quản lý); sửa trong trường
+  hợp đặc biệt, bắt buộc lý do, có nhật ký (Q47).
+- *Đã làm 23/10/2026 (Plan A, A1):* BR-KPI-16, 17, 23, 52.
 
 ### Phạm vi và nhịp đánh giá (PEND-09…12)
 
@@ -471,11 +479,8 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 | PEND-01 | Đăng ký luôn bắt đầu bằng B1 quản lý giao (BR-KPI-12) | Top-down và bottom-up song song; nhân viên tự lập không cần B1 | Doanh nghiệp dùng cả hai cách | Mẫu quy trình đăng ký, `workflowRules`, `formRules.canSubmit` |
 | PEND-02 | B4 HR ghi nhận và khóa, luôn thủ công | Cấu hình tự động hoặc thủ công | Giảm việc tay cho HR | Mẫu quy trình, `workflowRules` |
 | PEND-03 | Đã giao được từ Goal Plan công ty / đơn vị xuống đơn vị gần nhất có kế hoạch (21/10); Khối có thể không có Goal Plan (Q40) | Công ty → Khối → Phòng → NV; giao cho đơn vị hoặc NV | Đúng cơ cấu tập đoàn | Còn lại: Goal Plan của mọi Khối, điểm Khối trên dashboard (Q40, Q56) |
-| PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | `goalPlanRules`, `resultRules` |
+| PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | `goalPlanRules`, `resultRules`. Đã có: chia quý, cảnh báo; phiếu quý dùng mục tiêu quý (23/10). Còn: tháng khi chỉ chia quý (Q67), nhãn |
 | PEND-05 | Không có số lũy kế | Theo dõi lũy kế so với kế hoạch năm | Quản lý thấy tiến độ năm | Quy tắc mới, kết quả, dashboard |
-| PEND-06 | Số thực tế trên phiếu chỉ đọc; nhân viên không nhập (BR-KPI-17, Q33) | Nhân viên nhập thực tế + bằng chứng trên phiếu | Nhân viên là người có số | `formRules`, `actualRules`, quyền nhập số |
-| PEND-07 | Nhân viên tự gõ % (BR-KPI-16) | Hệ thống tính % từ thực tế và kế hoạch | Tránh tự chấm cảm tính | `formRules`, `calcRules` (KPI Rules) |
-| PEND-08 | B3 "HR/C&B chốt % cuối cùng" | HR chỉ ghi nhận kết quả quản lý; sửa ad-hoc | Quản lý chịu trách nhiệm cuối cùng | Mẫu quy trình đánh giá, nhãn bước |
 | PEND-09 | Đánh giá chính theo tháng (Q3) | Chính thức theo quý và năm; tháng là đánh giá liên tục | Phạm vi P1 mục 1 và 4 | Khởi chạy, kết quả, % lương |
 | PEND-10 | Đánh giá thử việc để P2 | Vào P1 (mục 3) | Phạm vi P1 | Loại phiếu mới (lớn) |
 | PEND-11 | Nhập tay và Excel; đồng bộ API gắn nhãn "Phase sau" (đã làm 21/10) | P1 chỉ nhập tay; 5 phương pháp tính | Phạm vi P1 | Còn lại: số phương pháp tính (Q55). Product owner giữ import Excel (Q54) |

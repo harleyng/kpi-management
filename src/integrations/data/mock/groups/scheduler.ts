@@ -13,7 +13,7 @@ import type { SchedulerGateway, SchedulerReport } from '../../types';
 import { clockOf } from '../authorize';
 import { newId } from '../rows';
 import type { Runtime } from '../runtime';
-import { assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf } from '../workflowContext';
+import { applyColumnEntry, assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf } from '../workflowContext';
 
 /**
  * `scheduler.runDue` — one tick of the clock-driven jobs, as of the gateway clock, in ONE system
@@ -86,6 +86,7 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
             tx.update('FormInstance', { ...form, overdueHandledAt: tx.now });
           } else {
             const saved = tx.update('FormInstance', { ...form, ...moved.form });
+            if (moved.nextStep) applyColumnEntry(tx, saved, moved.nextStep, stepOf(form, stepsOf(tx, form.workflowId)), due.action);
             // The system acted: nobody, on behalf of nobody (BR-KPI-13).
             const history: FormStepAction = { id: newId(), tenantId: tx.tenantId, ...moved.record, actorUserId: null, onBehalfOfUserId: null, delegationId: null };
             tx.insert('FormStepAction', history);

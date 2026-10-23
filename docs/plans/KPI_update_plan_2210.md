@@ -108,12 +108,12 @@ vai trò bước HR.
   - `saveEvaluationItems` từ chối `selfAchievementPct` do người gửi (ERR-KPI-04) — cột này do hệ thống ghi khi
     gửi bước 1.
 - **Việc cần làm.**
-  - [ ] `src/lib/formRules.ts`: `computedItemPct`, `managerOverrideIssues` (khác % tính mà thiếu nhận xét → 06).
-  - [ ] `formRules.canSubmit` ở bước SELF: không đòi % nữa, chỉ đòi giải trình nếu `requiresComment`.
-  - [ ] Mock `forms` group: khi SUBMIT bước SELF, ghi `selfAchievementPct` = % tính.
-  - [ ] `src/components/forms/EvaluationFormBody.tsx`: cột SELF chỉ đọc, nhãn "Hệ thống tính"; cột MANAGER có giá
+  - [x] `src/lib/formRules.ts`: `computedItemPct`, `managerOverrideIssues` (khác % tính mà thiếu nhận xét → 06).
+  - [x] `formRules.canSubmit` ở bước SELF: không đòi % nữa, chỉ đòi giải trình nếu `requiresComment`.
+  - [x] Mock `forms` group: khi SUBMIT bước SELF, ghi `selfAchievementPct` = % tính.
+  - [x] `src/components/forms/EvaluationFormBody.tsx`: cột SELF chỉ đọc, nhãn "Hệ thống tính"; cột MANAGER có giá
     trị mặc định.
-  - [ ] Tổng điểm của phiếu (`formRules.evaluationTotal`) đọc cột đã ghi, không đổi.
+  - [x] Tổng điểm của phiếu (`formRules.evaluationTotal`) đọc cột đã ghi, không đổi.
 - **Kiểm thử.** RATIO_UP / RATIO_DOWN / TIERED / BINARY / FORMULA / LEVELS mỗi loại một ca; thiếu số thực tế →
   `null` và phiếu vẫn gửi được nhưng tổng "tạm tính"; vượt trần → trần; mục tiêu = 0 → không tính được
   (ERR-KPI-12); quản lý sửa không nhận xét → 06; gửi `selfAchievementPct` bằng API → 04.
@@ -135,12 +135,12 @@ vai trò bước HR.
     giữ; số mới nhất thắng, như hiện tại.
   - % ở PEND-07 tính lại ngay khi số thay đổi.
 - **Việc cần làm.**
-  - [ ] `src/data/types.ts`: trường mới của `EvaluationItem`, nguồn `FORM` (tập + nhãn).
-  - [ ] `src/integrations/data/types.ts`: `EvaluationItemPatch`; mock `forms` group ghi `GoalActual` khi hoàn thành.
-  - [ ] `src/lib/formRules.ts` hoặc `actualRules.ts`: `formActualIssues` (kỳ chưa bắt đầu, kết quả đã chốt — dùng
+  - [x] `src/data/types.ts`: trường mới của `EvaluationItem`, nguồn `FORM` (tập + nhãn).
+  - [x] `src/integrations/data/types.ts`: `EvaluationItemPatch`; mock `forms` group ghi `GoalActual` khi hoàn thành.
+  - [x] `src/lib/formRules.ts` hoặc `actualRules.ts`: `formActualIssues` (kỳ chưa bắt đầu, kết quả đã chốt — dùng
     lại `actualRules.entryBlockers`).
-  - [ ] Seed: khởi tạo `actualValue` cho phiếu mẫu (**fixture — Large**).
-  - [ ] Giao diện: ô nhập số + tải bằng chứng ngay trên dòng chỉ tiêu (dùng lại `useEvidence`).
+  - [x] Seed: khởi tạo `actualValue` cho phiếu mẫu (**fixture — Large**).
+  - [x] Giao diện: ô nhập số + tải bằng chứng ngay trên dòng chỉ tiêu (dùng lại `useEvidence`).
 - **Kiểm thử.** Nhập số ở bước SELF, sửa ở MANAGER, bị từ chối ở FINAL (04); chỉ tiêu TEXT; số âm theo phương
   pháp; kỳ đã chốt kết quả → 04; hoàn thành phiếu ghi đúng một `GoalActual` nguồn FORM; **cách ly tenant** cho
   patch và cho bản ghi `GoalActual` sinh ra.
@@ -160,6 +160,12 @@ vai trò bước HR.
 - **Kiểm thử.** Vào bước 3 → FINAL = MANAGER; ghi nhận không sửa → kết quả kỳ đúng cột quản lý; sửa không lý do →
   06; sửa có lý do → nhật ký ghi cả hai giá trị.
 - **Xong khi.** BR-KPI-16, 23 viết lại; Q47 có câu trả lời.
+
+**Đợt 1 ✅ 23/10/2026 (Plan A, A1).** Theo `ASSUMPTION Q47, Q48, Q49`; phiếu kỳ quý chụp mục tiêu quý và tổng các
+tháng (PEND-04, phần phiếu). Khác thiết kế ban đầu sau Phase 2: % hệ thống tính cập nhật ngay khi số thay đổi (không
+chỉ lúc gửi); bước 2 không còn bắt buộc nhận xét mọi dòng — chỉ khi quản lý chấm khác hoặc sửa số của nhân viên;
+số trên phiếu chỉ ghi thành `GoalActual` nguồn FORM với **phiếu tháng** (giữ `Q36`, không thêm Q68); phiếu quý giữ
+số trên phiếu.
 
 ---
 
@@ -226,9 +232,9 @@ vai trò bước HR.
     `SPLIT_NO_AGGREGATION`) sai — phân bổ quý riêng vẫn được dùng.
 - **Việc cần làm.**
   - [x] Kiểm chứng (ở trên).
-  - [ ] Phiếu kỳ quý dùng mục tiêu quý: chụp mục tiêu kỳ lên `EvaluationItem` lúc khởi chạy, hoặc gọi
+  - [x] Phiếu kỳ quý dùng mục tiêu quý: chụp mục tiêu kỳ lên `EvaluationItem` lúc khởi chạy, hoặc gọi
     `calcRules.targetForPeriod` trên phiếu — làm cùng `formRules.computedItemPct` của PEND-07 (KPI Rules + Workflow).
-  - [ ] Số thực tế của phiếu kỳ quý: không có số riêng thì tổng hợp các tháng theo cách tổng hợp, như
+  - [x] Số thực tế của phiếu kỳ quý: không có số riêng thì tổng hợp các tháng theo cách tổng hợp, như
     `resultRules.actualFor`.
   - [ ] Tháng khi chỉ phân bổ quý (Q67, đề xuất: SUM → quý / số tháng của quý; AVG / LAST → số của quý) — sửa
     `calcRules.targetForPeriod`, cập nhật BR-KPI-11 (KPI Rules).

@@ -99,7 +99,8 @@ describe('seed — structure', () => {
   });
 
   it('stays under the size budget (localStorage holds about 5 M characters)', () => {
-    expect(JSON.stringify(seed).length).toBeLessThan(1_500_000);
+    // 1.5 M until A1 (2026-10-23): the evaluation items' form actual, target and submitted actual added ~20 k.
+    expect(JSON.stringify(seed).length).toBeLessThan(1_600_000);
   });
 });
 
@@ -418,7 +419,7 @@ describe('seed — period results (produced by resultRules, BR-KPI-40…43)', ()
   it('the seeded adjustments: one negative, one that crosses a level boundary (C → B)', () => {
     const negative = resultOf('T01', 'E016');
     expect(negative?.adjustmentPct).toBeLessThan(0);
-    const crossing = resultOf('T01', 'E019');
+    const crossing = resultOf('T01', 'E023');
     const code = (score: number) => ratingFor(roundScore(score), levels)?.code;
     expect(crossing?.adjustmentPct).toBeGreaterThan(0);
     expect(code(crossing?.totalScore as number)).toBe('B');

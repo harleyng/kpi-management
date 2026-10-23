@@ -1,4 +1,6 @@
 import type { Delegation, FormInstance, FormLaunch, FormStatus, FormType, Goal, GoalDraft, Id, IsoDate, RecipientFilter, StepAction } from '@/data/types';
+import { targetForPeriod } from '@/lib/calcRules';
+import { computedItemPct } from '@/lib/formRules';
 import { EVAL_DUE_DAYS } from '../catalog';
 import { createPrng } from '../prng';
 import type { IdFn, SeedRows, Workflows } from '../shared';
@@ -258,26 +260,61 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
 
   const score = () => Math.round(prng.between(16, 22.4)) * 5; // 80…110, people round to 5
   const SELF = ['Hoàn thành theo kế hoạch.', 'Vượt mục tiêu nhờ chương trình khuyến mãi.', 'Chưa đạt do thiếu nguồn lực trong tháng.'];
-  const MANAGER = ['Đồng ý với tự đánh giá.', 'Điều chỉnh theo số liệu đối soát.', 'Cần cải thiện tiến độ.'];
+  const MANAGER = ['Đồng ý với kết quả hệ thống tính.', 'Điều chỉnh theo số liệu đối soát.', 'Cần cải thiện tiến độ, chấm lại theo mức đóng góp thực tế.'];
 
-  type Fill = 'none' | 'self' | 'manager' | 'all';
-  const addItems = (form: FormInstance, code: string, month: string, fill: Fill) => {
+  /**
+   * Where the form stands, which decides what its items hold (PEND-06/07/08): the actual on the form
+   * is the recorded one, the SELF column the system's % of it; leaving the employee's step keeps that
+   * actual as submitted and starts the manager at the system's %; a manager who scored either kept it
+   * or overrode it with a comment; HR's step starts FINAL at the manager's %.
+   * - `open` — at the employee's step, nothing saved; `selfSaved` — explanations saved ("Lưu nháp");
+   * - `forwarded` — AUTO_FORWARDed to the manager without a self-assessment; `atManager` — submitted;
+   * - `atFinal` — the manager scored, at HR's step; `returnedToManager` — HR sent it back; `done`.
+   */
+  type Stage = 'open' | 'selfSaved' | 'forwarded' | 'atManager' | 'atFinal' | 'returnedToManager' | 'done';
+  const calcContext = (goal: Goal) => ({
+    goal,
+    method: s.rows.CalcMethod.find((m) => m.id === goal.calcMethodId) ?? null,
+    tiers: s.rows.CalcTier,
+    levels: s.rows.GoalTargetLevel,
+  });
+  /** HR's one special-case edit (Q47): a FINAL that differs from the manager's, with its reason. */
+  const HR_EDIT = { key: 'EVAL:T01:E027', reason: 'Điều chỉnh theo kết quả đối soát cuối kỳ của C&B (trường hợp đặc biệt).' };
+  const addItems = (form: FormInstance, code: string, month: string, stage: Stage) => {
     goalsAt(code, month).forEach((goal, i) => {
       const actual = a.currentAt(goal.id, month, form.launchedAt);
-      const self = fill !== 'none';
-      const manager = fill === 'manager' || fill === 'all';
+      const onForm = { actualValue: actual?.actualValue ?? null, actualText: actual?.actualText ?? null, targetSnapshot: targetForPeriod(goal, s.rows.GoalPeriodTarget, g.period(month).id) };
+      const system = computedItemPct(onForm, calcContext(goal));
+      const leftSelf = !['open', 'selfSaved'].includes(stage);
+      const scored = ['atFinal', 'returnedToManager', 'done'].includes(stage);
+      let manager = leftSelf ? system : null;
+      let managerComment: string | null = null;
+      if (scored) {
+        // A manager overrides about one goal in five — always when the system has no % — and says why.
+        if (system === null || prng.next() < 0.2) {
+          manager = score();
+          managerComment = MANAGER[1 + (i % 2)];
+        } else if (i % 2 === 0) managerComment = MANAGER[0];
+      }
+      const hrEdit = stage === 'done' && forms.get(HR_EDIT.key)?.id === form.id && i === 0 && manager !== null;
       s.add('EvaluationItem', {
         id: id('EvaluationItem', form.id, goal.id),
         formId: form.id,
         goalId: goal.id,
-        actualSnapshot: actual?.actualValue ?? null,
-        actualTextSnapshot: actual?.actualText ?? null,
-        selfAchievementPct: self ? score() : null,
-        selfComment: self ? SELF[i % SELF.length] : null,
-        managerAchievementPct: manager ? score() : null,
-        managerComment: manager ? MANAGER[i % MANAGER.length] : null,
-        finalAchievementPct: fill === 'all' ? score() : null,
-        finalComment: null,
+        actualSnapshot: onForm.actualValue,
+        actualTextSnapshot: onForm.actualText,
+        actualValue: onForm.actualValue,
+        actualText: onForm.actualText,
+        actualEnteredBy: null,
+        submittedActualValue: leftSelf ? onForm.actualValue : null,
+        submittedActualText: leftSelf ? onForm.actualText : null,
+        targetSnapshot: onForm.targetSnapshot,
+        selfAchievementPct: system,
+        selfComment: stage === 'open' || stage === 'forwarded' ? null : SELF[i % SELF.length],
+        managerAchievementPct: manager,
+        managerComment,
+        finalAchievementPct: scored ? (hrEdit ? Math.max(0, (manager as number) - 5) : manager) : null,
+        finalComment: hrEdit ? HR_EDIT.reason : null,
       });
     });
   };
@@ -296,7 +333,7 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
         act(form, 1, selfBy?.actor ?? code, 'SUBMIT', e1, selfBy ? { onBehalfOf: selfBy.onBehalfOf } : {});
         act(form, 2, managerBy?.actor ?? manager, 'SUBMIT', e2, managerBy ? { onBehalfOf: managerBy.onBehalfOf, delegation: managerBy.delegation } : {});
         act(form, 3, hr, 'APPROVE', e3);
-        addItems(form, code, month, 'all');
+        addItems(form, code, month, 'done');
       };
 
       if (month === 'T01') {
@@ -312,26 +349,26 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
           // At the manager's step since 03-03; deadline 03-07; REMINDed by the 03-08 tick.
           const form = addForm(key, { ...base, status: 'InProgress', step: 2, enteredAt: e1, overdueHandledAt: vn('2027-03-08 09:00') });
           act(form, 1, code, 'SUBMIT', e1);
-          addItems(form, code, month, 'self');
+          addItems(form, code, month, 'atManager');
         } else if (code === 'E037') {
           // At HR's step since 03-05; deadline 03-07; REMINDed by the 03-08 tick.
           const form = addForm(key, { ...base, status: 'InProgress', step: 3, enteredAt: e2, overdueHandledAt: vn('2027-03-08 09:00') });
           act(form, 1, code, 'SUBMIT', e1);
           act(form, 2, manager, 'SUBMIT', e2);
-          addItems(form, code, month, 'manager');
+          addItems(form, code, month, 'atFinal');
         } else if (code === 'E026') {
           // Never self-assessed: step-1 deadline 03-07 → the 03-08 tick AUTO_FORWARDs (PMGM.09); at step 2
           // its deadline is 03-12 → REMINDed by the 03-13 tick.
           const form = addForm(key, { ...base, status: 'InProgress', step: 2, enteredAt: vn('2027-03-08 09:00'), overdueHandledAt: vn('2027-03-13 09:00') });
           act(form, 1, null, 'AUTO_FORWARD', vn('2027-03-08 09:00'));
-          addItems(form, code, month, 'none');
+          addItems(form, code, month, 'forwarded');
         } else if (code === 'E041') {
           // Returned at the LAST step: HR sends it back to the manager on 03-06 (deadline 03-10 → REMINDed 03-11).
           const form = addForm(key, { ...base, status: 'InProgress', step: 2, enteredAt: vn('2027-03-06 10:00'), overdueHandledAt: vn('2027-03-11 09:00') });
           act(form, 1, code, 'SUBMIT', e1);
           act(form, 2, manager, 'SUBMIT', e2);
           act(form, 3, hr, 'RETURN', vn('2027-03-06 10:00'), { comment: 'Điểm quản lý chưa khớp số liệu đối soát, đề nghị chấm lại.' });
-          addItems(form, code, month, 'manager');
+          addItems(form, code, month, 'returnedToManager');
         } else if (code === 'E023') {
           // Scored by a delegate inside the (now expired) delegation window.
           complete(undefined, { actor: 'E006', onBehalfOf: 'E008', delegation: delegations.expired });
@@ -350,12 +387,12 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
         // Left on 03-10: HR cancels the March form (BR-KPI-23: HR/ADMIN, with a reason).
         const form = addForm(key, { ...base, status: 'Cancelled', step: null, enteredAt: null });
         act(form, 1, 'E035', 'CANCEL', vn('2027-04-02 10:00'), { comment: 'Nhân viên nghỉ việc từ 10/03/2027, không đánh giá tháng 3.' });
-        addItems(form, code, month, 'none');
+        addItems(form, code, month, 'open');
       } else if (['E015', 'E016', 'E029', 'E034'].includes(code)) {
         const at = vn({ E015: '2027-04-03 10:00', E016: '2027-04-03 14:00', E029: '2027-04-04 10:00', E034: '2027-04-05 10:00' }[code] as string);
         const form = addForm(key, { ...base, status: 'InProgress', step: 2, enteredAt: at });
         act(form, 1, code, 'SUBMIT', at);
-        addItems(form, code, month, 'self');
+        addItems(form, code, month, 'atManager');
       } else if (code === 'E020' || code === 'E038') {
         const s1 = vn('2027-04-02 10:00');
         const s2 = vn(code === 'E020' ? '2027-04-05 14:00' : '2027-04-05 16:00');
@@ -363,11 +400,11 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
         act(form, 1, code, 'SUBMIT', s1);
         if (code === 'E020') act(form, 2, 'E019', 'SUBMIT', s2, { onBehalfOf: 'E007', delegation: delegations.active });
         else act(form, 2, manager, 'SUBMIT', s2);
-        addItems(form, code, month, 'manager');
+        addItems(form, code, month, 'atFinal');
       } else {
         const form = addForm(key, { ...base, status: 'Open', step: 1, enteredAt: launchedAt });
         // "Lưu nháp": some people have saved self-scores already — EDIT, so still Open.
-        addItems(form, code, month, ['E019', 'E022', 'E023', 'E025', 'E031', 'E035'].includes(code) ? 'self' : 'none');
+        addItems(form, code, month, ['E019', 'E022', 'E023', 'E025', 'E031', 'E035'].includes(code) ? 'selfSaved' : 'open');
       }
     }
   }

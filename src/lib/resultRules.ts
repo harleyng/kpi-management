@@ -40,7 +40,7 @@ import type {
   RatingLevel,
   ResultDetail,
 } from '@/data/types';
-import { achievement, goalAchievementInput, type NotComputableReason } from './calcRules';
+import { achievement, goalAchievementInput, targetForPeriod, type NotComputableReason } from './calcRules';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { columnPct } from './formRules';
 import { weightIssue } from './goalPlanRules';
@@ -102,7 +102,7 @@ export interface ActualContext {
   alignments: readonly GoalAlignment[];
 }
 
-type ActualValue = { actualValue: number | null; actualText: string | null };
+export type ActualValue = { actualValue: number | null; actualText: string | null };
 
 const isMonth = (p: Pick<CyclePeriod, 'periodType'>) => p.periodType === 'Month';
 
@@ -113,7 +113,7 @@ function monthsOf(period: CyclePeriod, periods: readonly CyclePeriod[]): CyclePe
     .sort((a, b) => (a.startDate < b.startDate ? -1 : 1));
 }
 
-const aggregationOf = (goal: Goal, ctx: ActualContext): Aggregation | null =>
+const aggregationOf = (goal: Goal, ctx: Pick<ActualContext, 'kpiDefinitions'>): Aggregation | null =>
   ctx.kpiDefinitions.find((k) => k.id === goal.kpiDefId)?.aggregation ?? null;
 
 const currentActual = (goalId: Id, periodId: Id, actuals: readonly GoalActual[]): GoalActual | null =>
@@ -158,13 +158,40 @@ function actualFor(goal: Goal, period: CyclePeriod, ctx: ActualContext, visiting
  * the same way as the actuals (a quarter of a SUM goal = Σ of its three months). `null` = use the
  * goal's own target (`calcRules.targetForPeriod`).
  */
-function aggregatedTarget(goal: Goal, period: CyclePeriod, ctx: ActualContext): number | null {
+function aggregatedTarget(goal: Goal, period: CyclePeriod, ctx: Pick<ActualContext, 'periods' | 'periodTargets' | 'kpiDefinitions'>): number | null {
   if (isMonth(period) || ctx.periodTargets.some((t) => t.goalId === goal.id && t.periodId === period.id)) return null;
   const aggregation = aggregationOf(goal, ctx);
   const months = monthsOf(period, ctx.periods);
   if (aggregation === null || months.length === 0) return null;
   const monthly = months.map((m) => ctx.periodTargets.find((t) => t.goalId === goal.id && t.periodId === m.id)?.targetValue ?? null);
   return monthly.some((v) => v === null) ? null : aggregatePeriodActuals(monthly, aggregation);
+}
+
+/**
+ * The actual of a goal for a period, as a result reads it — what an evaluation form snapshots when it
+ * opens (BR-KPI-17): the period's own current actual, else for a Quarter / Half / Year its months
+ * aggregated, else none (and the roll-up of `rollUpFromChildren`).
+ */
+export function periodActual(goal: Goal, period: CyclePeriod, ctx: ActualContext): ActualValue | null {
+  return actualFor(goal, period, ctx, new Set());
+}
+
+/**
+ * The target of a goal for a period, as an evaluation form snapshots it (`EvaluationItem.targetSnapshot`):
+ * - a Month: `calcRules.targetForPeriod` (its split, else the goal's target — ASSUMPTION Q67 is A3's);
+ * - a longer period: its own split; else its months' splits aggregated (a SUM quarter = Σ months);
+ *   else the goal's target when it holds for any period — a Year, or a KPI averaged / taken last (a
+ *   ratio, a stock); else `null`. A SUM quarter never borrows the annual target: that would score a
+ *   quarter's actual against a year's target. `null` → the % is not computable, never wrong.
+ */
+export function periodTarget(goal: Goal, period: CyclePeriod, ctx: Pick<ActualContext, 'periods' | 'periodTargets' | 'kpiDefinitions'>): number | null {
+  if (isMonth(period)) return targetForPeriod(goal, ctx.periodTargets, period.id);
+  const own = ctx.periodTargets.find((t) => t.goalId === goal.id && t.periodId === period.id);
+  if (own) return own.targetValue;
+  const aggregated = aggregatedTarget(goal, period, ctx);
+  if (aggregated !== null) return aggregated;
+  const aggregation = ctx.kpiDefinitions.find((k) => k.id === goal.kpiDefId)?.aggregation ?? null;
+  return period.periodType === 'Year' || aggregation === 'AVG' || aggregation === 'LAST' ? goal.targetValue : null;
 }
 
 /**

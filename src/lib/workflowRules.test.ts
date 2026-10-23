@@ -333,7 +333,8 @@ describe('the evaluation, self → manager → HR (BR-KPI-16)', () => {
       form: form(), steps, plan: null, action: 'SUBMIT', expectedStepId: 's1', comment: null,
       actor: { actorUserId: 'u-e1', onBehalfOfUserId: null, delegationId: null },
       entitlement: { stepActors: ['u-e1'], delegations: [], actorMayProxy: false, actorMayCancel: false, subjectUserId: 'u-e1' },
-      submitCheck: { formType: 'KPI_EVAL', step: selfStep, items, goals: planGoals }, clock: CLOCK,
+      // The SELF % is the system's (PEND-07): what the employee owes is the explanation.
+      submitCheck: { formType: 'KPI_EVAL', step: { ...selfStep, requiresComment: true }, items, goals: planGoals }, clock: CLOCK,
     });
     expect(result).toMatchObject({ ok: false, code: 'ERR-KPI-09', detail: 'CONTENT_INCOMPLETE' });
     if (!result.ok) expect(result.issues).toHaveLength(5);

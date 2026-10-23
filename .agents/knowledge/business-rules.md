@@ -204,14 +204,38 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   a second open adjustment (`CHANGE_ALREADY_OPEN`, 04); a cycle that does not accept the form (04). A
   draft proposal (`saveGoalChangeItems`) may still lack its reasons — `changeItemIssues(..., { draft:
   true })`; the submit requires them. *Source: SF4C PMGM.06–07; Manager guide.*
-- **BR-KPI-16** — **Evaluation runs in three steps**: (1) the employee self-assesses each goal (% and
-  explanation) with evidence; (2) the direct manager scores each goal (% and comment); (3) HR/C&B records
-  the final % per goal. *Source: NoteX minutes §2.3; Manager guide pp. 98–109; SF4C PMGM.12.*
-  > **Pending (22/10/2026 meeting, §12):** PEND-07, 08 — the self % is computed by the system, not typed (`Q49`); the direct manager decides the result and HR only records it, editing in special cases (`Q47`).
-- **BR-KPI-17** — On the evaluation form the **actual value comes from the actuals data (T4) and is
-  read-only**; the form shows target/levels, actual, self %, manager %, final %, evidence, and the
-  computed total score. *Source: plan §5.5.*
-  > **Pending (22/10/2026 meeting, §12):** PEND-06 — the employee enters the actual, with evidence, on step 1 of the form; it is no longer read-only (`Q48`, replaces `Q33`).
+- **BR-KPI-16** — **Evaluation runs in three steps** (22/10 meeting, PEND-07/08, built 2026-10-23): (1) the
+  employee enters the actual of each goal on the form (BR-KPI-17) with evidence and an explanation —
+  the % beside it is **computed by the system** (`formRules.computedItemPct` = `calcRules.achievement` on
+  the form's actual and the period's target snapshot), never typed: a typed self % is refused (ERR-KPI-04
+  `SYSTEM_COLUMN`); no actual → no %, never 0, and the form still goes on (its total "tạm tính"); (2) the
+  **direct manager decides**: their % starts at the system's (`itemsOnEnterColumn`, on entering the step)
+  and follows it while untouched; a different % (also where the system has none) or an actual they
+  corrected after the employee sent it needs a comment (06 `OVERRIDE_COMMENT_REQUIRED`,
+  `ACTUAL_CHANGE_COMMENT_REQUIRED` — `ASSUMPTION Q49`); (3) **"HR ghi nhận kết quả"** — HR records the
+  manager's result: FINAL = MANAGER whenever the step is entered from another column (a return to the
+  manager drops an earlier HR edit); HR changes it only in special cases, with a reason (06
+  `OVERRIDE_REASON_REQUIRED`, audited — `ASSUMPTION Q47`). Two %s closer than 0.005 are the same score
+  (`samePct`). Defaults written on step entry are audited with reason `STEP_ENTRY` / `AUTO_FORWARD`; an
+  AUTO_FORWARD skips `canSubmit`, so a manager step entered that way may carry no comment. A typed % stays
+  within the method's cap, or without one the most it can award (top tier / level, at least 100 —
+  `scoreCeiling`). *Source: NoteX minutes §2.3 and 22/10/2026; Manager guide pp. 98–109; SF4C PMGM.12.*
+- **BR-KPI-17** — The evaluation form **snapshots, when it opens**, the period's recorded actual and its
+  target (`resultRules.periodActual` / `periodTarget`): a Quarter / Half / Year adds up its months by the
+  KPI's aggregation; its target is its own split, else its months' splits aggregated, else the goal's
+  target only for a Year or an AVG / LAST KPI — a SUM quarter never borrows the annual target (`null` →
+  not computable). The **actual on the form** starts as the snapshot and is **entered by the employee**
+  at the SELF step and correctable by the manager at the MANAGER step (22/10, PEND-06, `ASSUMPTION Q48`);
+  it is an EDIT on the form, not `actual.enter` — the §9 matrix is unchanged. Refused: at another step
+  (04 `ACTUAL_NOT_EDITABLE`), a locked period / a Final result (04), a period not started (06), the wrong
+  kind of value (06 `ACTUAL_TYPE_MISMATCH`); clearing it is allowed; a resent unchanged value is not a
+  change. The snapshots stay read-only ("Lúc mở phiếu"). When the form **completes**, each actual changed
+  on it (≠ its snapshot, not empty) of a **Month** form becomes the current `GoalActual` with source
+  **FORM** (`recordFormActuals`, entered by whoever last set it); a quarter form's figure stays on the form
+  (`ASSUMPTION Q36`); a write `entryBlockers` refuses is skipped and named on the form's audit row
+  (`FORM_ACTUAL_SKIPPED`), never blocking the completion. The form shows the period's target (the
+  annual one beside it), the actual, the three %s, evidence and the totals. *Source: plan §5.5; NoteX
+  22/10/2026.*
 - **BR-KPI-18** — A form can be **submitted** only when the weights sum to 100% (BR-KPI-04) and every
   item that requires a score or comment at that step has one (`formRules.canSubmit`, D6). *Source:
   Manager guide p. 26.*
@@ -271,8 +295,9 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   else as the valid delegate of a step actor; else, with `form.proxy`, on behalf of the first step
   actor. The audit rows of the edit name both people. `editRefusal` distinguishes the state (closed
   form, step without EDIT, frozen → 04) from the person (not entitled → 05). "Lưu nháp" writes only the
-  current step's column (another column → 04); the actual snapshots are never writable (04); a % above
-  the goal's method cap is 06. *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
+  current step's column (another column → 04) and, at a SELF / MANAGER step, the actual on the form
+  (BR-KPI-17); the system's SELF % (04 `SYSTEM_COLUMN`) and the snapshots are never writable (04); a %
+  above the goal's method cap — or, without one, `scoreCeiling` — is 06. *Source: Phase 1.1 workflow review; ERD `WORKFLOW_STEP.allowed_actions`.*
 - **BR-KPI-24** — **Someone who leaves mid-period** is evaluated for every period they worked at least
   one day of (left on 15 Jan → January's evaluation still launches on 1 Feb); their own SELF step has no
   actor, so its overdue behaviour carries the form on to the manager, and their lines are read as of
@@ -657,7 +682,8 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   (ERR-KPI-06). *Source: plan §3.2; Phase 1.1 review.*
 - **BR-KPI-51** — The prototype holds **no real personnel data**. The "Dữ liệu giả lập" banner is shown
   on every screen. *Source: plan §10.*
-- **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync) and when it was
+- **BR-KPI-52** — An actual records its **source** (manual, Excel batch, API sync, or **FORM** — a completed
+  evaluation form, BR-KPI-17; `ACTUAL_SOURCE_TYPES`, a data source is never of type FORM) and when it was
   recorded; actuals are snapshots, and only the current one per goal and period counts. Recording an
   actual is refused by ONE rule (`actualRules.actualIssues` = `entryBlockers` + `valueIssues`) that
   manual entry, every import row and every API reading pass through, most important first: the goal's
@@ -670,8 +696,9 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
   entered → 06 `ACTUAL_REQUIRED`; a NUMERIC goal needs a finite number and no text, a TEXT goal
   non-blank text and no number → 06 `ACTUAL_TYPE_MISMATCH`. A negative number is accepted. Who may
   enter by hand follows §9: `actual.enter` = MANAGER (their units) · HR · C&B · ADMIN — **an employee
-  does not enter actuals** in P1; they self-score with evidence on the evaluation form (`ASSUMPTION
-  Q33`). The detail codes' Vietnamese copy is `errorCatalog.ISSUE_DETAIL_COPY`. *Source: ERD
+  does not enter actuals by hand**; they enter theirs on the evaluation form, which records it as FORM
+  when it completes (`ASSUMPTION Q48`). The latest current snapshot wins whatever its source; an API sync
+  never overwrites a FORM one (Q37). The detail codes' Vietnamese copy is `errorCatalog.ISSUE_DETAIL_COPY`. *Source: ERD
   `GOAL_ACTUAL`; T4 Phase 1 (product owner, 2026-10-19).*
 - **BR-KPI-53** — **The actuals import** (WBS 4.4.3, `actualImportRules`). Template columns:
   `Mã chỉ tiêu được giao` · `Tên đăng nhập` · `Nhân viên` (reference) · `Mã KPI` · `Tên chỉ tiêu`,
@@ -762,7 +789,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q30 | Size and format limits of attachments? No source states them | 10 MB; PDF, images, Word, Excel, CSV, text | BR-KPI-48 |
 | Q31 | What does a LINK's `contributionPct` mean (a share of the parent's target, or of the child's result)? | Informational only — shown, never computed | BR-KPI-07 |
 | Q32 | In a cycle that does not start in January, is Q1 January–March or the cycle's first three months? | The cycle's first three months | BR-KPI-27 |
-| Q33 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says; the employee self-scores with evidence on the form. The seed's MANUAL rows "entered by the goal owner" predate this and are history (a later fixture fix) — **22/10: the employee enters it on the form** — not built (PEND-06, `Q48`) | BR-KPI-52 |
+| Q33 | Who enters actuals by hand — the employee too? | No — MANAGER (their units), HR, C&B, ADMIN as §9 says. **Superseded 22/10 (built 2026-10-23, PEND-06):** the employee enters the actual on the evaluation form (`Q48`). The seed's MANUAL rows "entered by the goal owner" predate this and are history | BR-KPI-17, 52 |
 | Q34 | Can C&B upload the import file (`system.uploadFile` needs `evidence.upload`)? | Resolved: yes — a C&B account with an employee record holds EMPLOYEE (BR-KPI-62), whose `evidence.upload` covers a file upload. A C&B system account without an employee could not; none exists | BR-KPI-54, 57 |
 | Q35 | May actuals be recorded for a goal whose plan is not yet Approved / Locked? | No — refused (ERR-KPI-04 `PLAN_NOT_APPROVED`). A plan HR reopens takes no new actual until re-approved | BR-KPI-52 |
 | Q36 | May a Quarter / Half / Year hold its own actual? | No — monthly only (06 `PERIOD_NOT_MONTH`); longer periods always add up their months | BR-KPI-52, 56 |
@@ -776,9 +803,9 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q44 | Does a manager get their own KPIs top-down or bottom-up? | Both, like an employee | PEND-01, BR-KPI-12 |
 | Q45 | Bottom-up: where does a registration form start when the manager cascades nothing? | Step 1 becomes optional — the manager sends it on with nothing cascaded, or HR launches straight into the employee's step | PEND-01, BR-KPI-12, 19 |
 | Q46 | Where is automatic record-and-lock configured, and what is the default? | On the registration workflow template; manual by default | PEND-02, BR-KPI-12, 14 |
-| Q47 | How does HR edit a result "in special cases"? | HR edits the FINAL column with a required reason, audited; the FINAL column defaults to the manager's | PEND-08, BR-KPI-16, 23 |
-| Q48 | The employee enters the actual on the form: does manual entry by manager / HR (BR-KPI-52) stay, and which number wins? | Manual entry stays; the form's actual is entered by the employee at step 1 and may be corrected by the manager at step 2 | PEND-06, BR-KPI-17, 52 |
-| Q49 | May the system-computed % be overridden? | Not by the employee; the manager may, with a comment | PEND-07, BR-KPI-16, 32 |
+| Q47 | How does HR edit a result "in special cases"? | HR edits the FINAL column with a required reason, audited; the FINAL column defaults to the manager's — **built 2026-10-23** | PEND-08, BR-KPI-16, 23 |
+| Q48 | The employee enters the actual on the form: does manual entry by manager / HR (BR-KPI-52) stay, and which number wins? | Manual entry stays; the form's actual is entered by the employee at step 1 and may be corrected by the manager at step 2 (with a comment); a changed actual of a Month form becomes the current FORM actual on completion, the latest snapshot wins — **built 2026-10-23** | PEND-06, BR-KPI-17, 52 |
+| Q49 | May the system-computed % be overridden? | Not by the employee; the manager may, with a comment — **built 2026-10-23** | PEND-07, BR-KPI-16, 32 |
 | Q50 | The minutes' quarterly example (500 tr + 2 tỷ + 5 tỷ + 10 tỷ = 17.5 tỷ) does not equal the 15 tỷ annual target — are quarter targets per quarter or cumulative? | Per quarter; a total that does not match is a warning (BR-KPI-11) | PEND-04, BR-KPI-11 |
 | Q51 | How is "lũy kế" (cumulative) computed for ratios and stock? | By the KPI's aggregation over the cycle's months up to the period viewed: SUM → running sum, AVG → mean of the months that have a number, LAST → the latest number. A month with no actual is never 0 — the figure uses the months that have one and is flagged incomplete. The cumulative target adds up the same way: SUM → the months' splits, else quarter / half splits that tile the window exactly, else the annual target only for the whole cycle — never prorated; AVG → mean of each month's target, the goal's own target where a month has no split; LAST → the last month's (same fallback). A period result still needs every month (`aggregatePeriodActuals` → `null` on a gap); only the running figure is partial. With a month missing, both comparisons are **provisional** ("tạm tính") — a partial actual against the whole window's target. Shown two ways: against the cumulative target (on track) and against the annual target (year progress). TEXT goals, roll-up goals (Q8) and goals with no aggregation are not cumulated (`cumulativeRules.ts`) | PEND-05, BR-KPI-11, 44 |
 | Q52 | Is the monthly continuous evaluation scored and paid? Which period produces the payout %? | Monthly is tracked, not paid; quarters and the year are scored and paid | PEND-09, BR-KPI-19, 40, 44 |
@@ -992,11 +1019,8 @@ the merge order of the two streams: `docs/plans/KPI_plan_A_kpi.md` §2.
 | PEND-01 | **Top-down and bottom-up registration run in parallel.** An employee may create their own KPIs and link them to a superior's goal when one exists; the manager's cascade step is no longer required first. The manager approves and may add or edit goals | BR-KPI-12, 19, 28 | Q44, Q45 | Workflow |
 | PEND-02 | **Step 4 "record and lock" is configurable**: automatic on the manager's approval, or manual by HR. HR (e.g. the HR head) may review and send the plan back to the manager | BR-KPI-12, 14 | Q46 | Workflow |
 | PEND-03 | **Cascade chain Company → Khối → Phòng → employee**; a superior's KPI can be cascaded to a unit or to a named employee. *Partly built 2026-10-21:* a Company / OrgUnit goal cascades to the nearest planned units below (BR-KPI-07 unit targets). Left: a plan for every Khối whose director receives KPIs, the dashboard's Khối score (Q40), the direct vs Khối manager | BR-KPI-01, 07, 85 | Q40, Q56 | Large (fixtures) |
-| PEND-04 | **Annual target split into quarters** (or months) in the same cycle — even split or typed in. *Checked 2026-10-23 (Đợt 0):* the split, `SPLIT_MISMATCH` / `SPLIT_INCOMPLETE` and Company / OrgUnit quarter results already work. Left: a quarterly KPI_EVAL form shows the annual target and snapshots no monthly sum; a month under a quarter-only split takes the annual target (Q67); clearer split labels. List: `KPI_update_plan_2210.md` §6 | BR-KPI-11, 44 | Q50, Q67 | KPI Rules |
+| PEND-04 | **Annual target split into quarters** (or months) in the same cycle — even split or typed in. *Checked 2026-10-23 (Đợt 0):* the split, `SPLIT_MISMATCH` / `SPLIT_INCOMPLETE` and Company / OrgUnit quarter results already work. *A1 (2026-10-23):* an evaluation form now snapshots the period's target and the months' sum (BR-KPI-17). Left (A3): a month under a quarter-only split takes the annual target (Q67), and `resultRules.actualLines` still falls back to the annual target for a quarter with no split; clearer split labels. List: `KPI_update_plan_2210.md` §6 | BR-KPI-11, 44 | Q50, Q67 | KPI Rules |
 | PEND-05 | **Cumulative (lũy kế) tracking** of quarter / month figures against the annual plan, on results and dashboards. *Rules built 2026-10-23 (Plan B, B0):* `src/lib/cumulativeRules.ts` — running actual and target by aggregation, on-track and year-progress achievements (`ASSUMPTION Q51`); not wired to any screen yet. Left: a read hook, the "Lũy kế" column on the Goal Plan and Results, the dashboard toggle (Đợt 4); the month target of a quarter-only split once Q67 is built | BR-KPI-44, 83…88 | Q51, Q67 | KPI Rules |
-| PEND-06 | **The employee enters the actual** (e.g. sales) with evidence (file, report link) at step 1 of the evaluation | BR-KPI-17, 52; `Q33` | Q48 | Workflow + KPI Rules |
-| PEND-07 | **The system computes the achievement %** from the actual and the assigned target, by the goal's method (`calcRules.achievement`) — not typed by the employee | BR-KPI-16, 32 | Q49 | KPI Rules |
-| PEND-08 | **The direct manager decides the result; HR does not approve it** — HR records the manager's result and may edit it in special (ad hoc) cases | BR-KPI-16, 23 | Q47 | Workflow |
 | PEND-09 | **Evaluation cadence**: formal evaluation quarterly and annual; monthly is continuous evaluation | BR-KPI-19, 22, 40, 44; `Q3` | Q52 | Workflow + KPI Rules |
 | PEND-10 | **Probation evaluation** (thử việc → chính thức) moves into P1 (item 3, after items 1 and 4) | `FORM_TYPES` (`PROBATION_EVAL`, P2 today) | Q53 | Large |
 | PEND-11 | **Manual data only in P1**; the library's calculation methods follow the PMGM guide's five. *Data part built 2026-10-21:* actuals by hand and Excel import, the API sync tagged "Phase sau" (BR-KPI-55, 56; product owner kept Excel, Q54). Left: the five methods — *checked 2026-10-23:* FORMULA is the one without a source; hide it from the picker (`ASSUMPTION Q55`) | BR-KPI-30 | Q55 | KPI Rules |

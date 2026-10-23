@@ -15,8 +15,8 @@ import { buildSeed, SEED_VERSION } from './index';
  *   5. log it with /log-decision.
  */
 const FROZEN = {
-  seedVersion: '2027-04-06.G1',
-  seedHash: '13f3d1c73192c7',
+  seedVersion: '2027-04-06.A1',
+  seedHash: '8ab04a6fae10a',
   entityCount: 49,
 } as const;
 

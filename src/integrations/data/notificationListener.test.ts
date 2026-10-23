@@ -248,7 +248,7 @@ describe('more recipients (QA follow-ups)', () => {
     const submit = async (form: (typeof open)[number]) => {
       const subject = accounts.find((x) => x.employeeId === form.subjectEmployeeId)?.id as Id;
       const items = await gateway.forms.listEvaluationItems(S, form.id);
-      await gateway.forms.saveEvaluationItems(S, subject, form.id, items.map((i) => ({ itemId: i.id, selfAchievementPct: 100, selfComment: 'Đạt' })));
+      await gateway.forms.saveEvaluationItems(S, subject, form.id, items.map((i) => ({ itemId: i.id, selfComment: 'Đạt' })));
       await act(gateway, subject, form.id, 'SUBMIT');
     };
 

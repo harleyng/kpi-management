@@ -46,11 +46,11 @@ const FIELDS: Record<EvaluationColumn, [keyof EvaluationItemPatch, keyof Evaluat
   FINAL: ['finalAchievementPct', 'finalComment'],
 };
 
-/** "Lưu nháp" of one column on every item of the form. */
+/** "Lưu nháp" of one column on every item of the form — at SELF only the explanation: the % is the system's (PEND-07). */
 async function score(gw: Gw, actor: Id, id: Id, column: EvaluationColumn, pct = 100) {
   const [p, c] = FIELDS[column];
   const items = await gw.forms.listEvaluationItems(S, id);
-  return gw.forms.saveEvaluationItems(S, actor, id, items.map((i) => ({ itemId: i.id, [p]: pct, [c]: 'Nhận xét' })));
+  return gw.forms.saveEvaluationItems(S, actor, id, items.map((i) => (column === 'SELF' ? { itemId: i.id, [c]: 'Nhận xét' } : { itemId: i.id, [p]: pct, [c]: 'Nhận xét' })));
 }
 
 const stepNoOf = async (gw: Gw, form: FormInstance) => (await gw.forms.listWorkflowSteps(S, form.workflowId)).find((s) => s.id === form.currentStepId)?.stepNo ?? null;
@@ -220,10 +220,11 @@ describe('forms.act — RETURN, CANCEL and refusals', () => {
 
   it('a submit with missing scores is refused (ERR-KPI-09) and a refusal changes nothing, announces nothing', async () => {
     const { gateway } = newGateway();
-    const id = formId('EVAL:T03:E016');
+    // At the employee's step with no explanation yet (the % is the system's, PEND-07).
+    const id = formId('EVAL:T03:E033');
     const before = await snapshotOf(gateway, id);
     const heard = listen(gateway);
-    expect((await rejection(act(gateway, u('E006'), id, 'SUBMIT'))).code).toBe('ERR-KPI-09');
+    expect((await rejection(act(gateway, u('E033'), id, 'SUBMIT'))).code).toBe('ERR-KPI-09');
     expect((await rejection(act(gateway, u('E017'), id, 'SUBMIT'))).code).toBe('ERR-KPI-05');
     await flush();
     expect(heard).toEqual([]);

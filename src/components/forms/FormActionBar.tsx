@@ -87,7 +87,7 @@ export function FormActionBar({
         onSuccess: () => {
           setDialog(null);
           setStaleAt(null);
-          toast.success(DONE[action]);
+          toast.success(action === 'APPROVE' && standing.step?.evaluationColumn === 'FINAL' ? 'Đã ghi nhận' : DONE[action]);
           setAnnouncement(DONE[action]);
           onActed?.();
         },
@@ -155,7 +155,8 @@ export function FormActionBar({
               aria-describedby={blocked ? `blockers-${form.id}` : undefined}
               onClick={() => run(action, null)}
             >
-              {STEP_ACTION_LABEL[action]}
+              {/* HR records the manager's result, it does not approve it (PEND-08). */}
+              {action === 'APPROVE' && standing.step?.evaluationColumn === 'FINAL' ? 'Ghi nhận' : STEP_ACTION_LABEL[action]}
             </Button>
           ))}
         </div>

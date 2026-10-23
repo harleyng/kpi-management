@@ -337,7 +337,8 @@ is **2027-04-06 09:00 +07**; the scheduler last ran 2027-04-01 09:00. Ids come f
 
 **Frozen at Gate 1 (2026-10-19)** as the contract between tracks: `src/data/fixtures/freeze.test.ts` pins
 the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49);
-`SEED_VERSION` is `2027-04-06.G1`. A failing freeze test is a **Large** change: system-architect
+`SEED_VERSION` is `2027-04-06.A1` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
+results). A failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4
 `Sync run:Running` (`STATE_EXEMPTIONS`) and the empty `PayrollExport` (`EMPTY_UNTIL_WIRED`: T6 wired the
@@ -367,6 +368,7 @@ delta Phase 5 applies when it writes the SQL schema.
 | D6 | `WORKFLOW_STEP.evaluation_column`, `requires_comment` feed `formRules.canSubmit()` — a rule, no table | Manager guide p. 26 |
 | D7 | Columns the P1 screens or the review needed: `EMPLOYEE.left_on`; `USER_ACCOUNT.display_name`; `CALC_METHOD.name`; `KPI_DEFINITION.category_tag` (Q5); `KGI.target_value/unit_id` (Q9); `GOAL.description/formula_text/target_type/roll_up_from_children (Q8)/replaces_goal_id/sort_order`; `SYNC_RUN.period_id`; `IMPORT_BATCH.cycle_id/rows/errors` (json); `GOAL_ACTUAL.note`; `WORKFLOW_STEP.name/return_to_step_no/remind_days_before`; `FORM_INSTANCE.form_type/current_step_entered_at/overdue_handled_at`; `FORM_STEP_ACTION.delegation_id`; `EVALUATION_ITEM.actual_text_snapshot/final_comment`; `DELEGATION.revoked_at`; `NOTIFICATION.event_code/subject/body/created_at/read_at`; `AUDIT_LOG.on_behalf_of_user_id/reason`. New table `GOAL_CHANGE_ITEM`. New enum values: Goal Plan `Returned`, step actions `CANCEL`/`AUTO_LOCK`, overdue `LOCK`, notification `STEP_ASSIGNED`; `KPI_ALERT` deferred to Phase 3 | Plan §5 screens; Phase 1.1 reviews |
 | D8 | ERD Vietnamese enum values become English codes with Vietnamese label maps (Khoi → Division, Thử việc → Probation, GĐ → Director…) | Code is English; the screen reads only the label maps |
+| D9 | `EVALUATION_ITEM.actual_value/actual_text` (the actual on the form), `actual_entered_by`, `submitted_actual_value/submitted_actual_text`, `target_snapshot` (the period's target); `GOAL_ACTUAL.source_type` adds `FORM` — `DATA_SOURCE.source_type` does not (`ACTUAL_SOURCE_TYPES` vs `SOURCE_TYPES`; the ERD shares one `source_type`) | 22/10 meeting, PEND-06/07/08 (A1, 2026-10-23) |
 
 ## Phases (plan §6)
 

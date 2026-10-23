@@ -115,11 +115,12 @@ describe('the dashboard on the seed (Phase 3 gate)', () => {
     const kd = model?.nodes.get(unit('KD'));
     expect(kd?.ownPlan).toBeNull();
     expect(kd?.own).toBeNull();
-    expect(kd).toMatchObject({ staffTotal: 9, staffCounted: 6, staffAverage: 95.25 });
+    expect(kd).toMatchObject({ staffTotal: 9, staffCounted: 6 });
+    expect(kd?.staffAverage).toBeCloseTo(99.7467, 4);
     // The company: 27 people evaluated in T02, 17 official results (E023 and E027 Draft; five without a completed form).
     const company = model?.nodes.get(unit('SYN'));
     expect(company).toMatchObject({ staffTotal: 27, staffCounted: 17 });
-    expect(company?.staffAverage).toBeCloseTo(95.3235, 4);
+    expect(company?.staffAverage).toBeCloseTo(97.6429, 4);
   });
 
   it('T01: everything Locked but E027 — company 93.71 B; no previous month', async () => {
@@ -170,14 +171,14 @@ describe('the dashboard on the seed (Phase 3 gate)', () => {
     // T02: 22 completed, 5 still open past their step deadline — the same "Quá hạn" as T5's lists.
     const t02 = formProgress(formsInScope(await allForms(gw, S, 'KPI_EVAL', period('T02').id), data, period('T02')), steps, clock);
     expect(t02).toMatchObject({ total: 27, completed: 22, overdue: 5 });
-    expect(t02.byStep.map((s) => [s.name, s.count])).toEqual([['Quản lý đánh giá', 4], ['HR/C&B chốt kết quả', 1]]);
+    expect(t02.byStep.map((s) => [s.name, s.count])).toEqual([['Quản lý đánh giá', 4], ['HR ghi nhận kết quả', 1]]);
   });
 
   it('operations: the T02 rating distribution counts the official Employee results only', async () => {
     const { data, period, levels } = await load(gw, S, SYNTRA.user(SYNTRA.personas.hr));
     const model = buildDashboard(data, period('T02').id);
     const dist = model ? ratingDistribution(resultsInScope(model), levels) : null;
-    expect(dist?.levels.map((l) => [l.level.code, l.count])).toEqual([['A+', 0], ['A', 3], ['B', 12], ['C', 2], ['D', 0]]);
+    expect(dist?.levels.map((l) => [l.level.code, l.count])).toEqual([['A+', 0], ['A', 5], ['B', 12], ['C', 0], ['D', 0]]);
     expect(dist).toMatchObject({ unrated: 0, total: 17 });
   });
 

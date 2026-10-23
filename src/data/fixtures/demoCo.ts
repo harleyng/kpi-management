@@ -1,4 +1,5 @@
 import type { Goal, Id, RoleCode, Tenant } from '@/data/types';
+import { targetForPeriod } from '@/lib/calcRules';
 import { idsFor, seedId } from './ids';
 import { ResultScript } from './results';
 import { addLibrary, addNotificationTemplates, addRating, addRoles, addWorkflows, goalFromKpi, SeedRows } from './shared';
@@ -121,7 +122,9 @@ export function buildDemoCo(): TenantSeed {
   step(ev.id, 'KPI_EVAL', 2, 'D001', 'SUBMIT', vn('2027-02-05 10:00'), delegation.id, 'D002');
   step(ev.id, 'KPI_EVAL', 3, 'D004', 'APPROVE', vn('2027-02-07 10:00'));
   for (const goal of goals) {
-    s.add('EvaluationItem', { id: id('EvaluationItem', goal.id), formId: ev.id, goalId: goal.id, actualSnapshot: null, actualTextSnapshot: null, selfAchievementPct: 100, selfComment: 'Hoàn thành.', managerAchievementPct: 95, managerComment: 'Đồng ý.', finalAchievementPct: 95, finalComment: null });
+    // No actual on the form → the system has no % (PEND-07); the manager decides with a comment, HR records it.
+    const targetSnapshot = targetForPeriod(goal, s.rows.GoalPeriodTarget, t01.id);
+    s.add('EvaluationItem', { id: id('EvaluationItem', goal.id), formId: ev.id, goalId: goal.id, actualSnapshot: null, actualTextSnapshot: null, actualValue: null, actualText: null, actualEnteredBy: null, submittedActualValue: null, submittedActualText: null, targetSnapshot, selfAchievementPct: null, selfComment: 'Hoàn thành.', managerAchievementPct: 95, managerComment: 'Đồng ý.', finalAchievementPct: 95, finalComment: null });
   }
   const gc = form('GC', { type: 'GOAL_CHANGE', periodId: null, launchId: null, at: vn('2027-02-15 09:00'), due: '2027-02-25' });
   step(gc.id, 'GOAL_CHANGE', 1, 'D003', 'SUBMIT', vn('2027-02-15 10:00'));

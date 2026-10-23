@@ -1,4 +1,4 @@
-import type { Evidence, GoalActual, Id, SourceType } from '@/data/types';
+import type { ActualSourceType, Evidence, GoalActual, Id } from '@/data/types';
 import { newId } from './rows';
 import type { Tx } from './store';
 
@@ -15,7 +15,7 @@ export function writeActualSnapshot(
     actualValue: number | null;
     actualText: string | null;
     note: string | null;
-    sourceType: SourceType;
+    sourceType: ActualSourceType;
     batchId: Id | null;
     syncRunId: Id | null;
     /** `null` for an API sync. */

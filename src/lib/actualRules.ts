@@ -93,7 +93,7 @@ export function currentActual<A extends Pick<GoalActual, 'goalId' | 'periodId' |
 
 /**
  * A sync never overwrites a number a person put there: when the current snapshot came from manual
- * entry or an Excel batch, the reading is skipped (`ASSUMPTION Q37`). Over its own earlier reading
+ * entry, an Excel batch or an evaluation form (FORM), the reading is skipped (`ASSUMPTION Q37`). Over its own earlier reading
  * (API) the latest wins.
  */
 export function syncKeepsHumanActual(current: Pick<GoalActual, 'sourceType'> | null): boolean {

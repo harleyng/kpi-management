@@ -47,6 +47,7 @@
  */
 
 import type {
+  ActualSourceType,
   AlignmentType,
   AuditAction,
   AuditLog,
@@ -112,7 +113,6 @@ import type {
   ResultDetail,
   Role,
   RolePermission,
-  SourceType,
   StepAction,
   SyncRun,
   Tenant,
@@ -231,7 +231,7 @@ export interface AlignmentFilter {
 export interface ActualFilter {
   goalIds?: readonly Id[];
   periodId?: Id;
-  sourceType?: SourceType;
+  sourceType?: ActualSourceType;
   /** Default `true`: only the current snapshot per (goal, period). `false` returns the history. */
   currentOnly?: boolean;
 }
@@ -291,8 +291,16 @@ export interface RecordActualInput {
  * "Lưu nháp" on an evaluation form — only the current step's columns are accepted. A key left
  * `undefined` leaves the column untouched; `null` clears it.
  */
+/**
+ * "Lưu nháp" on an evaluation form. Only the current step's column is writable; the SELF % is the
+ * system's (`formRules.computedItemPct`) and any `selfAchievementPct` is refused (ERR-KPI-04
+ * `SYSTEM_COLUMN`, PEND-07). `actualValue` / `actualText` — the actual on the form (PEND-06) — at a
+ * SELF or MANAGER step only (else 04 `ACTUAL_NOT_EDITABLE`); a value equal to the stored one is not a change.
+ */
 export interface EvaluationItemPatch {
   itemId: Id;
+  actualValue?: number | null;
+  actualText?: string | null;
   selfAchievementPct?: number | null;
   selfComment?: string | null;
   managerAchievementPct?: number | null;
@@ -423,7 +431,7 @@ export type DomainEvent =
       type: 'actuals.recorded';
       periodId: Id;
       goalIds: Id[];
-      sourceType: SourceType;
+      sourceType: ActualSourceType;
       batchId: Id | null;
       syncRunId: Id | null;
     })

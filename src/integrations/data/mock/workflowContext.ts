@@ -1,6 +1,18 @@
 import type { CollectionName, RowOf } from '@/data/fixtures/types';
-import { GOAL_PLAN_INITIAL_STATUS, type FormInstance, type FormLaunch, type FormType, type GoalPlan, type Id, type WorkflowStep } from '@/data/types';
+import {
+  GOAL_PLAN_INITIAL_STATUS,
+  type EvaluationItem,
+  type FormInstance,
+  type FormLaunch,
+  type FormType,
+  type GoalPlan,
+  type Id,
+  type WorkflowStep,
+} from '@/data/types';
+import { entryBlockers, isResultFinalised } from '@/lib/actualRules';
 import { KpiError, toKpiError, type RuleIssue } from '@/lib/errorCatalog';
+import { computedItemPct, itemsOnEnterColumn, sameActual, type ItemCalcContext } from '@/lib/formRules';
+import { periodActual, periodTarget, type ActualContext } from '@/lib/resultRules';
 import { planStatusOnEnterStep, type Decision } from '@/lib/goalPlanRules';
 import { planEditability, type OpenRegistration } from '@/lib/planAccessRules';
 import { todayOf } from '@/lib/isoDate';
@@ -19,6 +31,7 @@ import {
   type Recipients,
   type Refusal,
 } from '@/lib/workflowRules';
+import { writeActualSnapshot } from './actualWrites';
 import { actorCan, authorizeActor, clockOf } from './authorize';
 import { newId } from './rows';
 import type { Tx } from './store';
@@ -234,7 +247,7 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
   }
 
   const plans = tx.all('GoalPlan').filter((p) => p.cycleId === cycleId && p.ownerType === 'Employee');
-  const actuals = launch.formType === 'KPI_EVAL' ? tx.all('GoalActual').filter((a) => a.periodId === launch.periodId && a.isCurrent) : [];
+  const evalCtx = launch.formType === 'KPI_EVAL' && period ? actualContextOf(tx, period) : null;
   const dueDate = launchDueDate(clock.now, launch.dueDays, clock.tz);
   const formIds: Id[] = [];
   for (const subjectEmployeeId of recipients.subjects) {
@@ -267,21 +280,30 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
         .filter((g) => g.goalPlanId === plan.id && g.status === 'Active')
         .sort((a, b) => a.sortOrder - b.sortOrder);
       for (const goal of goals) {
-        const actual = actuals.find((a) => a.goalId === goal.id);
-        tx.insert('EvaluationItem', {
+        // The period's actual and target as a result reads them (a quarter adds up its months).
+        const actual = evalCtx && period ? periodActual(goal, period, evalCtx) : null;
+        const item: EvaluationItem = {
           id: newId(),
           tenantId: tx.tenantId,
           formId: form.id,
           goalId: goal.id,
           actualSnapshot: actual?.actualValue ?? null,
           actualTextSnapshot: actual?.actualText ?? null,
+          actualValue: actual?.actualValue ?? null,
+          actualText: actual?.actualText ?? null,
+          actualEnteredBy: null,
+          submittedActualValue: null,
+          submittedActualText: null,
+          targetSnapshot: evalCtx && period ? periodTarget(goal, period, evalCtx) : null,
           selfAchievementPct: null,
           selfComment: null,
           managerAchievementPct: null,
           managerComment: null,
           finalAchievementPct: null,
           finalComment: null,
-        });
+        };
+        // PEND-07 — the system's % from the first moment the form exists.
+        tx.insert('EvaluationItem', { ...item, selfAchievementPct: computedItemPct(item, itemCalcContextOf(tx, goal.id)) });
       }
     }
   }
@@ -289,4 +311,95 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
   const fired = tx.update('FormLaunch', { ...tx.get('FormLaunch', launch.id), status: 'Launched', launchedAt: clock.now });
   tx.emit({ type: 'form.launched', launchId: launch.id, formIds });
   return { launch: fired, formIds, skipped: recipients.skipped };
+}
+
+// ─── Evaluation items (PEND-06/07/08) ──────────────────────────────────────────────────────────
+
+/** What `resultRules.periodActual` / `periodTarget` read, from the transaction. */
+export function actualContextOf(tx: Tx, period: ActualContext['period']): ActualContext {
+  return {
+    period,
+    periods: tx.all('CyclePeriod'),
+    actuals: tx.all('GoalActual'),
+    periodTargets: tx.all('GoalPeriodTarget'),
+    methods: tx.all('CalcMethod'),
+    tiers: tx.all('CalcTier'),
+    levels: tx.all('GoalTargetLevel'),
+    kpiDefinitions: tx.all('KpiDefinition'),
+    allGoals: tx.all('Goal'),
+    alignments: tx.all('GoalAlignment'),
+  };
+}
+
+/** What the system's % of a goal's item reads: the goal, its method, the tiers and levels. */
+export function itemCalcContextOf(tx: Tx, goalId: Id): ItemCalcContext {
+  const goal = tx.get('Goal', goalId);
+  return {
+    goal,
+    method: tx.find('CalcMethod', goal.calcMethodId) ?? null,
+    tiers: tx.all('CalcTier').filter((t) => t.calcMethodId === goal.calcMethodId),
+    levels: tx.all('GoalTargetLevel').filter((l) => l.goalId === goalId),
+  };
+}
+
+/**
+ * Entering a step of an evaluation form (`forms.act` on SUBMIT / APPROVE / RETURN, the scheduler's
+ * AUTO_FORWARD): `formRules.itemsOnEnterColumn` for the entered step's column — the system's %
+ * recomputed, the manager's default, FINAL = MANAGER — written with `reason` so the audit tells these
+ * defaults from a person's edit. Nothing for a step without a column (registration, adjustment).
+ */
+export function applyColumnEntry(tx: Tx, form: FormInstance, entered: WorkflowStep, left: WorkflowStep | undefined, reason: string): void {
+  if (form.formType !== 'KPI_EVAL' || entered.evaluationColumn === null) return;
+  const items = tx.all('EvaluationItem').filter((i) => i.formId === form.id);
+  const computed = new Map(items.map((i) => [i.id, computedItemPct(i, itemCalcContextOf(tx, i.goalId))]));
+  for (const next of itemsOnEnterColumn(items, entered.evaluationColumn, left?.evaluationColumn ?? null, computed)) {
+    tx.update('EvaluationItem', next, { reason });
+  }
+}
+
+/**
+ * A completed evaluation records the actuals entered on it (PEND-06, BR-KPI-52): for each item whose
+ * actual was CHANGED on the form (≠ its snapshot — an untouched form never reverts a later correction)
+ * and is not empty, one `GoalActual` of source FORM becomes the current one (`writeActualSnapshot`).
+ * Only a Month form writes: actuals are monthly, a quarter adds up its months (`ASSUMPTION Q36`), so a
+ * quarter form's figure stays on the form. A write `actualRules.entryBlockers` refuses (the result is
+ * already Final, the period locked) is skipped — the form still completes; the skipped goals are
+ * returned for the audit row.
+ */
+export function recordFormActuals(tx: Tx, form: FormInstance): { written: Id[]; skipped: Id[] } {
+  const done = { written: [] as Id[], skipped: [] as Id[] };
+  if (form.formType !== 'KPI_EVAL' || form.periodId === null || form.goalPlanId === null) return done;
+  const period = tx.get('CyclePeriod', form.periodId);
+  if (period.periodType !== 'Month') return done;
+  const plan = tx.get('GoalPlan', form.goalPlanId);
+  const subjectUser = tx.all('UserAccount').find((u) => u.employeeId === form.subjectEmployeeId)?.id ?? null;
+  const asOf = todayOf(clockOf(tx));
+  const finalised = isResultFinalised(tx.all('PeriodResult'), plan.id, period.id);
+  for (const item of tx.all('EvaluationItem').filter((i) => i.formId === form.id)) {
+    const empty = item.actualValue === null && (item.actualText === null || item.actualText.trim() === '');
+    if (empty || sameActual(item, { actualValue: item.actualSnapshot, actualText: item.actualTextSnapshot })) continue;
+    const goal = tx.get('Goal', item.goalId);
+    // The goal was Active when the form opened; a later adjustment does not stop its month's number.
+    const blockers = entryBlockers({ goal: { ...goal, status: 'Active' }, planStatus: plan.status, goalCycleId: plan.cycleId, period, resultsFinalised: finalised, asOf });
+    if (blockers.length > 0) {
+      done.skipped.push(item.goalId);
+      continue;
+    }
+    writeActualSnapshot(tx, {
+      goalId: item.goalId,
+      periodId: period.id,
+      actualValue: item.actualValue,
+      actualText: item.actualValue === null ? item.actualText : null,
+      note: null,
+      sourceType: 'FORM',
+      batchId: null,
+      syncRunId: null,
+      enteredBy: item.actualEnteredBy ?? subjectUser,
+    });
+    done.written.push(item.goalId);
+  }
+  if (done.written.length > 0) {
+    tx.emit({ type: 'actuals.recorded', periodId: period.id, goalIds: done.written, sourceType: 'FORM', batchId: null, syncRunId: null });
+  }
+  return done;
 }

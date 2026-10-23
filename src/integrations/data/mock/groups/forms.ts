@@ -1,7 +1,9 @@
 import type { Delegation, EvaluationItem, FormInstance, FormLaunch, FormStepAction, FormType, GoalChangeItem, Id, WorkflowStep } from '@/data/types';
 import { cycleAllowsLaunch } from '@/lib/cycleRules';
 import { KpiError, type RuleIssue } from '@/lib/errorCatalog';
-import { COLUMN_FIELDS, validateScoreInput, type CanSubmitInput } from '@/lib/formRules';
+import { COLUMN_FIELDS, SYSTEM_COLUMN, computedItemPct, formActualIssues, sameActual, validateScoreInput, withFormActual, type CanSubmitInput } from '@/lib/formRules';
+import { isResultFinalised } from '@/lib/actualRules';
+import { todayOf } from '@/lib/isoDate';
 import { submitCheckInput } from '@/lib/formViewRules';
 import { applyGoalChanges, changeItemIssues, planStatusOnEnterStep } from '@/lib/goalPlanRules';
 import { resourceOfSubject } from '@/lib/permissionRules';
@@ -27,13 +29,16 @@ import { eqOpt, inList, newId, saveChildren, upsert } from '../rows';
 import type { Runtime } from '../runtime';
 import type { Tx } from '../store';
 import {
+  applyColumnEntry,
   assertMayEdit,
   assigneesFor,
+  itemCalcContextOf,
   directoryOf,
   entitlementCtx,
   fireLaunch,
   planOfForm,
   planOwnerEmployeeId,
+  recordFormActuals,
   refOrInvalid,
   setPlanStatus,
   stepOf,
@@ -46,8 +51,10 @@ import { paginate } from './page';
 
 /** The six score / comment columns of an evaluation item (`EvaluationItemPatch`). */
 const SCORE_FIELDS = ['selfAchievementPct', 'selfComment', 'managerAchievementPct', 'managerComment', 'finalAchievementPct', 'finalComment'] as const;
-/** Read-only copies of the actual (BR-KPI-17): never writable through "Lưu nháp". */
-const SNAPSHOT_FIELDS = ['actualSnapshot', 'actualTextSnapshot'] as const;
+/** Read-only copies of the actual and target (BR-KPI-17) and the system's bookkeeping: never writable through "Lưu nháp". */
+const SNAPSHOT_FIELDS = ['actualSnapshot', 'actualTextSnapshot', 'targetSnapshot', 'actualEnteredBy', 'submittedActualValue', 'submittedActualText'] as const;
+/** The columns whose step may change the actual on the form (PEND-06): the employee's, then the manager's. */
+const ACTUAL_COLUMNS = ['SELF', 'MANAGER'] as const;
 
 /**
  * The content check `checkAction` runs on SUBMIT / APPROVE — always built, for the form's type, by
@@ -234,21 +241,52 @@ export function formsGroup(rt: Runtime): FormsGateway {
       const column = editableColumn(step);
       if (column === null) throw new KpiError('ERR-KPI-04', 'NO_EDITABLE_COLUMN');
       const own = COLUMN_FIELDS[column];
-      const methods = new Map(tx.all('CalcMethod').map((m) => [m.id, m]));
+      const actor = tx.ctx.actorUserId as Id;
+      const period = form.periodId ? tx.get('CyclePeriod', form.periodId) : null;
+      const plan = form.goalPlanId ? tx.get('GoalPlan', form.goalPlanId) : null;
       const issues: RuleIssue[] = [];
       for (const patch of patches) {
         const item = typeof patch?.itemId === 'string' ? tx.find('EvaluationItem', patch.itemId) : undefined;
         if (!item || item.formId !== form.id) throw new KpiError('ERR-KPI-06', `EvaluationItem ${String(patch?.itemId)} is not on form ${formId}`);
         const fields = patch as unknown as Record<string, unknown>;
         if (SNAPSHOT_FIELDS.some((f) => fields[f] !== undefined)) throw new KpiError('ERR-KPI-04', 'SNAPSHOT_READ_ONLY');
+        // PEND-07 — the system's % is never typed, not even cleared.
+        if (fields[COLUMN_FIELDS[SYSTEM_COLUMN].pct] !== undefined) throw new KpiError('ERR-KPI-04', 'SYSTEM_COLUMN');
         if (SCORE_FIELDS.some((f) => fields[f] !== undefined && f !== own.pct && f !== own.comment)) throw new KpiError('ERR-KPI-04', 'COLUMN_NOT_EDITABLE');
-        const next: EvaluationItem = { ...item };
-        const pct = patch[own.pct];
-        if (pct !== undefined) {
-          const goal = tx.get('Goal', item.goalId);
-          const issue = validateScoreInput(pct, methods.get(goal.calcMethodId) ?? null);
-          if (issue) issues.push({ ...issue, ref: item.id });
-          next[own.pct] = pct;
+        const goal = tx.get('Goal', item.goalId);
+        const calc = itemCalcContextOf(tx, goal.id);
+        let next: EvaluationItem = { ...item };
+
+        // PEND-06 — the actual on the form; a resent unchanged value is not a change.
+        if (patch.actualValue !== undefined || patch.actualText !== undefined) {
+          const actual = {
+            actualValue: patch.actualValue !== undefined ? patch.actualValue : item.actualValue,
+            actualText: patch.actualText !== undefined ? patch.actualText : item.actualText,
+          };
+          if (!sameActual(actual, item)) {
+            if (!(ACTUAL_COLUMNS as readonly string[]).includes(column)) throw new KpiError('ERR-KPI-04', 'ACTUAL_NOT_EDITABLE');
+            const found =
+              period && plan
+                ? formActualIssues(actual, {
+                    goal,
+                    goalCycleId: plan.cycleId,
+                    period,
+                    resultsFinalised: isResultFinalised(tx.all('PeriodResult'), plan.id, period.id),
+                    asOf: todayOf(clockOf(tx)),
+                  })
+                : [];
+            if (found.length) issues.push(...found.map((i) => ({ ...i, ref: item.id })));
+            else next = withFormActual(next, actual, computedItemPct({ ...item, ...actual }, calc), actor);
+          }
+        }
+
+        if (column !== SYSTEM_COLUMN) {
+          const pct = patch[own.pct];
+          if (pct !== undefined) {
+            const issue = validateScoreInput(pct, calc.method, calc);
+            if (issue) issues.push({ ...issue, ref: item.id });
+            next[own.pct] = pct;
+          }
         }
         const comment = patch[own.comment];
         if (comment !== undefined) next[own.comment] = comment;
@@ -298,11 +336,15 @@ export function formsGroup(rt: Runtime): FormsGateway {
       // Both people are named on every event and audit row of this write (BR-KPI-21).
       tx.onBehalfOfUserId = checked.record.onBehalfOfUserId;
 
-      const reason = input.action === 'CANCEL' || input.action === 'RETURN' ? input.comment : null;
+      // A completed evaluation records the actuals entered on it (PEND-06); a skipped one is named on the audit row.
+      const recorded = checked.form.status === 'Completed' ? recordFormActuals(tx, form) : null;
+      const skipped = recorded && recorded.skipped.length > 0 ? `FORM_ACTUAL_SKIPPED: ${recorded.skipped.join(', ')}` : null;
+      const reason = input.action === 'CANCEL' || input.action === 'RETURN' ? input.comment : skipped;
       const saved = tx.update('FormInstance', { ...form, ...checked.form }, { reason });
       const history: FormStepAction = { id: newId(), tenantId: tx.tenantId, ...checked.record };
       tx.insert('FormStepAction', history);
 
+      if (checked.nextStep) applyColumnEntry(tx, saved, checked.nextStep, step, 'STEP_ENTRY');
       if (checked.planStatus && plan) setPlanStatus(tx, plan, checked.planStatus, reason);
       if (checked.applyGoalChanges && plan) {
         const goals = tx.all('Goal').filter((g) => g.goalPlanId === plan.id);

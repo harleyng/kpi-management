@@ -173,7 +173,8 @@ export const form = (o: Partial<FormInstance> = {}): FormInstance => ({
 
 export const evaluationItem = (o: Partial<EvaluationItem> = {}): EvaluationItem => ({
   id: `it-${o.goalId ?? 'g1'}`, tenantId: TENANT, formId: 'f1', goalId: 'g1', actualSnapshot: null,
-  actualTextSnapshot: null, selfAchievementPct: null, selfComment: null, managerAchievementPct: null,
+  actualTextSnapshot: null, actualValue: o.actualSnapshot ?? null, actualText: o.actualTextSnapshot ?? null,
+  actualEnteredBy: null, submittedActualValue: null, submittedActualText: null, targetSnapshot: null, selfAchievementPct: null, selfComment: null, managerAchievementPct: null,
   managerComment: null, finalAchievementPct: null, finalComment: null, ...o,
 });
 

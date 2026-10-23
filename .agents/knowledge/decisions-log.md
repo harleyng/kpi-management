@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-10-23 — Plan A, A1: the system computes the self %, the employee enters the actual, HR records the manager's result
+
+**Decision.** PEND-06/07/08 built on `ASSUMPTION Q47–Q49` (BR-KPI-16, 17, 23, 52). The SELF column is the
+system's % (`formRules.computedItemPct`) on the actual entered on the form and the period's target snapshot; a typed
+self % is 04 `SYSTEM_COLUMN`. The manager's % starts at it and follows it until overridden; an override or a
+corrected actual needs a comment; FINAL = MANAGER on every entry from another column, an HR change needs a reason.
+Step-entry defaults run in one helper (`applyColumnEntry`) from `forms.act` and the scheduler's AUTO_FORWARD. A
+completed **Month** form writes each changed actual as a `GoalActual` of the new source FORM
+(`ACTUAL_SOURCE_TYPES`, separate from the data sources' `SOURCE_TYPES`). Forms snapshot the period's target and,
+for a quarter, its months' sum (`resultRules.periodActual` / `periodTarget`). KPI_EVAL step 2 no longer requires a
+comment on every row.
+
+**Why.** Writing a FORM actual on a quarter form (a proposed Q68) would shadow the months in `actualFor`: a later
+monthly correction or import would never reach the quarter again — so Q36 stays and a quarter's figure stays on the
+form. Comparing the form's actual with the CURRENT actual (instead of its snapshot) would make an untouched form
+revert an HR correction made after launch. A SUM quarter scored against the annual target gives 20% for a quarter
+on plan, so `periodTarget` returns `null` (not computable) rather than borrow it. A required comment on every
+manager row contradicted "comment only when the manager differs" (Q49).
+
+**Consequence.** Seed results moved (FINAL now = the manager's, mostly the system's %): the story's adjustments
+became E023 +2 (88.97 C → 90.97 B) and E040 −2 (100.30 A → 98.30 B); the seed size budget went 1.5 M → 1.6 M;
+`SEED_VERSION` 2027-04-06.A1 and a new freeze hash. Plan B must rebase: `EvaluationItem` gained six fields and
+`GoalActual.sourceType` is `ActualSourceType`. Left for A3: `resultRules.actualLines` still borrows the annual
+target for a quarter with no split, and Q67 (a month under a quarter-only split).
+
+**Updated alongside.** `business-rules.md` BR-KPI-16, 17, 23, 52, §8 Q33/Q47–Q49, §12 (PEND-06/07/08 removed,
+PEND-04 narrowed); `architecture.md` ERD deviation D9 and `SEED_VERSION`; `docs/flows/new-flow.md` §4 and §4G;
+plan tables (`KPI_plan_A_kpi.md` A1 ✅, `KPI_update_plan_2210.md` §4, §6).
+
 ## 2026-10-23 — Plan B, B0: monthly work scoring and cumulative tracking as pure rules, ahead of their entities
 
 **Decision.** `src/lib/workRules.ts` (PEND-14) and `src/lib/cumulativeRules.ts` (PEND-05) land before any

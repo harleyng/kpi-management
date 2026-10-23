@@ -117,8 +117,8 @@ history produces; `seed.test.ts` checks that only the one named form is overdue 
 - **Results** (`syntra/results.ts`, run last, through `resultRules` — the gateway recalculating a Draft
   reproduces its row exactly). An Employee plan has a result only from a COMPLETED evaluation form
   (FINAL column, `ASSUMPTION Q17`); Company / department plans are scored from the current actuals.
-  **T01** Locked — adjustments E016 −2 and E019 +1 (89.50 C → 90.50 B, payout 50% → 80%); E027 stays
-  Draft (its plan stopped at 3 goals, 75%). **T02** Final — E031 −2 (101.75 A → 99.75 B); Draft: E023
+  **T01** Locked — adjustments E016 −2 and E023 +2 (88.97 C → 90.97 B, payout 50% → 80%); E027 stays
+  Draft (its plan stopped at 3 goals, 75%). **T02** Final — E040 −2 (100.30 A → 98.30 B); Draft: E023
   (held — its manager step was a delegate's), E027 (75%) and the company plan (an ERP Sale record never
   arrived); E025, E026, E028, E037, E041 have no completed form, so no result. **T03** calculated only:
   the ten unit plans Draft (CSKH and Mua hàng incomplete — the CRM batch is still Validating).

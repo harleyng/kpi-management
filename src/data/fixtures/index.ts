@@ -10,7 +10,7 @@ import type { Seed } from './types';
  * Bump SEED_VERSION whenever the fixtures change: a browser holding an older copy then reseeds on
  * its next load instead of mixing old rows with new code.
  */
-export const SEED_VERSION = '2027-04-06.G1';
+export const SEED_VERSION = '2027-04-06.A1';
 export { LAST_SCHEDULER_TICK, SEED_NOW } from './timeline';
 
 export function buildSeed(): Seed {

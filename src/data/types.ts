@@ -634,6 +634,18 @@ export const SOURCE_TYPE_LABEL: Readonly<Record<SourceType, string>> = {
   API: 'Kết nối API',
 };
 
+/**
+ * ERD `GOAL_ACTUAL.source_type` — the data sources' types plus `FORM`: the actual an employee entered
+ * on a completed evaluation form (PEND-06, BR-KPI-52). A data source is never of type FORM, so the
+ * pickers and filters of data sources keep `SOURCE_TYPES`.
+ */
+export const ACTUAL_SOURCE_TYPES = [...SOURCE_TYPES, 'FORM'] as const;
+export type ActualSourceType = (typeof ACTUAL_SOURCE_TYPES)[number];
+export const ACTUAL_SOURCE_TYPE_LABEL: Readonly<Record<ActualSourceType, string>> = {
+  ...SOURCE_TYPE_LABEL,
+  FORM: 'Phiếu đánh giá',
+};
+
 /** ERD `DATA_SOURCE` — ERP Sale, HRIS, Excel, Thủ công… */
 export interface DataSource extends TenantScoped {
   code: string;
@@ -836,7 +848,7 @@ export interface GoalActual extends TenantScoped {
   periodId: Id;
   actualValue: number | null;
   actualText: string | null;
-  sourceType: SourceType;
+  sourceType: ActualSourceType;
   batchId: Id | null;
   syncRunId: Id | null;
   /** The user who entered it; `null` for an API sync. */
@@ -938,7 +950,7 @@ export type EvaluationColumn = (typeof EVALUATION_COLUMNS)[number];
 export const EVALUATION_COLUMN_LABEL: Readonly<Record<EvaluationColumn, string>> = {
   SELF: 'Tự đánh giá',
   MANAGER: 'Quản lý đánh giá',
-  FINAL: 'HR/C&B chốt',
+  FINAL: 'HR ghi nhận',
 };
 
 /**
@@ -1035,10 +1047,32 @@ export interface FormStepAction extends TenantScoped {
 export interface EvaluationItem extends TenantScoped {
   formId: Id;
   goalId: Id;
-  /** Read-only copy of the current actual when the form opened (BR-KPI-17). */
+  /**
+   * Read-only copy of the recorded actual when the form opened ("Số đã ghi nhận lúc mở phiếu",
+   * BR-KPI-17): the period's own actual, or for a Quarter / Half / Year its months aggregated
+   * (`resultRules.periodActual`).
+   */
   actualSnapshot: number | null;
   /** D7 — the text counterpart for TEXT goals. */
   actualTextSnapshot: string | null;
+  /**
+   * PEND-06 — the actual ON THE FORM: starts as the snapshot, entered by the employee at the SELF step
+   * and correctable by the manager at the MANAGER step (EDIT, not `actual.enter`). Written to
+   * `GoalActual` (source FORM) when the form completes.
+   */
+  actualValue: number | null;
+  actualText: string | null;
+  /** Who last changed the form's actual (`null` = never changed: it is still the snapshot). */
+  actualEnteredBy: Id | null;
+  /**
+   * The form's actual when the SELF step was left (SUBMIT or AUTO_FORWARD); `null` before. A manager
+   * who changes the actual after it must say why (`formRules.managerActualIssues`).
+   */
+  submittedActualValue: number | null;
+  submittedActualText: string | null;
+  /** The period's target when the form opened (`resultRules.periodTarget`); `null` = no numeric target. */
+  targetSnapshot: number | null;
+  /** PEND-07 — the system's % (`formRules.computedItemPct`), never typed (BR-KPI-16). */
   selfAchievementPct: number | null;
   selfComment: string | null;
   managerAchievementPct: number | null;
