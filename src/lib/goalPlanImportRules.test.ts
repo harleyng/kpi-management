@@ -18,7 +18,7 @@ const ctx = (o: Partial<GoalPlanImportContext> = {}): GoalPlanImportContext => (
   ],
   perspectives: [{ id: 'fin', code: 'FIN' }, { id: 'cus', code: 'CUS' }],
   units: [{ id: 'vnd', code: 'VND' }, { id: 'pct', code: 'PCT' }],
-  methods: [{ id: 'up', code: 'UP', methodType: 'RATIO_UP' }, { id: 'lv', code: 'LV', methodType: 'LEVELS' }, { id: 'bin', code: 'BIN', methodType: 'BINARY' }],
+  methods: [{ id: 'up', code: 'UP', methodType: 'RATIO_UP' }, { id: 'lv', code: 'LV', methodType: 'LEVELS' }, { id: 'bin', code: 'BIN', methodType: 'BINARY' }, { id: 'fx', code: 'FX', methodType: 'FORMULA' }],
   dataSources: [{ id: 'erp', code: 'ERP' }, { id: 'man', code: 'MANUAL' }],
   kpis: [{ id: 'k-dt', code: 'KPI-DT', name: 'Doanh thu', perspectiveId: 'fin', unitId: 'vnd', calcMethodId: 'up', defaultDataSourceId: 'erp', definition: 'Tổng doanh thu', formulaText: 'Σ', status: 'Active' }],
   today: '2027-01-10',
@@ -66,6 +66,7 @@ describe('goalPlanImportIssues — row errors (BR-KPI-26)', () => {
     [{ targetValue: null }, 'targetValue:ERR-KPI-06:TARGET_REQUIRED'],
     [{ targetType: 'TEXT', targetValue: null, targetText: 'Đạt' }, 'calcMethodCode:ERR-KPI-06:TARGET_TYPE_MISMATCH'],
     [{ calcMethodCode: 'LV' }, 'L1.target:ERR-KPI-13:LEVELS_MISSING'],
+    [{ calcMethodCode: 'FX' }, 'calcMethodCode:ERR-KPI-06:CODE_UNKNOWN'], // PEND-11: FORMULA is not a new pick
     [{ levels: [lv(10, 100), lv(20, 0), null] }, 'L1.target:ERR-KPI-13:LEVEL_SCORES_ORDER'],
   ] as [Partial<GoalPlanImportRow>, string][])('%j → %s', (patch, expected) => {
     expect(details(goalPlanImportIssues([row(patch)], ctx()))).toContain(`2:${headerOf(expected)}`);

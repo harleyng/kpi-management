@@ -1,4 +1,5 @@
 import {
+  CALC_METHOD_TYPES,
   AGGREGATION_LABEL,
   AGGREGATIONS,
   KPI_CATEGORY_TAG_LABEL,
@@ -9,6 +10,7 @@ import {
   LIBRARY_STATUSES,
   type BscPerspective,
   type CalcMethod,
+  type CalcMethodType,
   type CalcTier,
   type DataSource,
   type Goal,
@@ -22,6 +24,25 @@ import {
 } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { GOAL_COUNT, isWeightComplete } from './goalPlanRules';
+
+// ─── The methods offered for a new pick (PEND-11, ASSUMPTION Q55) ────────────────────────────────
+
+/**
+ * Method types no longer offered for a new pick: FORMULA has no source among the PMGM / DATX methods
+ * (Đợt 0 check). Hidden, never deleted — a FORMULA method and the goals using it keep computing, like an
+ * archived library item (BR-KPI-78).
+ */
+export const RETIRED_METHOD_TYPES: readonly CalcMethodType[] = ['FORMULA'];
+
+/** The types a method editor offers: the five sourced ones, plus the stored type when it is a retired one. */
+export function pickableMethodTypes(storedType: CalcMethodType | null): CalcMethodType[] {
+  return CALC_METHOD_TYPES.filter((t) => !RETIRED_METHOD_TYPES.includes(t) || t === storedType);
+}
+
+/** The methods a goal / KPI picker offers: none of a retired type, except the one already chosen. */
+export function pickableMethods<M extends Pick<CalcMethod, 'id' | 'methodType'>>(methods: readonly M[], storedId: Id | null): M[] {
+  return methods.filter((m) => !RETIRED_METHOD_TYPES.includes(m.methodType) || m.id === storedId);
+}
 
 /**
  * The KPI library's write rules (track T2, WBS 4.2.1–4.2.4) — BR-KPI-74…80 in business-rules.md §3b.

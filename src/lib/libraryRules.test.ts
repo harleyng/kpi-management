@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Id, KpiDefinition, LibraryStatus } from '@/data/types';
 import { calcMethod, goal, kpiDefinition, kpiTemplate, measureUnit, perspective, templateItem, tier } from '@/test/builders';
 import {
+  pickableMethods,
+  pickableMethodTypes,
   activeTemplatesContaining,
   calcMethodIssues,
   codeIssues,
@@ -317,5 +319,20 @@ describe('export rows (WBS 4.2.5)', () => {
       { templateName: 'B', appliesTo: 'Đơn vị', appliesToCode: 'KD', templateStatus: 'Đang áp dụng', kpiCode: 'KPI-1', kpiName: 'Doanh thu', defaultWeight: 60, defaultTarget: 5 },
       { templateName: 'B', appliesTo: 'Đơn vị', appliesToCode: 'KD', templateStatus: 'Đang áp dụng', kpiCode: null, kpiName: null, defaultWeight: 40, defaultTarget: null },
     ]);
+  });
+});
+
+describe('pickable methods — FORMULA is hidden from new picks (PEND-11, ASSUMPTION Q55)', () => {
+  it('a new method offers the five sourced types; an existing FORMULA method keeps its own', () => {
+    expect(pickableMethodTypes(null)).toEqual(['RATIO_UP', 'RATIO_DOWN', 'TIERED', 'BINARY', 'LEVELS']);
+    expect(pickableMethodTypes('RATIO_UP')).not.toContain('FORMULA');
+    expect(pickableMethodTypes('FORMULA')).toContain('FORMULA');
+  });
+
+  it('a goal / KPI picker hides FORMULA methods unless one is already chosen', () => {
+    const methods = [calcMethod({ id: 'up' }), calcMethod({ id: 'fx', methodType: 'FORMULA' })];
+    expect(pickableMethods(methods, null).map((m) => m.id)).toEqual(['up']);
+    expect(pickableMethods(methods, 'up').map((m) => m.id)).toEqual(['up']);
+    expect(pickableMethods(methods, 'fx').map((m) => m.id)).toEqual(['up', 'fx']);
   });
 });

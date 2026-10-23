@@ -29,7 +29,7 @@ import {
   type MeasureUnit,
 } from '@/data/types';
 import { useSaveKpiDefinition } from '@/hooks/queries/library';
-import { kpiDefinitionIssues, otherCodesOf } from '@/lib/libraryRules';
+import { kpiDefinitionIssues, otherCodesOf, pickableMethods } from '@/lib/libraryRules';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { fieldErrors, issueMessage } from './libraryCopy';
 
@@ -288,7 +288,7 @@ function KpiDefinitionSheetInner({
                       <SelectValue placeholder="Chọn phương pháp tính" />
                     </SelectTrigger>
                     <SelectContent>
-                      {methods.map((m) => (
+                      {pickableMethods(methods, initial.calcMethodId || null).map((m) => (
                         <SelectItem key={m.id} value={m.id}>
                           {m.name}
                         </SelectItem>

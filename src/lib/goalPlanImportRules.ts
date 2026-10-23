@@ -31,6 +31,7 @@ import type { ErrorCode } from './errorCatalog';
 import { levelsMissingIssue, validateTargetLevels } from './calcRules';
 import { GOAL_COUNT, isWeightComplete } from './goalPlanRules';
 import { isIsoDate } from './isoDate';
+import { pickableMethods } from './libraryRules';
 import { foldDiacritics } from './utils';
 
 /** One column of the template, in order — `header` is what the Excel file shows (Vietnamese). */
@@ -162,7 +163,8 @@ export function goalPlanImportIssues(
       return fallback;
     };
     const unit = pick(ctx.units, row.unitCode, kpi?.unitId, 'unitCode');
-    const method = pick(ctx.methods, row.calcMethodCode, kpi?.calcMethodId, 'calcMethodCode');
+    // A method typed in the row is a new pick: FORMULA is not offered (PEND-11, ASSUMPTION Q55) unless it is the KPI's own.
+    const method = pick(pickableMethods(ctx.methods, kpi?.calcMethodId ?? null), row.calcMethodCode, kpi?.calcMethodId, 'calcMethodCode');
     const source = pick(ctx.dataSources, row.dataSourceCode, kpi?.defaultDataSourceId, 'dataSourceCode');
 
     if (row.weight === null || !Number.isFinite(row.weight) || row.weight <= 0) err(r, 'weight', 'ERR-KPI-06', 'WEIGHT_INVALID');

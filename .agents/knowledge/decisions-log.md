@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-10-23 — PEND-11: FORMULA is hidden from new picks, never deleted
+
+**Decision.** `libraryRules.RETIRED_METHOD_TYPES = ['FORMULA']`; `pickableMethodTypes` / `pickableMethods` filter
+the method-type picker (`CalcMethodSheet`), the goal and KPI method pickers (`GoalEditorPanel`,
+`KpiDefinitionSheet`) and a method code typed in a Goal Plan import row (06 `CODE_UNKNOWN`). A stored FORMULA
+method, goal or KPI keeps its own value on screen and keeps computing (`calcRules` untouched). `ASSUMPTION Q55`.
+
+**Why.** No source (PMGM guides, DATX) lists a FORMULA method; the meeting's "five methods" map to the other five.
+Deleting it would break any goal already on it — the same reason archiving a library item only hides it (BR-KPI-78).
+The import row was the one path left that could still make a new FORMULA goal.
+
+**Updated alongside.** `business-rules.md` BR-KPI-30, §8 Q55, §12 (PEND-11 row removed); `new-flow.md` §5 table;
+plan tables.
+
 ## 2026-10-23 — Plan A, A1: the system computes the self %, the employee enters the actual, HR records the manager's result
 
 **Decision.** PEND-06/07/08 built on `ASSUMPTION Q47–Q49` (BR-KPI-16, 17, 23, 52). The SELF column is the

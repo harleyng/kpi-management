@@ -27,6 +27,7 @@ import { levelsMissingIssue, validateTargetLevels } from '@/lib/calcRules';
 import { KpiError } from '@/lib/errorCatalog';
 import { nextSortOrder, remainingWeight } from '@/lib/goalPlanRules';
 import { isIsoDate } from '@/lib/isoDate';
+import { pickableMethods } from '@/lib/libraryRules';
 import { formatDecimalInput, parseDecimalInput } from '@/lib/numberInput';
 import { firstIssueText, issueText } from './goalCopy';
 
@@ -359,7 +360,7 @@ export function GoalEditorPanel({ data, lookups, goal, readOnly, readOnlyReason,
                   <SelectValue placeholder="Chọn phương pháp" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lookups.methods.map((m) => (
+                  {pickableMethods(lookups.methods, initial.calcMethodId || null).map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.name}
                     </SelectItem>

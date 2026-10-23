@@ -318,6 +318,8 @@ số trên phiếu.
   **FORMULA không có nguồn**, seed không có phương pháp hay chỉ tiêu nào dùng. Việc còn lại: hàm thuần
   "phương pháp được chọn" trong `libraryRules` + test, lọc ở `CalcMethodSheet.tsx`; phương pháp FORMULA đã có vẫn
   hiện và tính được (`ASSUMPTION Q55`).
+- **✅ 23/10/2026.** `libraryRules.pickableMethodTypes` / `pickableMethods`; lọc ở `CalcMethodSheet`,
+  `GoalEditorPanel`, `KpiDefinitionSheet`.
 - **Chuyên gia.** `hr-performance-expert`.
 
 ---

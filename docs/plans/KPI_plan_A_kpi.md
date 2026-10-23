@@ -76,7 +76,7 @@ flowchart TB
 tháng khi chỉ phân bổ quý (Q67), nhãn — danh sách ở plan 22/10 §6, làm ở A1 (phần phiếu) và A3. PEND-11: FORMULA là
 phương pháp không có nguồn (plan 22/10 §8).
 
-**Ngoài lượt merge (làm lúc nào cũng được):** PEND-11 ẩn phương pháp thừa — file `libraryRules` / danh sách chọn,
+**Ngoài lượt merge (làm lúc nào cũng được):** ✅ 23/10 PEND-11 ẩn phương pháp thừa — file `libraryRules` / danh sách chọn,
 không đụng file của Plan B; merge ngay khi xong.
 
 ## 4. File dùng chung với Plan B

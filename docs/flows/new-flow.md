@@ -483,7 +483,6 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 | PEND-05 | Không có số lũy kế | Theo dõi lũy kế so với kế hoạch năm | Quản lý thấy tiến độ năm | Quy tắc mới, kết quả, dashboard |
 | PEND-09 | Đánh giá chính theo tháng (Q3) | Chính thức theo quý và năm; tháng là đánh giá liên tục | Phạm vi P1 mục 1 và 4 | Khởi chạy, kết quả, % lương |
 | PEND-10 | Đánh giá thử việc để P2 | Vào P1 (mục 3) | Phạm vi P1 | Loại phiếu mới (lớn) |
-| PEND-11 | Nhập tay và Excel; đồng bộ API gắn nhãn "Phase sau" (đã làm 21/10) | P1 chỉ nhập tay; 5 phương pháp tính | Phạm vi P1 | Còn lại: số phương pháp tính (Q55). Product owner giữ import Excel (Q54) |
 | PEND-12 | Chưa có import dữ liệu lịch sử | Có, do C&B / HR, ưu tiên thấp | Dữ liệu tham chiếu | Tính năng mới |
 | PEND-13 | Dashboard: Tổng quan + Vận hành | Ba góc nhìn lãnh đạo / quản lý / HR; lọc tháng, quý, 6 tháng; lũy kế | Mỗi vai trò cần số khác nhau | `dashboardRules`, màn hình Dashboard |
 | PEND-14 | Không có công việc tháng (Q10); kế hoạch việc tháng làm trên Excel / email | Phiếu kế hoạch và phiếu đánh giá công việc tháng tự khởi chạy, điểm KQcv / KLcv / Hsht tự tính, Hsnv khi dưới ngưỡng | Mục 4 của P1 (Q59) | Module mới: `workRules` (đã có phần tính), thực thể, hai mẫu quy trình, `/my/work`, `/team/work` |

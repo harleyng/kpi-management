@@ -8,11 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { FormField, RequiredLegend } from '@/components/shared/FormField';
 import { toastError, toastSuccess } from '@/components/shared/notify';
-import { CALC_METHOD_TYPE_LABEL, CALC_METHOD_TYPES, type CalcMethod, type CalcMethodType, type CalcTier } from '@/data/types';
+import { CALC_METHOD_TYPE_LABEL, type CalcMethod, type CalcMethodType, type CalcTier } from '@/data/types';
 import { useSaveCalcMethod } from '@/hooks/queries/library';
 import { validateCalcMethod } from '@/lib/calcRules';
 import { KpiError } from '@/lib/errorCatalog';
-import { calcMethodIssues, otherCodesOf } from '@/lib/libraryRules';
+import { calcMethodIssues, otherCodesOf, pickableMethodTypes } from '@/lib/libraryRules';
 import { DiscardChangesDialog } from './DiscardChangesDialog';
 import { issueMessage, methodLockedMessage, numberText, parseNumberInput } from './libraryCopy';
 
@@ -225,7 +225,7 @@ function CalcMethodSheetInner({ editing, onClose, readOnly, methods, tiers, goal
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CALC_METHOD_TYPES.map((t) => (
+                      {pickableMethodTypes(stored?.methodType ?? null).map((t) => (
                         <SelectItem key={t} value={t}>
                           {CALC_METHOD_TYPE_LABEL[t]}
                         </SelectItem>
