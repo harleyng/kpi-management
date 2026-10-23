@@ -41,6 +41,9 @@ flowchart LR
   W8 --> W4
 ```
 
+**Chạy song song hai luồng:** `KPI_plan_A_kpi.md` (Plan A — đợt 0–3, 5–7) và `KPI_plan_B_monthly_work.md`
+(Plan B — đợt 8, PEND-05, đợt 4), với một thứ tự merge chung 12 lượt.
+
 Đợt 1 và đợt 2 sửa hai phần khác nhau của `workflowRules` / seed (đánh giá và đăng ký), nên làm **lần lượt**,
 không song song trên cùng file. Đợt 5 độc lập, chen vào lúc nào cũng được.
 

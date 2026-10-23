@@ -2,6 +2,7 @@
 
 > Phiên bản 1.0 · 23/10/2026 · Người lập: Claude cho @harleyng
 > **Là Đợt 8 của** `docs/plans/KPI_update_plan_2210.md` (dùng chung quy tắc §2, đợt 0 và bảng rủi ro của file đó).
+> **Thứ tự làm và điểm chờ:** `docs/plans/KPI_plan_B_monthly_work.md` (Plan B, chạy song song với Plan A).
 > **Nguồn:** CMC PMGM — HR tr. 13 (mục 4), 25–26 (trường của "Kế hoạch công việc tháng"), 88–95 (khởi chạy định
 > kỳ), 141–150 (import điểm tổng thể tháng, định tuyến phiếu) · Nhân viên tr. 67–73 · Quản lý tr. 120–136 ·
 > SF4C PMGM.08–09 · biên bản 22/10/2026 §2.8 (P1 gồm mục 4).
