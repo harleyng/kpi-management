@@ -6,6 +6,53 @@
 
 ---
 
+## 2026-10-23 — Plan B, B3 on merge: an HR step that records by itself still records the month once
+
+**Decision.** `syncWorkReview` takes the steps `settleAutoSteps` passed (`settled.passedSteps`) and runs
+each one's entry effects in order before the entered step's, then records ONE `WorkResult`. With the HR
+(FINAL) step on `autoApprove` (PEND-02), the manager's send copies MANAGER into FINAL and records the month in
+the same write. No content check runs on that FINAL — it is a full copy of MANAGER, which passed
+`reviewSubmitIssues` on the send (workflow-expert). `workKpiRules.monthKpiReference` reports `targetSource`
+(`MONTH` / `DERIVED` / `GOAL`) instead of `targetFromGoal`, so a month derived from a quarter split (A3's Q67)
+says so. Screen (ui-ux critique 26/40, P1s fixed): an out-of-scale cell is marked on the cell with the scale,
+a "Nhập Hsnv" link beside Hsht moves focus to Hsnv, the task column is sticky and narrower at 768, the KLcv
+input lines up with its header, and its row is flagged by the rule's ref (`managerDisciplineScore`, not
+`discipline`). Rules recorded as BR-KPI-91…93.
+
+**Why.** Before, the auto step left FINAL empty and the record threw `RESULT_INCOMPLETE`, rolling back the
+manager's send: a tenant that turned on auto-recording could never close a month. The old note "a
+quarter-only split takes the annual one" became false with A3 (1 tỷ of a 3,75 tỷ quarter, not 15 tỷ).
+
+**Updated alongside.** `business-rules.md` §4 (BR-KPI-91…93), Q71 wording, §12 PEND-14; `new-flow.md` Quy
+trình 4; `KPI_plan_B_monthly_work.md` B3 ✅; `component-registry.md`.
+
+---
+
+## 2026-10-23 — Plan B, B3: the monthly work review moves; one result per month
+
+**Decision.** WORK_REVIEW moves (`checkAction` gate gone). One helper, `syncWorkReview`, after every move from
+`forms.act` and the scheduler (beside A1's `applyColumnEntry` — same call sites): the effects come from the
+column ENTERED (`workReviewEffects`): MANAGER fill-empty from SELF (scores + KLcv; `=== null` only — a 0 stays;
+never comments or Hsnv); a RETURN onto SELF clears manager cells still equal to SELF (untouched copies) so the
+employee's revision reaches him (workflow-expert); FINAL overwritten from MANAGER (Hsnv + reason too) with HR's
+own comments cleared, so a stale reason never covers a later change (hr-performance-expert). HR override:
+`workFinalOverrideIssues` — a changed task score needs that item's comment, a changed KLcv or EFFECTIVE Hsnv (only
+when required) the form's; named apart from A1's `formRules.finalOverrideIssues`. Completion inserts ONE
+`WorkResult` from FINAL with server-side tasks and scoring; a null final score is refused (`RESULT_INCOMPLETE`),
+never stored. Prefills are audited with their reason. A review workflow ends on FINAL, columns in order. No
+reopen (Q72). Screen: effective weights; Hsht shown to 2 decimals and never rounded up across the threshold
+(`displayWorkScore` — 79.996 shows 79,99); the KPI reference uses the Results page's arithmetic
+(`workKpiRules.monthKpiReference`). Known overlap until Plan A's PEND-09: the seed's T03 has both a KPI_EVAL and a
+WORK_REVIEW per Kinh doanh employee (D-W3 says one) — PEND-09 stops the monthly KPI_EVAL.
+
+**Why.** Deriving effects from the entered column keeps a longer or reordered workflow right; clearing only
+untouched copies keeps the manager's deliberate cells; one row per month is what the dashboard and import read.
+
+**Updated alongside.** `business-rules.md` §5, §8 (Q71, Q72), §12; `new-flow.md` Quy trình 4; `component-registry.md`;
+plans §7 and B3 row.
+
+---
+
 ## 2026-10-23 — Plan A, A3: the KPI evaluation is quarterly and annual; a month is tracked, never paid
 
 **Decision.** One table, `workflowRules.LAUNCH_PERIOD_TYPES` (KPI_EVAL → Quarter / Year; WORK_* → Month), checked

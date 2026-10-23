@@ -542,3 +542,125 @@ export function currentMonthForm<F extends { status: string; launchedAt: string 
   const newest = [...forms].sort((a, b) => (a.launchedAt < b.launchedAt ? 1 : a.launchedAt > b.launchedAt ? -1 : 0));
   return newest.find((f) => f.status !== 'Cancelled') ?? newest[0] ?? null;
 }
+
+// ─── The WORK_REVIEW form (step 8.3) ───────────────────────────────────────────────────────────
+
+/** Two scores are the same cell value: both empty, or equal within float noise. `0` is a score. */
+export const sameWorkScore = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) < THRESHOLD_EPSILON);
+
+type ReviewRows = { review: WorkReview; items: WorkReviewItem[] };
+
+/**
+ * The column a step starts from when the review ENTERS it (plan §7; hr-performance-expert + workflow-expert, B3):
+ * - MANAGER — every EMPTY manager cell (`=== null`; a 0 is a score and stays) takes the employee's: task scores
+ *   and KLcv. Comments are the manager's own; Hsnv is not in SELF.
+ * - FINAL — the HR column becomes the manager's (scores, KLcv, Hsnv and its reason), its own comments cleared,
+ *   so HR records what the manager decided and a stale reason never covers a later change (PEND-08's shape).
+ * SELF is never prefilled. Pure: new rows, the inputs untouched.
+ */
+export function reviewColumnPrefill(rows: ReviewRows, to: EvaluationColumn): ReviewRows {
+  const { review, items } = rows;
+  if (to === 'MANAGER') {
+    return {
+      review: { ...review, managerDisciplineScore: review.managerDisciplineScore ?? review.selfDisciplineScore },
+      items: items.map((i) => ({ ...i, managerScore: i.managerScore ?? i.selfScore })),
+    };
+  }
+  if (to === 'FINAL') {
+    return {
+      review: {
+        ...review,
+        finalDisciplineScore: review.managerDisciplineScore,
+        finalHsnv: review.managerHsnv,
+        finalHsnvReason: review.managerHsnvReason,
+        finalComment: null,
+      },
+      items: items.map((i) => ({ ...i, finalScore: i.managerScore, finalComment: null })),
+    };
+  }
+  return { review: { ...review }, items: items.map((i) => ({ ...i })) };
+}
+
+/**
+ * A RETURN back to the employee's step (workflow-expert, B3): manager cells that are still untouched copies
+ * of the employee's (equal to the SELF cell) are cleared, so the employee's revision reaches the manager
+ * when the review comes back (`reviewColumnPrefill` fills them again). A cell the manager changed stays.
+ */
+export function reviewClearCopiedCells(rows: ReviewRows): ReviewRows {
+  const { review, items } = rows;
+  const copied = (manager: number | null, self: number | null) => manager !== null && self !== null && sameWorkScore(manager, self);
+  return {
+    review: { ...review, managerDisciplineScore: copied(review.managerDisciplineScore, review.selfDisciplineScore) ? null : review.managerDisciplineScore },
+    items: items.map((i) => ({ ...i, managerScore: copied(i.managerScore, i.selfScore) ? null : i.managerScore })),
+  };
+}
+
+export interface WorkReviewEffects {
+  /** The column to prefill on entering a step, or `null`. */
+  prefill: 'MANAGER' | 'FINAL' | null;
+  /** A RETURN landed on the employee's column: clear the manager's untouched copies. */
+  clearCopies: boolean;
+  /** The review completed: record the month's `WorkResult` from the FINAL column. */
+  recordResult: boolean;
+}
+
+/**
+ * What a move of a WORK_REVIEW form does to its rows — from the column of the step ENTERED (never from
+ * which step it left), so a longer workflow behaves the same. A cancel does nothing; a completion records.
+ */
+export function workReviewEffects(entered: EvaluationColumn | null, viaReturn: boolean, completed: boolean): WorkReviewEffects {
+  return {
+    prefill: entered === 'MANAGER' || entered === 'FINAL' ? entered : null,
+    clearCopies: viaReturn && entered === 'SELF',
+    recordResult: completed,
+  };
+}
+
+/** Hsnv as it counts for a column: only when that column's Hsht requires it (a leftover draft is not a decision). */
+function effectiveHsnv(column: 'MANAGER' | 'FINAL', review: WorkReview, items: readonly WorkReviewItem[], tasks: readonly WeightedTask[], config: WorkScoring): number | null {
+  const { hsht: h } = columnTotals(column, review, items, tasks, config);
+  if (!hsnvRequired(h, config)) return null;
+  return column === 'MANAGER' ? review.managerHsnv : review.finalHsnv;
+}
+
+/**
+ * HR changing what the manager decided needs a reason (PEND-08's rule, for the work review): a task whose FINAL
+ * score differs from MANAGER needs that item's `finalComment` (ERR-KPI-06 `FINAL_REASON_REQUIRED`, `ref` = the
+ * task); a different KLcv or a different effective Hsnv needs the form's `finalComment` (`ref` = `finalComment`).
+ * Equal within float noise, both empty = equal. Items of tasks no longer live are not compared.
+ */
+export function workFinalOverrideIssues(review: WorkReview, items: readonly WorkReviewItem[], tasks: readonly WeightedTask[], config: WorkScoring): RuleIssue[] {
+  const live = new Set(liveTasks(tasks).map((t) => t.id));
+  const issues: RuleIssue[] = [];
+  for (const i of items) {
+    if (!live.has(i.taskId) || sameWorkScore(i.finalScore, i.managerScore)) continue;
+    if (blank(i.finalComment)) issues.push(ruleIssue('ERR-KPI-06', i.taskId, 'FINAL_REASON_REQUIRED'));
+  }
+  const formChanged =
+    !sameWorkScore(review.finalDisciplineScore, review.managerDisciplineScore) ||
+    !sameWorkScore(effectiveHsnv('FINAL', review, items, tasks, config), effectiveHsnv('MANAGER', review, items, tasks, config));
+  if (formChanged && blank(review.finalComment)) issues.push(ruleIssue('ERR-KPI-06', 'finalComment', 'FINAL_REASON_REQUIRED'));
+  return issues;
+}
+
+/**
+ * A work score as the screen shows it — up to 2 decimals (hr-performance-expert, B3) — and never rounded up
+ * across the Hsnv threshold: 79.996 shows 79.99, not 80, while Hsnv is still required. Display only; stored
+ * values stay unrounded. `null` stays `null`.
+ */
+export function displayWorkScore(value: number | null, threshold: number | null = null): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value * 100) / 100;
+  if (threshold !== null && value < threshold - THRESHOLD_EPSILON && rounded >= threshold) return Math.floor(value * 100) / 100;
+  return rounded;
+}
+
+/**
+ * The review's columns a screen shows: those of the steps reached so far (all once the form is closed), in
+ * SELF → MANAGER → FINAL order — a later column appears when its step is entered, never empty ahead of it.
+ */
+export function reviewColumnsShown(steps: readonly Pick<WorkflowStep, 'stepNo' | 'evaluationColumn'>[], currentStepNo: number | null): EvaluationColumn[] {
+  const order: EvaluationColumn[] = ['SELF', 'MANAGER', 'FINAL'];
+  const reached = steps.filter((s) => currentStepNo === null || s.stepNo <= currentStepNo).map((s) => s.evaluationColumn);
+  return order.filter((c) => reached.includes(c));
+}

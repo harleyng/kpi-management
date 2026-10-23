@@ -25,6 +25,13 @@ import {
   type WorkScoring,
   copyFromPreviousMonth,
   currentMonthForm,
+  displayWorkScore,
+  reviewClearCopiedCells,
+  reviewColumnPrefill,
+  reviewColumnsShown,
+  sameWorkScore,
+  workFinalOverrideIssues,
+  workReviewEffects,
   defaultWorkMonth,
   followProgress,
   previousMonth,
@@ -582,5 +589,126 @@ describe('currentMonthForm', () => {
     expect(currentMonthForm([f('a', 'Cancelled', '2027-04-05'), f('b', 'Completed', '2027-04-01')])?.id).toBe('b');
     expect(currentMonthForm([f('a', 'Cancelled', '2027-04-01'), f('c', 'Cancelled', '2027-04-05')])?.id).toBe('c');
     expect(currentMonthForm([])).toBeNull();
+  });
+});
+
+// ─── Step 8.3 ──────────────────────────────────────────────────────────────────────────────────
+
+describe('reviewColumnPrefill — the column a step starts from', () => {
+  const rows = () => ({
+    review: reviewRow({ selfDisciplineScore: 90, selfComment: 'tự nhận xét', managerDisciplineScore: null }),
+    items: [item('a', { selfScore: 100, managerScore: 0 }), item('b', { selfScore: 80, selfComment: 'x' }), item('c', { selfScore: null })],
+  });
+  it('MANAGER: empty cells take the employee\'s scores and KLcv; a manager 0 stays; comments and Hsnv are not copied', () => {
+    const before = rows();
+    const { review, items } = reviewColumnPrefill(before, 'MANAGER');
+    expect(items.map((i) => i.managerScore)).toEqual([0, 80, null]);
+    expect(items.map((i) => i.managerComment)).toEqual([null, null, null]);
+    expect(review).toMatchObject({ managerDisciplineScore: 90, managerComment: null, managerHsnv: null });
+    expect(before.items[1].managerScore).toBeNull(); // pure
+  });
+  it('FINAL: overwritten from MANAGER — scores, KLcv, Hsnv and reason — its own comments cleared', () => {
+    const { review, items } = reviewColumnPrefill(
+      {
+        review: reviewRow({ managerDisciplineScore: 70, managerHsnv: 72, managerHsnvReason: 'Lý do', finalDisciplineScore: 99, finalComment: 'cũ', finalHsnv: 50 }),
+        items: [item('a', { managerScore: 60, finalScore: 90, finalComment: 'cũ' })],
+      },
+      'FINAL',
+    );
+    expect(review).toMatchObject({ finalDisciplineScore: 70, finalHsnv: 72, finalHsnvReason: 'Lý do', finalComment: null });
+    expect(items[0]).toMatchObject({ finalScore: 60, finalComment: null });
+  });
+  it('SELF is never prefilled', () => {
+    const r = rows();
+    expect(reviewColumnPrefill(r, 'SELF')).toEqual(r);
+  });
+});
+
+describe('reviewClearCopiedCells — a RETURN to the employee', () => {
+  it('clears the manager cells still equal to the employee\'s; a changed one stays', () => {
+    const { review, items } = reviewClearCopiedCells({
+      review: reviewRow({ selfDisciplineScore: 90, managerDisciplineScore: 90 }),
+      items: [item('a', { selfScore: 100, managerScore: 100 }), item('b', { selfScore: 80, managerScore: 70 }), item('c', { selfScore: 0, managerScore: 0 })],
+    });
+    expect(review.managerDisciplineScore).toBeNull();
+    expect(items.map((i) => i.managerScore)).toEqual([null, 70, null]);
+  });
+});
+
+describe('workReviewEffects', () => {
+  it('by the column entered: MANAGER / FINAL prefill, a return to SELF clears copies, a completion records', () => {
+    expect(workReviewEffects('MANAGER', false, false)).toEqual({ prefill: 'MANAGER', clearCopies: false, recordResult: false });
+    expect(workReviewEffects('FINAL', false, false)).toEqual({ prefill: 'FINAL', clearCopies: false, recordResult: false });
+    expect(workReviewEffects('SELF', true, false)).toEqual({ prefill: null, clearCopies: true, recordResult: false });
+    expect(workReviewEffects('MANAGER', true, false).prefill).toBe('MANAGER'); // back from HR: FINAL waits for its next entry
+    expect(workReviewEffects(null, false, true)).toEqual({ prefill: null, clearCopies: false, recordResult: true });
+    expect(workReviewEffects(null, false, false)).toEqual({ prefill: null, clearCopies: false, recordResult: false });
+  });
+});
+
+describe('workFinalOverrideIssues — HR changing the manager\'s decision needs a reason', () => {
+  const base = (o: Partial<WorkReview> = {}) => reviewRow({ managerDisciplineScore: 90, finalDisciplineScore: 90, ...o });
+  const same = ['a', 'b', 'c'].map((t) => item(t, { managerScore: 90, finalScore: 90 }));
+  it('the same as the manager → nothing to explain', () => {
+    expect(workFinalOverrideIssues(base(), same, tasks, cfg)).toEqual([]);
+  });
+  it('a task score changed: that item\'s comment, ref = the task', () => {
+    const changed = [item('a', { managerScore: 90, finalScore: 80 }), ...same.slice(1)];
+    expect(workFinalOverrideIssues(base(), changed, tasks, cfg).map((i) => `${i.ref}:${i.detail}`)).toEqual(['a:FINAL_REASON_REQUIRED']);
+    expect(workFinalOverrideIssues(base(), [{ ...changed[0], finalComment: 'Đã xác minh lại' }, ...same.slice(1)], tasks, cfg)).toEqual([]);
+  });
+  it('KLcv changed: the form\'s reason; float noise is no change', () => {
+    expect(workFinalOverrideIssues(base({ finalDisciplineScore: 85 }), same, tasks, cfg).map((i) => i.ref)).toEqual(['finalComment']);
+    expect(workFinalOverrideIssues(base({ finalDisciplineScore: 85, finalComment: 'Lý do' }), same, tasks, cfg)).toEqual([]);
+    expect(workFinalOverrideIssues(base({ finalDisciplineScore: 90 + 1e-12 }), same, tasks, cfg)).toEqual([]);
+  });
+  it('a leftover Hsnv that is not required is not a change; a different required Hsnv is', () => {
+    expect(workFinalOverrideIssues(base({ managerHsnv: 70, finalHsnv: 75 }), same, tasks, cfg)).toEqual([]); // Hsht 90: not required
+    const low = ['a', 'b', 'c'].map((t) => item(t, { managerScore: 60, finalScore: 60 }));
+    const r = base({ managerDisciplineScore: 60, finalDisciplineScore: 60, managerHsnv: 70, finalHsnv: 75 });
+    expect(workFinalOverrideIssues(r, low, tasks, cfg).map((i) => i.ref)).toEqual(['finalComment']);
+  });
+});
+
+describe('the hand calculation (hr-performance-expert, B3)', () => {
+  it('50/30/20 scored 100/80/0 → KQcv 74; KLcv 90 → Hsht 78.8 → Hsnv required', () => {
+    const k = kqcv(tasks, [score('a', 100), score('b', 80), score('c', 0)]);
+    expect(k).toBeCloseTo(74, 9);
+    const h = hsht(k, 90, cfg);
+    expect(h).toBeCloseTo(78.8, 9);
+    expect(hsnvRequired(h, cfg)).toBe(true);
+  });
+  it('33.33 / 33.33 / 33.34 all scored 80, KLcv 80 → Hsht 80: not required', () => {
+    const thirds = [task('a', 33.33), task('b', 33.33), task('c', 33.34)];
+    const h = hsht(kqcv(thirds, [score('a', 80), score('b', 80), score('c', 80)]), 80, cfg);
+    expect(hsnvRequired(h, cfg)).toBe(false);
+  });
+  it('a 60 / 40 configuration', () => {
+    expect(hsht(70, 90, { ...cfg, resultWeight: 60, disciplineWeight: 40 })).toBeCloseTo(78, 9);
+  });
+});
+
+describe('displayWorkScore / sameWorkScore', () => {
+  it('2 decimals, never rounded up across the threshold', () => {
+    expect(displayWorkScore(78.8)).toBe(78.8);
+    expect(displayWorkScore(79.996, 80)).toBe(79.99);
+    expect(displayWorkScore(79.996)).toBe(80);
+    expect(displayWorkScore(80, 80)).toBe(80);
+    expect(displayWorkScore(null)).toBeNull();
+    expect(displayWorkScore(Number.NaN)).toBeNull();
+  });
+  it('0 is a value; both empty are equal', () => {
+    expect(sameWorkScore(0, null)).toBe(false);
+    expect(sameWorkScore(null, null)).toBe(true);
+    expect(sameWorkScore(80, 80 + 1e-12)).toBe(true);
+  });
+});
+
+describe('reviewColumnsShown', () => {
+  const steps = [{ stepNo: 1, evaluationColumn: 'SELF' as const }, { stepNo: 2, evaluationColumn: 'MANAGER' as const }, { stepNo: 3, evaluationColumn: 'FINAL' as const }];
+  it('the columns of the steps reached; all once closed', () => {
+    expect(reviewColumnsShown(steps, 1)).toEqual(['SELF']);
+    expect(reviewColumnsShown(steps, 2)).toEqual(['SELF', 'MANAGER']);
+    expect(reviewColumnsShown(steps, null)).toEqual(['SELF', 'MANAGER', 'FINAL']);
   });
 });

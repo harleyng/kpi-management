@@ -51,4 +51,36 @@ test.describe('@smoke Công việc tháng', () => {
     await expect(page.getByRole('combobox', { name: 'Trạng thái — Báo cáo tuần cho trưởng nhóm' })).toHaveText('Đang thực hiện');
     expect(errors).toEqual([]);
   });
+
+  test('March review: the employee sends, the manager decides Hsnv below 80, HR records the month', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    const openReview = async () => {
+      await page.goto('/my/tasks/inbox');
+      await page.getByRole('button', { name: 'Mở phiếu Đánh giá công việc tháng của Mai Quang Huy' }).first().click();
+      await expect(page.getByRole('heading', { level: 1, name: /Đánh giá công việc tháng — Mai Quang Huy/ })).toBeVisible();
+    };
+
+    await become(page, 'Mai Quang Huy', 'Nhân viên');
+    await openReview();
+    await expect(page.getByText('Hsht (Tự đánh giá):')).toContainText('87,2');
+    await page.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await expect(page.getByText('Đã gửi', { exact: true }).first()).toBeVisible();
+
+    await become(page, 'Đỗ Văn Hùng', 'Quản lý');
+    await openReview();
+    await page.getByLabel('Quản lý đánh giá — Chăm sóc 30 khách hàng VIP', { exact: true }).fill('50');
+    await expect(page.getByText('Hsht dưới ngưỡng: cần quyết định Hsnv.')).toBeVisible();
+    await page.getByRole('textbox', { name: /^Hsnv/ }).fill('78');
+    await page.getByRole('textbox', { name: /^Giải trình/ }).fill('Nhóm khách VIP chuyển sang quản lý mới giữa tháng.');
+    await page.getByRole('button', { name: 'Gửi', exact: true }).click();
+    await expect(page.getByText(/Bước 3\/3/)).toBeVisible();
+
+    await become(page, 'Kha Thị Duyên', 'Nhân sự');
+    await openReview();
+    await page.getByRole('button', { name: 'Ghi nhận', exact: true }).click();
+    await expect(page.getByText('Hoàn thành', { exact: true }).first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
+

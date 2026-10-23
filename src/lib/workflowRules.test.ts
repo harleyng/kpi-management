@@ -130,6 +130,9 @@ describe('validateWorkflow', () => {
     ['WORK_PLAN', [step({ stepNo: 1, actorRule: 'DIRECT_MANAGER' }), step({ stepNo: 2, actorRule: 'HR', allowedActions: ['APPROVE'] })], 'OWNER_STEP_REQUIRED'],
     ['WORK_PLAN', [step({ stepNo: 1, actorRule: 'DIRECT_MANAGER' }), step({ stepNo: 2, actorRule: 'SELF', allowedActions: ['SUBMIT'] })], 'SELF_LAST_STEP'],
     ['WORK_REVIEW', [step({ stepNo: 1 }), step({ stepNo: 2, actorRule: 'SELF', allowedActions: ['SUBMIT'] })], 'SELF_LAST_STEP'],
+    // The review records the month from FINAL: it ends there, columns in order (B3).
+    ['WORK_REVIEW', [step({ stepNo: 1, evaluationColumn: 'SELF' }), step({ stepNo: 2, actorRule: 'DIRECT_MANAGER', allowedActions: ['SUBMIT'], evaluationColumn: 'MANAGER' })], 'FINAL_LAST_STEP'],
+    ['WORK_REVIEW', [step({ stepNo: 1, evaluationColumn: 'SELF' }), step({ stepNo: 2, actorRule: 'HR', allowedActions: ['SUBMIT'], evaluationColumn: 'FINAL' }), step({ stepNo: 3, actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE'], evaluationColumn: 'FINAL' })], 'COLUMNS_ORDER'],
   ] as const)('%s %# → %s', (formType, steps, detail) => {
     expect(details(formType, steps)).toContain(detail);
   });

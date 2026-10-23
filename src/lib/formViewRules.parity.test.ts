@@ -124,15 +124,18 @@ async function loadWorld(tenantIndex: number, existing?: DataGateway): Promise<W
   };
 
   const contentOk = async (form: FormInstance, s: FormStanding) => {
-    const [goalRows, kgis, items, changeItems, workTasks, periods] = await Promise.all([
+    const [goalRows, kgis, items, changeItems, workTasks, periods, workReview, workReviewItems, workScoring] = await Promise.all([
       form.goalPlanId ? goals.listGoals(t, { goalPlanIds: [form.goalPlanId] }) : Promise.resolve([]),
       form.goalPlanId ? goals.listKgis(t, form.goalPlanId) : Promise.resolve([]),
       form.formType === 'KPI_EVAL' ? forms.listEvaluationItems(t, form.id) : Promise.resolve([]),
       form.formType === 'GOAL_CHANGE' ? forms.listGoalChangeItems(t, form.id) : Promise.resolve([]),
       form.workPlanId ? work.listWorkTasks(t, form.workPlanId) : Promise.resolve([]),
       form.formType === 'WORK_PLAN' ? goals.listCycles(t).then((cs) => Promise.all(cs.map((c) => goals.listPeriods(t, c.id)))).then((ps) => ps.flat()) : Promise.resolve([]),
+      form.formType === 'WORK_REVIEW' ? work.getWorkReview(t, form.id) : Promise.resolve(null),
+      form.formType === 'WORK_REVIEW' ? work.listWorkReviewItems(t, form.id) : Promise.resolve([]),
+      work.getWorkScoringConfig(t),
     ]);
-    return canSubmit(submitCheckInput(form, s.step!, s.steps, { goals: goalRows, kgis, items, changeItems, workTasks, periods })).ok;
+    return canSubmit(submitCheckInput(form, s.step!, s.steps, { goals: goalRows, kgis, items, changeItems, workTasks, periods, workReviews: workReview ? [workReview] : [], workReviewItems, workScoring: workScoring ?? undefined })).ok;
   };
 
   return { gateway, preparedId, tenant, directory, allForms: all, openForms: all.filter((f) => f.status === 'Open' || f.status === 'InProgress'), plans, standingOf, candidatesFor, contentOk };
@@ -188,7 +191,7 @@ describe.each([
     }
     // Demo Co's seed holds closed forms only (seed README) — nothing to act on there.
     if (world.openForms.length > 0) expect(checked).toBeGreaterThan(0);
-  });
+  }, 60_000); // walks every open form of the seed, like the case below
 
   it('every action the screen shows is accepted (one case per type, step, mode and action)', async () => {
     const { tenant, openForms, standingOf, candidatesFor, contentOk } = world;

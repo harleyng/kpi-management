@@ -482,8 +482,20 @@ sequenceDiagram
   thay) **hủy việc kèm lý do**. Kế hoạch đã khóa không mở lại ở P1.
 - **Phiếu đánh giá** chỉ khởi chạy cho kế hoạch **đã khóa có ít nhất một việc** (Q69) — người chưa có kế hoạch
   được duyệt thì HR xử lý kế hoạch trước.
-- *Đã làm 23/10:* phần tính điểm (B0); dữ liệu, seed (B1); phiếu kế hoạch và hai màn hình (B2). Chưa làm: phiếu
-  đánh giá (B3), khởi chạy đầu kỳ và import điểm (B4), kết quả và dashboard (B5).
+- **Đánh giá tháng (phiếu WORK_REVIEW, đã làm 23/10 — B3):** nhân viên chấm từng việc 0–100 và ý thức kỷ luật,
+  thấy ngay KQcv / KLcv / Hsht (hiển thị 2 số lẻ, không làm tròn lên qua ngưỡng 80). **Gửi** → cột quản lý tự điền
+  bằng điểm nhân viên ở các ô còn trống (nhận xét không chép); quản lý sửa, Hsht dưới 80 thì **bắt buộc Hsnv kèm
+  giải trình** mới gửi được; quản lý trả lại → các ô quản lý còn y như điểm nhân viên được xóa để lần gửi sau nhận
+  điểm mới. Vào bước HR → cột HR ghi nhận = cột quản lý; HR bấm **Ghi nhận** là xong; HR sửa điểm việc nào thì ghi lý
+  do ở việc đó, sửa kỷ luật / Hsnv thì ghi lý do chung. Hoàn thành → hệ thống ghi **một** kết quả tháng (KQcv, KLcv,
+  Hsht, Hsnv, điểm cuối) và không mở lại được ở P1 (Q72). Phiếu có phần **KPI tháng (tham khảo)**: thực tế, mục tiêu,
+  % hoàn thành của các KPI trong tháng — chỉ để xem, không vào Hsht. Mục tiêu tháng của KPI chỉ phân bổ theo quý
+  được suy ra từ quý (Q67) và phiếu ghi rõ "Suy ra từ mục tiêu quý / năm đã phân bổ".
+- **Bước HR tự ghi nhận** (cấu hình tự duyệt bước cuối, PEND-02): quản lý bấm Gửi là cột HR được chép từ cột quản
+  lý và kết quả tháng được ghi ngay, một lần, trong cùng thao tác; lịch sử có dòng "Tự động duyệt" không người
+  thực hiện. Cột quản lý chưa đủ (thiếu điểm, thiếu Hsnv dưới ngưỡng) thì quản lý không gửi được.
+- *Đã làm 23/10:* phần tính điểm (B0); dữ liệu, seed (B1); phiếu kế hoạch và hai màn hình (B2); phiếu đánh giá
+  (B3). Chưa làm: khởi chạy đầu kỳ và import điểm (B4), kết quả và dashboard (B5).
 
 ### Dashboard theo vai trò (PEND-13)
 

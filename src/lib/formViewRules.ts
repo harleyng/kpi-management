@@ -32,9 +32,12 @@ import type {
   KpiDefinition,
   PersonFormAction,
   WorkflowStep,
+  WorkReview,
+  WorkReviewItem,
   WorkTask,
 } from '@/data/types';
 import type { CanSubmitInput } from './formRules';
+import { DEFAULT_WORK_SCORING, type WorkScoring } from './workRules';
 import { todayOf, type Clock } from './isoDate';
 import type { SessionDirectory } from './sessionRules';
 import {
@@ -91,6 +94,10 @@ export interface SubmitRows {
   /** Monthly work (PEND-14): the tasks and the months a WORK_PLAN form's check reads. Default none. */
   workTasks?: readonly WorkTask[];
   periods?: readonly Pick<CyclePeriod, 'id' | 'startDate' | 'endDate'>[];
+  /** A WORK_REVIEW form's review row and items, and the tenant's scoring (default CMC's 70 / 30 / 80). */
+  workReviews?: readonly WorkReview[];
+  workReviewItems?: readonly WorkReviewItem[];
+  workScoring?: WorkScoring;
 }
 
 /**
@@ -123,8 +130,17 @@ export function submitCheckInput(
       const tasks = (rows.workTasks ?? []).filter((t) => t.workPlanId === form.workPlanId);
       return { formType: 'WORK_PLAN', stepNo: step.stepNo, steps, tasks, period };
     }
-    case 'WORK_REVIEW':
-      return { formType: 'WORK_REVIEW' };
+    case 'WORK_REVIEW': {
+      const review = (rows.workReviews ?? []).find((r) => r.formId === form.id) ?? null;
+      return {
+        formType: 'WORK_REVIEW',
+        step,
+        review,
+        items: (rows.workReviewItems ?? []).filter((i) => i.formId === form.id),
+        tasks: (rows.workTasks ?? []).filter((t) => t.workPlanId === form.workPlanId),
+        config: rows.workScoring ?? DEFAULT_WORK_SCORING,
+      };
+    }
   }
 }
 
@@ -241,10 +257,7 @@ export function formStanding(input: FormStandingInput): FormStanding {
   if (frozen) return { ...entitled, readOnlyReason: 'FROZEN' };
 
   const n = Math.max(...steps.map((s) => s.stepNo));
-  // The monthly work review does not move yet (`checkAction` refuses WORK_FORM_NOT_BUILT until 8.3): offer no move.
-  const moves = form.formType === 'WORK_REVIEW'
-    ? []
-    : STEP_ACTIONS_SHOWN.filter(
+  const moves = STEP_ACTIONS_SHOWN.filter(
         // A non-blank comment stands in for the one the dialog will ask for: only the step decides here.
         (action) => TRANSITIONS[action].refusal(step, form, n, '—') === null,
       );

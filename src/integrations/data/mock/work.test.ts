@@ -218,14 +218,6 @@ describe('work.saveWorkReview — "Lưu nháp" of the current step\'s column', (
 });
 
 describe('work — forms and launches (the monthly-work part wired in 8.1)', () => {
-  it('the review does not move yet (8.3); HR may still cancel it', async () => {
-    const { gateway } = newGateway();
-    const form = await gateway.forms.getForm(S, formId('WR:T03:E017'));
-    const base = { formId: form.id, expectedStepId: form.currentStepId as Id, comment: 'Gửi', onBehalfOfUserId: null, delegationId: null };
-    expect(await codeOf(gateway.forms.act(S, MANAGER, { ...base, action: 'SUBMIT' }))).toBe('ERR-KPI-04:WORK_FORM_NOT_BUILT');
-    expect((await gateway.forms.act(S, hr, { ...base, action: 'CANCEL', comment: 'Kiểm thử' })).status).toBe('Cancelled');
-  });
-
   it('a WORK_PLAN launch creates each recipient\'s Draft plan for the month; a second skips them', async () => {
     const { gateway } = newGateway();
     const input = { workflowId: (await gateway.forms.listWorkflows(S, 'WORK_PLAN'))[0].id, name: 'Kế hoạch T05', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T05'), dueDays: 7, recipientMode: 'FILTER', recipientFilter: KDBH, timing: 'NOW' } as const;
@@ -457,5 +449,253 @@ describe('WORK_PLAN — top-down: the manager assigns first (PEND-01 startStepNo
     const [form] = (await gateway.forms.listForms(S, { launchId: launch.id })).items;
     const steps = await gateway.forms.listWorkflowSteps(S, form.workflowId);
     expect(steps.find((s) => s.id === form.currentStepId)?.stepNo).toBe(2);
+  });
+});
+
+// ─── Step 8.3: the WORK_REVIEW form ──────────────────────────────────────────────────────────────
+
+const reviewOf = async (gw: DataGateway, key: string) => ({
+  review: await gw.work.getWorkReview(S, formId(key)),
+  items: await gw.work.listWorkReviewItems(S, formId(key)),
+});
+
+/** Switches the WORK_REVIEW workflow's last step (HR) to record by itself (PEND-02), as HR would in the editor. */
+async function hrRecordsByItself(gw: DataGateway) {
+  const [workflow] = await gw.forms.listWorkflows(S, 'WORK_REVIEW');
+  const steps = await gw.forms.listWorkflowSteps(S, workflow.id);
+  const last = Math.max(...steps.map((s) => s.stepNo));
+  const { tenantId: _t, ...input } = workflow;
+  await gw.forms.saveWorkflow(S, u(SYNTRA.personas.admin), input, steps.map(({ tenantId: _tt, workflowId: _w, stepNo, ...s }) => ({ ...s, autoApprove: stepNo === last })));
+}
+
+describe('WORK_REVIEW — tự đánh giá → quản lý → HR ghi nhận (step 8.3)', () => {
+  it('E015: SELF sent → MANAGER prefilled; manager sends → FINAL = MANAGER; HR records → one WorkResult by hand', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    const atManager = await reviewOf(gateway, 'WR:T03:E015');
+    expect(atManager.items.map((i) => i.managerScore)).toEqual(atManager.items.map((i) => i.selfScore));
+    expect(atManager.review.managerDisciplineScore).toBe(90);
+    expect(atManager.review.managerComment).toBeNull(); // comments are the manager's own
+    const audit = await gateway.system.listAuditLog(S, { entityName: 'WorkReviewItem', entityId: atManager.items[0].id });
+    expect(audit.items.some((a) => a.reason === 'Điền sẵn cột Quản lý từ cột Tự đánh giá')).toBe(true);
+
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    const atHr = await reviewOf(gateway, 'WR:T03:E015');
+    expect(atHr.items.map((i) => i.finalScore)).toEqual(atHr.items.map((i) => i.managerScore));
+    const done = await actOn(gateway, hr, 'WR:T03:E015', 'APPROVE');
+    expect(done.status).toBe('Completed');
+    const results = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] });
+    expect(results).toHaveLength(1);
+    // 40 / 20 / 40 scored 90 / 80 / 85 → KQcv 86; KLcv 90 → Hsht 0.7 × 86 + 0.3 × 90 = 87.2.
+    expect(results[0].kqcv).toBeCloseTo(86, 9);
+    expect(results[0].hsht).toBeCloseTo(87.2, 9);
+    expect(results[0]).toMatchObject({ hsnv: null, formId: formId('WR:T03:E015') });
+    expect(results[0].finalScore).toBeCloseTo(87.2, 9);
+    // Recorded: the form is closed and the month's tasks frozen for good.
+    expect((await rejection(actOn(gateway, hr, 'WR:T03:E015', 'APPROVE'))).code).toBe('ERR-KPI-04');
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] })).toHaveLength(1);
+    expect(await codeOf(gateway.work.updateTaskProgress(S, u('E015'), task('E015', 'T03', 1), { progressPct: 100, progressStatus: 'Done', note: null }))).toBe('ERR-KPI-04:RESULT_RECORDED');
+  });
+
+  it('E017 below 80: the manager must decide Hsnv with a reason; it is kept in the result', async () => {
+    const { gateway } = newGateway();
+    const f = formId('WR:T03:E017');
+    const items = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, MANAGER, f, { disciplineScore: 70, items: items.map((i) => ({ itemId: i.id, score: 60 })) });
+    const refused = await rejection(actOn(gateway, MANAGER, 'WR:T03:E017', 'SUBMIT'));
+    expect([refused.code, refused.issues.map((i) => i.detail)]).toEqual(['ERR-KPI-06', ['HSNV_REQUIRED', 'HSNV_REASON_REQUIRED']]);
+    expect((await gateway.work.getWorkReview(S, f)).finalDisciplineScore).toBeNull(); // a refusal prefills nothing
+    await gateway.work.saveWorkReview(S, MANAGER, f, { hsnv: 72, hsnvReason: 'Khách hàng tồn lớn, đã chủ động xử lý' });
+    await actOn(gateway, MANAGER, 'WR:T03:E017', 'SUBMIT');
+    expect((await gateway.work.getWorkReview(S, f)).finalHsnv).toBe(72);
+    await actOn(gateway, hr, 'WR:T03:E017', 'APPROVE');
+    const [result] = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] });
+    expect(result.hsht).toBeCloseTo(63, 9); // 0.7 × 60 + 0.3 × 70
+    expect(result).toMatchObject({ hsnv: 72, hsnvReason: 'Khách hàng tồn lớn, đã chủ động xử lý', finalScore: 72 });
+  });
+
+  it('HR changing the manager\'s score needs that task\'s reason; then it counts', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    const f = formId('WR:T03:E015');
+    const [first] = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, hr, f, { items: [{ itemId: first.id, score: 70 }] });
+    const e = await rejection(actOn(gateway, hr, 'WR:T03:E015', 'APPROVE'));
+    expect([e.code, e.issues[0].detail, e.issues[0].ref]).toEqual(['ERR-KPI-06', 'FINAL_REASON_REQUIRED', first.taskId]);
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] })).toEqual([]);
+    await gateway.work.saveWorkReview(S, hr, f, { items: [{ itemId: first.id, comment: 'Khách VIP thực tế 18/30, đã đối chiếu CRM' }] });
+    await actOn(gateway, hr, 'WR:T03:E015', 'APPROVE');
+    const [result] = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] });
+    expect(result.kqcv).toBeCloseTo(0.4 * 70 + 0.2 * 80 + 0.4 * 85, 9);
+  });
+
+  it('RETURN to the employee clears the manager\'s untouched copies, keeps the changed ones; the revision reaches him', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    const f = formId('WR:T03:E015');
+    const [a, b] = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, MANAGER, f, { items: [{ itemId: b.id, score: 60 }] });
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'RETURN', 'Xem lại việc kèm cặp nhân viên mới');
+    let rows = await reviewOf(gateway, 'WR:T03:E015');
+    expect(rows.items.find((i) => i.id === a.id)?.managerScore).toBeNull();
+    expect(rows.items.find((i) => i.id === b.id)?.managerScore).toBe(60);
+    expect(rows.review.managerDisciplineScore).toBeNull();
+    await gateway.work.saveWorkReview(S, u('E015'), f, { items: [{ itemId: a.id, score: 95 }] });
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    rows = await reviewOf(gateway, 'WR:T03:E015');
+    expect(rows.items.find((i) => i.id === a.id)?.managerScore).toBe(95);
+    expect(rows.items.find((i) => i.id === b.id)?.managerScore).toBe(60);
+  });
+
+  it('RETURN from HR keeps FINAL until step 3 is entered again, then copies MANAGER afresh', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    const f = formId('WR:T03:E015');
+    const [a] = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, hr, f, { items: [{ itemId: a.id, score: 10 }] });
+    await actOn(gateway, hr, 'WR:T03:E015', 'RETURN', 'Quản lý xem lại điểm việc 1');
+    expect((await gateway.work.listWorkReviewItems(S, f)).find((i) => i.id === a.id)?.finalScore).toBe(10);
+    await gateway.work.saveWorkReview(S, MANAGER, f, { items: [{ itemId: a.id, score: 88 }] });
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    expect((await gateway.work.listWorkReviewItems(S, f)).find((i) => i.id === a.id)?.finalScore).toBe(88);
+  });
+
+  it('step 1 overdue with nothing self-scored: the manager gets an empty column (null, never 0)', async () => {
+    const { gateway } = newGateway();
+    gateway.dev?.setNow('2027-04-08T02:00:00.000Z'); // T03 reviews' step-1 deadline was 04-07
+    await gateway.scheduler.runDue(S);
+    const form = await gateway.forms.getForm(S, formId('WR:T03:E016'));
+    expect(form.status).toBe('InProgress');
+    const { review, items } = await reviewOf(gateway, 'WR:T03:E016');
+    expect(items.map((i) => i.managerScore)).toEqual(items.map(() => null));
+    expect(review.managerDisciplineScore).toBeNull();
+  });
+
+  it('a leftover Hsnv above the threshold is not a decision: the stored result has none and keeps Hsht (QA, B3)', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    await gateway.work.saveWorkReview(S, hr, formId('WR:T03:E015'), { hsnv: 50, hsnvReason: 'Nháp cũ' });
+    await actOn(gateway, hr, 'WR:T03:E015', 'APPROVE');
+    const [result] = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] });
+    expect(result.hsnv).toBeNull();
+    expect(result.finalScore).toBeCloseTo(87.2, 9);
+  });
+
+  it('HR clearing a required Hsnv cannot record the month (HSNV_REQUIRED); nothing is stored', async () => {
+    const { gateway } = newGateway();
+    const f = formId('WR:T03:E017');
+    const items = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, MANAGER, f, { disciplineScore: 70, items: items.map((i) => ({ itemId: i.id, score: 60 })), hsnv: 72, hsnvReason: 'Khách hàng tồn lớn' });
+    await actOn(gateway, MANAGER, 'WR:T03:E017', 'SUBMIT');
+    await gateway.work.saveWorkReview(S, hr, f, { hsnv: null });
+    const e = await rejection(actOn(gateway, hr, 'WR:T03:E017', 'APPROVE'));
+    expect(e.code).toBe('ERR-KPI-06');
+    expect(e.issues.map((i) => i.detail)).toContain('HSNV_REQUIRED');
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] })).toEqual([]);
+  });
+
+  it('a review cancelled and launched again records the month once; a third launch skips it (QA, B3)', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, hr, 'WR:T03:E017', 'CANCEL', 'Khởi chạy lại sau khi điều chỉnh việc');
+    const workflowId = (await gateway.forms.listWorkflows(S, 'WORK_REVIEW'))[0].id;
+    const launchT03 = () => gateway.forms.createLaunch(S, hr, {
+      workflowId, name: 'Đánh giá lại T03', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T03'), dueDays: 12,
+      recipientMode: 'FILTER', timing: 'NOW', recipientFilter: { ...KDBH, employeeIds: [SYNTRA.employee('E017')] },
+    });
+    const [again] = (await gateway.forms.listForms(S, { launchId: (await launchT03()).id })).items;
+    expect(again.subjectEmployeeId).toBe(SYNTRA.employee('E017'));
+    const items = await gateway.work.listWorkReviewItems(S, again.id);
+    expect(items.length).toBeGreaterThan(0);
+    const act = async (actor: Id, action: 'SUBMIT' | 'APPROVE') => {
+      const form = await gateway.forms.getForm(S, again.id);
+      return gateway.forms.act(S, actor, { formId: again.id, expectedStepId: form.currentStepId as Id, action, comment: null, onBehalfOfUserId: null, delegationId: null });
+    };
+    await gateway.work.saveWorkReview(S, u('E017'), again.id, { disciplineScore: 90, items: items.map((i) => ({ itemId: i.id, score: 90 })) });
+    await act(u('E017'), 'SUBMIT');
+    await act(MANAGER, 'SUBMIT');
+    expect((await act(hr, 'APPROVE')).status).toBe('Completed');
+    const recorded = () => gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] });
+    expect(await recorded()).toHaveLength(1);
+    expect((await gateway.forms.listForms(S, { launchId: (await launchT03()).id })).items).toEqual([]);
+    expect(await recorded()).toHaveLength(1);
+  });
+
+  it('HR\'s step records by itself (PEND-02): the manager\'s send copies MANAGER into FINAL and records ONE result', async () => {
+    const { gateway } = newGateway();
+    await hrRecordsByItself(gateway);
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    const done = await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    expect(done.status).toBe('Completed');
+    const { review, items } = await reviewOf(gateway, 'WR:T03:E015');
+    expect(items.map((i) => i.finalScore)).toEqual(items.map((i) => i.managerScore));
+    expect(review.finalDisciplineScore).toBe(review.managerDisciplineScore);
+    const audit = await gateway.system.listAuditLog(S, { entityName: 'WorkReviewItem', entityId: items[0].id });
+    expect(audit.items.some((a) => a.reason === 'Điền cột HR ghi nhận bằng cột Quản lý')).toBe(true);
+    const results = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] });
+    expect(results).toHaveLength(1);
+    expect(results[0].hsht).toBeCloseTo(87.2, 9);
+    expect(results[0].finalScore).toBeCloseTo(87.2, 9);
+    expect((await gateway.forms.listFormActions(S, formId('WR:T03:E015'))).slice(-2).map((a) => [a.action, a.actorUserId])).toEqual([['SUBMIT', MANAGER], ['AUTO_APPROVE', null]]);
+  });
+
+  it('HR\'s step records by itself below 80: the manager\'s Hsnv and reason reach the one result', async () => {
+    const { gateway } = newGateway();
+    await hrRecordsByItself(gateway);
+    const f = formId('WR:T03:E017');
+    const items = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, MANAGER, f, { disciplineScore: 70, items: items.map((i) => ({ itemId: i.id, score: 60 })), hsnv: 72, hsnvReason: 'Khách hàng tồn lớn, đã chủ động xử lý' });
+    expect((await actOn(gateway, MANAGER, 'WR:T03:E017', 'SUBMIT')).status).toBe('Completed');
+    const results = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ hsnv: 72, hsnvReason: 'Khách hàng tồn lớn, đã chủ động xử lý', finalScore: 72 });
+    expect((await gateway.work.getWorkReview(S, f)).finalHsnv).toBe(72);
+  });
+
+  it('HR\'s step records by itself: HR sending FOR the manager names both on the send; the automatic row names nobody', async () => {
+    const { gateway } = newGateway();
+    await hrRecordsByItself(gateway);
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    expect((await actOn(gateway, hr, 'WR:T03:E015', 'SUBMIT', null, { onBehalfOfUserId: MANAGER, delegationId: null })).status).toBe('Completed');
+    const [send, auto] = (await gateway.forms.listFormActions(S, formId('WR:T03:E015'))).slice(-2);
+    expect(send).toMatchObject({ action: 'SUBMIT', actorUserId: hr, onBehalfOfUserId: MANAGER });
+    expect(auto).toMatchObject({ action: 'AUTO_APPROVE', actorUserId: null, onBehalfOfUserId: null, delegationId: null });
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] })).toHaveLength(1);
+  });
+
+  it('HR\'s step records by itself: a RETURN to the employee and a new send record the revised scores, once', async () => {
+    const { gateway } = newGateway();
+    await hrRecordsByItself(gateway);
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'RETURN', 'Xem lại việc 1');
+    const f = formId('WR:T03:E015');
+    const [a] = await gateway.work.listWorkReviewItems(S, f);
+    await gateway.work.saveWorkReview(S, u('E015'), f, { items: [{ itemId: a.id, score: 100 }] });
+    await actOn(gateway, u('E015'), 'WR:T03:E015', 'SUBMIT');
+    await actOn(gateway, MANAGER, 'WR:T03:E015', 'SUBMIT');
+    expect((await gateway.work.listWorkReviewItems(S, f)).find((i) => i.id === a.id)?.finalScore).toBe(100);
+    const results = await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E015')] });
+    expect(results).toHaveLength(1);
+    expect(results[0].kqcv).toBeCloseTo(0.4 * 100 + 0.2 * 80 + 0.4 * 85, 9);
+  });
+
+  it('HR\'s step records by itself, but the manager\'s column is incomplete: refused, nothing written', async () => {
+    const { gateway } = newGateway();
+    await hrRecordsByItself(gateway);
+    const f = formId('WR:T03:E017');
+    const before = await reviewOf(gateway, 'WR:T03:E017');
+    expect((await rejection(actOn(gateway, MANAGER, 'WR:T03:E017', 'SUBMIT'))).code).toBe('ERR-KPI-06');
+    expect((await gateway.forms.getForm(S, f)).status).toBe('InProgress');
+    expect(await reviewOf(gateway, 'WR:T03:E017')).toEqual(before);
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] })).toEqual([]);
+  });
+
+  it('HR cancels a review at the manager\'s step: no result, the task list unfreezes', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, hr, 'WR:T03:E017', 'CANCEL', 'Khởi chạy lại sau khi điều chỉnh việc');
+    expect(await gateway.work.listWorkResults(S, { periodIds: [period('T03')], employeeIds: [SYNTRA.employee('E017')] })).toEqual([]);
+    expect((await gateway.work.cancelWorkTask(S, MANAGER, task('E017', 'T03', 2), 'Không còn cần')).progressStatus).toBe('Cancelled');
   });
 });

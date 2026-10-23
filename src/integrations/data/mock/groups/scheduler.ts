@@ -15,7 +15,7 @@ import type { SchedulerGateway, SchedulerReport } from '../../types';
 import { clockOf } from '../authorize';
 import { newId } from '../rows';
 import type { Runtime } from '../runtime';
-import { applyColumnEntry, assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf, syncWorkPlan } from '../workflowContext';
+import { applyColumnEntry, assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf, syncWorkPlan, syncWorkReview } from '../workflowContext';
 
 /**
  * `scheduler.runDue` — one tick of the clock-driven jobs, as of the gateway clock, in ONE system
@@ -112,6 +112,8 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
             const plan = planOfForm(tx, form);
             if (moved.planStatus && plan) setPlanStatus(tx, plan, moved.planStatus, due.action);
             syncWorkPlan(tx, form, moved.workPlanStatus, null, due.action);
+            // AUTO_FORWARD never completes a review (never on the last step): only the prefill can run here.
+            syncWorkReview(tx, form, due.action, moved.nextStep, false);
             if (due.action === 'AUTO_FORWARD') {
               tx.emit({
                 type: 'form.stepActed',

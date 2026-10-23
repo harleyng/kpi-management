@@ -1,6 +1,5 @@
 import { useParams } from 'react-router-dom';
 import { AccessDenied } from '@/components/layout/AccessDenied';
-import { InlineNotice } from '@/components/shared/InlineNotice';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ErrorStateCard } from '@/components/shared/ErrorStateCard';
 import { FormStatusBadge, OverdueBadge } from '@/components/shared/StatusBadge';
@@ -11,12 +10,12 @@ import { FormStepStrip } from '@/components/forms/FormStepStrip';
 import { GoalChangeFormBody } from '@/components/forms/GoalChangeFormBody';
 import { GoalPlanFormBody } from '@/components/forms/GoalPlanFormBody';
 import { WorkPlanFormBody } from '@/components/work/WorkPlanFormBody';
+import { WorkReviewFormBody } from '@/components/work/WorkReviewFormBody';
 import { actingAsSentence, formPeriodText, formTitle, readOnlySentence, returnedSentence } from '@/components/forms/formCopy';
 import { useFormDetail } from '@/components/forms/useFormDetail';
 import { useSession } from '@/contexts/useSession';
 import { errorSpecOf, KpiError } from '@/lib/errorCatalog';
 import { formatDate } from '@/lib/utils';
-import { isWorkFormType } from '@/data/types';
 
 /**
  * One form (phiếu) — `/forms/:formId`, reached from the inbox, the team list, HR's list and links
@@ -77,11 +76,8 @@ export default function FormDetailPage() {
       <GoalPlanFormBody detail={detail} title={title} />
     ) : form.formType === 'WORK_PLAN' ? (
       <WorkPlanFormBody detail={detail} title={title} />
-    ) : isWorkFormType(form.formType) ? (
-      // The monthly work review's body arrives with Plan B step 8.3.
-      <InlineNotice tone="info" title="Nội dung phiếu đánh giá công việc tháng đang được xây dựng">
-        Phiếu đã được tạo và lưu đầy đủ. Màn hình chấm điểm công việc tháng sẽ có ở bản cập nhật tới.
-      </InlineNotice>
+    ) : form.formType === 'WORK_REVIEW' ? (
+      <WorkReviewFormBody detail={detail} title={title} />
     ) : (
       <GoalChangeFormBody detail={detail} title={title} />
     );

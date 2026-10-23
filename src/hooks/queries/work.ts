@@ -4,6 +4,13 @@ import type { Id } from '@/data/types';
 import { getDataGateway } from '@/integrations/data';
 import type { WorkPlanFilter, WorkResultFilter, WorkReviewPatch, WorkScoringInput, WorkTaskInput, WorkTaskProgressInput } from '@/integrations/data/types';
 import { DEFAULT_WORK_SCORING, type WorkScoring } from '@/lib/workRules';
+import { monthKpiReference } from '@/lib/workKpiRules';
+import { combineQueries } from '@/lib/queryState';
+import { useMemo } from 'react';
+import type { CyclePeriod } from '@/data/types';
+import { useActuals } from './actuals';
+import { useAllPeriods, useGoalPlans, useGoalRows, usePeriodTargets, useTargetLevels } from './goals';
+import { useCalcMethods, useCalcTiers, useKpiDefinitions } from './library';
 import { queryKey, type KeyRoot } from './keys';
 
 /**
@@ -148,4 +155,41 @@ export function useSaveWorkScoring() {
     onSuccess: () => invalidate(),
     mutationFn: (input: WorkScoringInput) => getDataGateway().work.saveWorkScoringConfig(tenantId, user.id, input),
   });
+}
+
+/**
+ * "KPI tháng (tham khảo)" for a review (D-W3): the employee's own Locked / Approved plan in the month's cycle,
+ * its goals' actual, target and % for the month (`workKpiRules.monthKpiReference` — the Results page's
+ * arithmetic). `lines` is `[]` when the employee has no such plan. Roll-up goals read only this plan's goals.
+ */
+export function useMonthKpiReference(employeeId: Id | null, period: CyclePeriod | null) {
+  const plans = useGoalPlans(period ? { cycleId: period.cycleId } : {}, { enabled: period !== null && employeeId !== null });
+  const plan = plans.data?.find((p) => p.ownerType === 'Employee' && p.ownerEmployeeId === employeeId && (p.status === 'Locked' || p.status === 'Approved')) ?? null;
+  const goals = useGoalRows({ goalPlanIds: plan ? [plan.id] : [] }, { enabled: plan !== null });
+  const goalIds = useMemo(() => (goals.data ?? []).map((g) => g.id), [goals.data]);
+  const actuals = useActuals({ goalIds, periodId: period?.id }, { enabled: goalIds.length > 0 && period !== null });
+  const targets = usePeriodTargets(goalIds.length > 0 ? { goalIds } : null);
+  const levels = useTargetLevels(plan ? { goalPlanId: plan.id } : null);
+  const methods = useCalcMethods();
+  const tiers = useCalcTiers();
+  const kpis = useKpiDefinitions();
+  const periods = useAllPeriods();
+  const ready = plans.data !== undefined && (plan === null || (goals.data !== undefined && (goalIds.length === 0 || (actuals.data && targets.data && levels.data && methods.data && tiers.data && kpis.data && periods.data))));
+  const lines = useMemo(() => {
+    if (!ready || !period) return undefined;
+    if (plan === null || goalIds.length === 0) return [];
+    return monthKpiReference(goals.data ?? [], period, {
+      period,
+      periods: periods.data ?? [],
+      actuals: actuals.data ?? [],
+      periodTargets: targets.data ?? [],
+      methods: methods.data ?? [],
+      tiers: tiers.data ?? [],
+      levels: levels.data ?? [],
+      kpiDefinitions: kpis.data ?? [],
+      allGoals: goals.data ?? [],
+      alignments: [],
+    });
+  }, [ready, period, plan, goalIds.length, goals.data, periods.data, actuals.data, targets.data, methods.data, tiers.data, levels.data, kpis.data]);
+  return { lines, query: combineQueries([plans, goals, actuals, targets, levels, methods, tiers, kpis, periods.query]) };
 }

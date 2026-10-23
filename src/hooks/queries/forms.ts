@@ -5,6 +5,7 @@ import { getDataGateway } from '@/integrations/data';
 import type {
   ChildInput,
   EvaluationItemPatch,
+  WorkReviewPatch,
   FormActionInput,
   FormFilter,
   NewLaunchInput,
@@ -247,6 +248,8 @@ export interface UnsavedEdits {
   evaluation?: readonly EvaluationItemPatch[];
   /** The whole proposal, when it changed (GOAL_CHANGE). */
   changeItems?: readonly ChildInput<GoalChangeItem, 'formId'>[];
+  /** The step's column of a monthly work review, when it changed (WORK_REVIEW, PEND-14). */
+  workReview?: WorkReviewPatch;
 }
 
 /**
@@ -257,7 +260,7 @@ export interface UnsavedEdits {
 export function useActOnForm() {
   const { tenantId, user } = useSession();
   const refresh = useRefreshForm();
-  const invalidate = useInvalidateRoots('forms', 'inbox', 'goalPlans', 'goals');
+  const invalidate = useInvalidateRoots('forms', 'inbox', 'goalPlans', 'goals', 'workPlans', 'workReviews', 'workResults');
   return useMutation({
     onSuccess: () => invalidate(),
     mutationFn: async ({ input, unsaved = {} }: { input: FormActionInput; unsaved?: UnsavedEdits }) => {
@@ -267,6 +270,7 @@ export function useActOnForm() {
         await forms.saveEvaluationItems(tenantId, user.id, input.formId, unsaved.evaluation);
       }
       if (forward && unsaved.changeItems) await forms.saveGoalChangeItems(tenantId, user.id, input.formId, unsaved.changeItems);
+      if (forward && unsaved.workReview) await getDataGateway().work.saveWorkReview(tenantId, user.id, input.formId, unsaved.workReview);
       return forms.act(tenantId, user.id, input);
     },
     onSettled: (_data, _error, { input }) => refresh(input.formId),

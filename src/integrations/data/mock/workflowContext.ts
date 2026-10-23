@@ -17,7 +17,7 @@ import { KpiError, toKpiError, type RuleIssue } from '@/lib/errorCatalog';
 import { computedItemPct, itemsOnEnterColumn, sameActual, type ItemCalcContext } from '@/lib/formRules';
 import { periodActual, periodTarget, type ActualContext } from '@/lib/resultRules';
 import { planStatusOnEnterStep, type Decision } from '@/lib/goalPlanRules';
-import { workPlanStatusOnEnterStep } from '@/lib/workRules';
+import { DEFAULT_WORK_SCORING, reviewClearCopiedCells, reviewColumnPrefill, workPlanStatusOnEnterStep, workResultOf, workReviewEffects } from '@/lib/workRules';
 import { planEditability, type OpenRegistration } from '@/lib/planAccessRules';
 import { todayOf } from '@/lib/isoDate';
 import { resourceOfSubject } from '@/lib/permissionRules';
@@ -234,6 +234,54 @@ export function syncWorkPlan(tx: Tx, form: FormInstance, workPlanStatus: WorkPla
   // A Locked plan has no unlock in P1: no form move takes it out of Locked (a relaunch never reaches one).
   if (plan.status === 'Locked' && workPlanStatus !== 'Locked') return;
   setWorkPlanStatus(tx, plan, workPlanStatus, approver, reason);
+}
+
+/** The review's step columns in words, for the audit rows of a prefill. */
+const PREFILL_REASON = { MANAGER: 'Điền sẵn cột Quản lý từ cột Tự đánh giá', FINAL: 'Điền cột HR ghi nhận bằng cột Quản lý' } as const;
+
+/**
+ * After a WORK_REVIEW form moved (`forms.act`; the scheduler's AUTO_FORWARD): `workRules.workReviewEffects`
+ * of the step entered — a RETURN to the employee clears the manager's untouched copies, entering MANAGER fills
+ * its empty cells from SELF, entering FINAL copies MANAGER; a completion records the month's ONE
+ * `WorkResult` from FINAL (`workResultOf`, tasks and scoring read here, never from the caller). Each row
+ * changed is written with the reason, so the audit tells a prefill from a person's edit. A cancel does nothing.
+ * The FINAL check (`canSubmit`) makes the result complete; one that is not is refused, never stored null.
+ * `passed` — the steps an automatic approval (PEND-02, `settleAutoSteps`) entered and left in the same
+ * write: their entry effects run first, in order, so an HR step that records by itself still copies the
+ * manager's column before the ONE result is recorded. No content check runs on that FINAL: it is a full
+ * copy of MANAGER (comments cleared), which passed `reviewSubmitIssues` on the manager's send, so
+ * `workFinalOverrideIssues` would find nothing; the `finalScore === null` refusal is the backstop.
+ */
+export function syncWorkReview(tx: Tx, form: FormInstance, action: string, entered: WorkflowStep | null, completed: boolean, passed: readonly WorkflowStep[] = []): void {
+  if (form.formType !== 'WORK_REVIEW' || action === 'CANCEL') return;
+  const moves = [
+    // A RETURN never passes a step (autoApprove sits only on the last step), so passed steps are never "via return".
+    ...passed.map((step) => workReviewEffects(step.evaluationColumn, false, false)),
+    workReviewEffects(entered?.evaluationColumn ?? null, action === 'RETURN', completed),
+  ].filter((e) => e.prefill || e.clearCopies || e.recordResult);
+  if (moves.length === 0) return;
+  const review = tx.all('WorkReview').find((r) => r.formId === form.id);
+  if (!review) throw new KpiError('ERR-KPI-02', `WorkReview of form ${form.id} not found`);
+  const items = tx.all('WorkReviewItem').filter((i) => i.formId === form.id);
+  let rows = { review, items };
+  const write = (next: typeof rows, reason: string) => {
+    if (JSON.stringify(next.review) !== JSON.stringify(rows.review)) tx.update('WorkReview', next.review, { reason });
+    next.items.forEach((item, i) => {
+      if (JSON.stringify(item) !== JSON.stringify(rows.items[i])) tx.update('WorkReviewItem', item, { reason });
+    });
+    rows = next;
+  };
+  for (const effects of moves) {
+    if (effects.clearCopies) write(reviewClearCopiedCells(rows), 'Bỏ các ô Quản lý chép từ cột Tự đánh giá khi phiếu trả về nhân viên');
+    if (effects.prefill) write(reviewColumnPrefill(rows, effects.prefill), PREFILL_REASON[effects.prefill]);
+  }
+  if (moves.some((e) => e.recordResult)) {
+    const plan = tx.get('WorkPlan', review.workPlanId);
+    const tasks = tx.all('WorkTask').filter((t) => t.workPlanId === plan.id);
+    const scores = workResultOf(rows.review, rows.items, tasks, tx.all('WorkScoringConfig')[0] ?? DEFAULT_WORK_SCORING);
+    if (scores.finalScore === null) throw new KpiError('ERR-KPI-06', 'RESULT_INCOMPLETE');
+    tx.insert('WorkResult', { id: newId(), tenantId: tx.tenantId, employeeId: plan.employeeId, periodId: plan.periodId, workPlanId: plan.id, formId: form.id, ...scores, recordedAt: tx.now });
+  }
 }
 
 // ─── Launches ──────────────────────────────────────────────────────────────────────────────────

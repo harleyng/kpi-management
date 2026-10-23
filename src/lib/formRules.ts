@@ -9,13 +9,13 @@
  * column starts at the manager's and HR records it (a different % needs a reason).
  */
 
-import type { CalcMethod, CalcTier, CyclePeriod, EvaluationColumn, EvaluationItem, Goal, GoalChangeItem, GoalTargetLevel, Id, Kgi, WorkflowStep } from '@/data/types';
+import type { CalcMethod, CalcTier, CyclePeriod, EvaluationColumn, EvaluationItem, Goal, GoalChangeItem, GoalTargetLevel, Id, Kgi, WorkflowStep, WorkReview, WorkReviewItem } from '@/data/types';
 import { entryBlockers, type ActualEntryInput } from './actualRules';
 import { achievement, type Achievement } from './calcRules';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { changeItemIssues, ownerStepNo, planAfterChanges, submitIssues, weightIssue } from './goalPlanRules';
 import { weightedScore, type WeightedScore } from './scoreRules';
-import { planSubmitIssues, type PlannedTask } from './workRules';
+import { planSubmitIssues, reviewSubmitIssues, workFinalOverrideIssues, type PlannedTask, type WeightedTask, type WorkScoring } from './workRules';
 
 /** The two fields of an evaluation item one column owns. */
 export const COLUMN_FIELDS = {
@@ -33,8 +33,19 @@ export type CanSubmitInput =
   | { formType: 'GOAL_CHANGE'; goals: readonly Goal[]; changeItems: readonly GoalChangeItem[]; kgis: readonly Kgi[] }
   /** Monthly work plan (PEND-14, 8.2): the plan's tasks and its month. `period` null = the form names none. */
   | { formType: 'WORK_PLAN'; stepNo: number; steps: readonly WorkflowStep[]; tasks: readonly PlannedTask[]; period: Pick<CyclePeriod, 'startDate' | 'endDate'> | null }
-  /** Monthly work review: `workRules.reviewSubmitIssues`, wired with `forms.act` in 8.3. */
-  | { formType: 'WORK_REVIEW' };
+  /**
+   * Monthly work review (PEND-14, 8.3): the step's column of the review — `workRules.reviewSubmitIssues`, and at
+   * FINAL HR's reasons for changing the manager's decision (`workFinalOverrideIssues`). `tasks` = every task of
+   * the plan, cancelled ones included (the rules drop them). `review` null = the form lost its review row.
+   */
+  | {
+      formType: 'WORK_REVIEW';
+      step: WorkflowStep;
+      review: WorkReview | null;
+      items: readonly WorkReviewItem[];
+      tasks: readonly WeightedTask[];
+      config: WorkScoring;
+    };
 
 export type CanSubmitResult = { ok: true } | { ok: false; issues: RuleIssue[] };
 
@@ -219,7 +230,8 @@ export function formActualIssues(
  * - GOAL_CHANGE — the proposal is well-formed and the plan AFTER it still passes `submitIssues`.
  * - WORK_PLAN — from the employee's step on, `workRules.planSubmitIssues` (a task, weights at 100%, dates
  *   that touch the month). Before it (a manager assigning first, top-down) the list is still being built.
- * - WORK_REVIEW — not wired yet (ERR-KPI-04 `WORK_FORM_NOT_BUILT`, step 8.3).
+ * - WORK_REVIEW — the step's column is complete and on the scale (`reviewSubmitIssues`: every live task scored,
+ *   KLcv, Hsnv with its reason below the threshold); at FINAL, HR's changes carry their reasons.
  */
 export function canSubmit(input: CanSubmitInput): CanSubmitResult {
   switch (input.formType) {
@@ -256,8 +268,14 @@ export function canSubmit(input: CanSubmitInput): CanSubmitResult {
       if (input.stepNo < ownerStepNo(input.steps)) return { ok: true };
       if (input.period === null) return result([ruleIssue('ERR-KPI-06', 'periodId', 'PERIOD_REQUIRED')]);
       return result(planSubmitIssues(input.tasks, input.period));
-    case 'WORK_REVIEW':
-      return result([ruleIssue('ERR-KPI-04', null, 'WORK_FORM_NOT_BUILT')]);
+    case 'WORK_REVIEW': {
+      const column = input.step.evaluationColumn;
+      if (column === null) return { ok: true };
+      if (input.review === null) return result([ruleIssue('ERR-KPI-06', null, 'REVIEW_MISSING')]);
+      const issues = reviewSubmitIssues(column, input.review, input.items, input.tasks, input.config);
+      if (column === 'FINAL' && issues.length === 0) issues.push(...workFinalOverrideIssues(input.review, input.items, input.tasks, input.config));
+      return result(issues);
+    }
   }
 }
 

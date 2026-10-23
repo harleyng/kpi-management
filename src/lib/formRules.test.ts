@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CalcMethod, CalcMethodType, CyclePeriod, GoalDraft } from '@/data/types';
+import type { CalcMethod, CalcMethodType, CyclePeriod, GoalDraft, WorkReview, WorkReviewItem } from '@/data/types';
+import { DEFAULT_WORK_SCORING } from './workRules';
 import { calcMethod, evaluationItem, evaluationSteps, goal, goalChange, goals, kgi, level, registrationSteps, tier } from '@/test/builders';
 import {
   canSubmit,
@@ -130,8 +131,42 @@ describe('canSubmit — WORK_PLAN (PEND-14, 8.2)', () => {
     expect(issues(canSubmit({ formType: 'WORK_PLAN', stepNo: 2, steps, tasks: [task('a', 100)], period: null }))).toEqual([['ERR-KPI-06', 'periodId', 'PERIOD_REQUIRED']]);
   });
 
-  it('the review is not wired yet (8.3)', () => {
-    expect(issues(canSubmit({ formType: 'WORK_REVIEW' }))).toEqual([['ERR-KPI-04', null, 'WORK_FORM_NOT_BUILT']]);
+});
+
+describe('canSubmit — WORK_REVIEW (PEND-14, 8.3)', () => {
+  const [selfStep, managerStep, finalStep] = evaluationSteps();
+  const tasks = [{ id: 'a', weight: 50, cancelledAt: null }, { id: 'b', weight: 50, cancelledAt: null }];
+  const review = (o: Partial<WorkReview> = {}): WorkReview => ({
+    id: 'r', tenantId: 't', formId: 'f', workPlanId: 'p', selfDisciplineScore: null, selfComment: null, managerDisciplineScore: null, managerComment: null,
+    managerHsnv: null, managerHsnvReason: null, finalDisciplineScore: null, finalComment: null, finalHsnv: null, finalHsnvReason: null, ...o,
+  });
+  const item = (taskId: string, o: Partial<WorkReviewItem> = {}): WorkReviewItem => ({
+    id: `i-${taskId}`, tenantId: 't', formId: 'f', taskId, selfScore: null, selfComment: null, managerScore: null, managerComment: null, finalScore: null, finalComment: null, ...o,
+  });
+  const check = (step: typeof selfStep, r: WorkReview | null, items: WorkReviewItem[]) =>
+    issues(canSubmit({ formType: 'WORK_REVIEW', step, review: r, items, tasks, config: DEFAULT_WORK_SCORING }));
+
+  it('SELF: every task and KLcv scored — 0 is a score', () => {
+    expect(check(selfStep, review({ selfDisciplineScore: 0 }), [item('a', { selfScore: 0 }), item('b', { selfScore: 100 })])).toEqual([]);
+    expect(check(selfStep, review(), [item('a', { selfScore: 90 }), item('b')]).map((i) => i[2])).toEqual(['TASK_SCORE_REQUIRED', 'DISCIPLINE_REQUIRED']);
+  });
+
+  it('MANAGER: Hsht 79.99 needs Hsnv and its reason; 80 does not', () => {
+    const low = [item('a', { managerScore: 79.99 }), item('b', { managerScore: 79.99 })];
+    expect(check(managerStep, review({ managerDisciplineScore: 79.99 }), low).map((i) => i[2])).toEqual(['HSNV_REQUIRED', 'HSNV_REASON_REQUIRED']);
+    expect(check(managerStep, review({ managerDisciplineScore: 79.99, managerHsnv: 85, managerHsnvReason: 'Lý do' }), low)).toEqual([]);
+    const ok = [item('a', { managerScore: 80 }), item('b', { managerScore: 80 })];
+    expect(check(managerStep, review({ managerDisciplineScore: 80 }), ok)).toEqual([]);
+  });
+
+  it('FINAL: what HR changed carries a reason', () => {
+    const items = [item('a', { managerScore: 90, finalScore: 90 }), item('b', { managerScore: 90, finalScore: 85 })];
+    expect(check(finalStep, review({ managerDisciplineScore: 90, finalDisciplineScore: 90 }), items)).toEqual([['ERR-KPI-06', 'b', 'FINAL_REASON_REQUIRED']]);
+  });
+
+  it('a step without a column passes; a form without its review row does not', () => {
+    expect(check({ ...selfStep, evaluationColumn: null }, null, [])).toEqual([]);
+    expect(check(selfStep, null, [])).toEqual([['ERR-KPI-06', null, 'REVIEW_MISSING']]);
   });
 });
 

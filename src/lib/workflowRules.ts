@@ -102,6 +102,14 @@ export function validateWorkflow(formType: FormType, steps: readonly WorkflowSte
   // Monthly work: completing the form locks the plan / records the month, so the employee never
   // takes the last step — no one approves or scores their own month (PEND-14).
   if (isWorkFormType(formType) && sorted[n - 1].actorRule === 'SELF') bad(sorted[n - 1], 'SELF_LAST_STEP');
+  // The review records the month from its last step's column: it ends on FINAL, and the columns run
+  // SELF → MANAGER → FINAL, each at most once (workflow-expert, B3).
+  if (formType === 'WORK_REVIEW') {
+    if (sorted[n - 1].evaluationColumn !== 'FINAL') bad(sorted[n - 1], 'FINAL_LAST_STEP');
+    const order: Record<EvaluationColumn, number> = { SELF: 1, MANAGER: 2, FINAL: 3 };
+    const columns = sorted.map((s) => s.evaluationColumn).filter((c): c is EvaluationColumn => c !== null);
+    if (columns.some((c, i) => i > 0 && order[c] <= order[columns[i - 1]])) bad(null, 'COLUMNS_ORDER');
+  }
   return issues;
 }
 
@@ -522,9 +530,6 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
   if (form.currentStepId !== input.expectedStepId) return refuse('ERR-KPI-04', 'STALE_STEP');
   const step = steps.find((s) => s.id === form.currentStepId && s.workflowId === form.workflowId);
   if (!step) return refuse('ERR-KPI-04', 'STEP_UNKNOWN');
-  // Monthly work review (PEND-14): completing it must record the month's WorkResult — wired in step
-  // 8.3. Until then only HR's CANCEL goes through.
-  if (form.formType === 'WORK_REVIEW' && action !== 'CANCEL') return refuse('ERR-KPI-04', 'WORK_FORM_NOT_BUILT');
   if (action !== 'CANCEL' && isFrozen(form, step, input.plan)) return refuse('ERR-KPI-04', 'FROZEN');
 
   const who = entitlement(form, step, action, input.actor, { ...input.entitlement, clock });
@@ -539,7 +544,7 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
     // The check must describe THIS form at THIS step — a lenient one built for another would skip it.
     const matches =
       check.formType === form.formType &&
-      (check.formType !== 'KPI_EVAL' || check.step.id === step.id) &&
+      ((check.formType !== 'KPI_EVAL' && check.formType !== 'WORK_REVIEW') || check.step.id === step.id) &&
       (check.formType !== 'GOAL_SETTING' || check.stepNo === step.stepNo) &&
       (check.formType !== 'WORK_PLAN' || check.stepNo === step.stepNo);
     if (!matches) return refuse('ERR-KPI-04', 'SUBMIT_CHECK_MISMATCH');

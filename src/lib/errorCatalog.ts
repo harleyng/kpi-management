@@ -215,6 +215,9 @@ export const ISSUE_DETAILS = [
   'PLAN_EMPTY', 'NAME_REQUIRED', 'WEIGHT_INVALID', 'DATES_ORDER', 'DATES_OUTSIDE_PERIOD', 'WORK_PLAN_LOCKED', 'REVIEW_LAUNCHED',
   'RESULT_RECORDED', 'NOT_APPROVED', 'MANAGER_ONLY', 'NOT_SUBJECT_OR_MANAGER', 'CANCEL_REASON_REQUIRED', 'PROGRESS_OUT_OF_RANGE',
   'STATUS_MISMATCH', 'CANCEL_BY_PROGRESS', 'TASK_CANCELLED', 'LINKED_GOAL_INVALID', 'NO_OPEN_FORM', 'PERIOD_REQUIRED', 'LAST_LIVE_TASK',
+  // workRules — the monthly work review (PEND-14)
+  'TASK_SCORE_REQUIRED', 'DISCIPLINE_REQUIRED', 'HSNV_REQUIRED', 'HSNV_REASON_REQUIRED', 'FINAL_REASON_REQUIRED', 'REVIEW_MISSING', 'RESULT_INCOMPLETE',
+  'SCORE_OUT_OF_RANGE', 'SCALE_INVALID', 'THRESHOLD_OUT_OF_RANGE',
   // workflowRules — where a form starts (PEND-01); which periods a KPI evaluation is for (PEND-09)
   'START_STEP_INVALID', 'EVAL_PERIOD_NOT_FORMAL',
   // payrollRules — only quarters and the year are paid (PEND-09)
@@ -289,6 +292,16 @@ export const ISSUE_DETAIL_COPY: Readonly<Record<IssueDetail, string>> = {
   NO_OPEN_FORM: 'Không có phiếu kế hoạch đang mở cho tháng này.',
   PERIOD_REQUIRED: 'Phiếu chưa gắn với tháng nào.',
   LAST_LIVE_TASK: 'Không hủy được việc cuối cùng còn hiệu lực: tháng sẽ không còn gì để đánh giá.',
+  TASK_SCORE_REQUIRED: 'Việc chưa được chấm điểm.',
+  DISCIPLINE_REQUIRED: 'Chưa chấm ý thức chấp hành kỷ luật và thái độ làm việc.',
+  HSNV_REQUIRED: 'Hsht dưới ngưỡng: cần quyết định Hsnv.',
+  HSNV_REASON_REQUIRED: 'Hsht dưới ngưỡng: cần giải trình cho Hsnv.',
+  FINAL_REASON_REQUIRED: 'Kết quả ghi nhận khác đánh giá của quản lý: cần ghi lý do.',
+  REVIEW_MISSING: 'Phiếu chưa có phần đánh giá công việc.',
+  RESULT_INCOMPLETE: 'Chưa đủ điểm để ghi nhận kết quả tháng.',
+  SCORE_OUT_OF_RANGE: 'Điểm nằm ngoài thang cho phép.',
+  SCALE_INVALID: 'Thang điểm không hợp lệ: điểm cao nhất phải lớn hơn điểm thấp nhất, không âm.',
+  THRESHOLD_OUT_OF_RANGE: 'Ngưỡng Hsnv phải nằm trong thang điểm.',
   START_STEP_INVALID: 'Phiếu chỉ bắt đầu được từ bước 1 hoặc bước của người lập (nhân viên), không bỏ qua bước của họ.',
   EVAL_PERIOD_NOT_FORMAL: 'Đánh giá KPI chính thức theo quý hoặc năm. Đánh giá hằng tháng là đánh giá công việc tháng.',
   PERIOD_NOT_PAID: 'Chỉ kết quả quý và năm được xuất file lương; kết quả tháng chỉ để theo dõi.',
