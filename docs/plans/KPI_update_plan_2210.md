@@ -1,6 +1,6 @@
 # Kế hoạch triển khai cập nhật sau buổi họp 22/10/2026
 
-> Phiên bản 1.0 · 23/10/2026 · Người lập: Claude cho @harleyng
+> Phiên bản 1.1 · 23/10/2026 · Người lập: Claude cho @harleyng · 1.1: thêm Đợt 8 (mục 4 — công việc tháng)
 > **Nguồn:** biên bản NoteX 22/10/2026 (`docs/source-map.md`) · đề xuất quy trình `docs/flows/new-flow.md` §4G ·
 > danh sách thay đổi `business-rules.md` §12 (PEND-01…13) · câu hỏi mở `business-rules.md` §8 (Q44–Q58).
 > **Mục đích:** biến 13 thay đổi đã thống nhất thành các đợt làm được, mỗi đợt có thiết kế, việc cần làm,
@@ -20,8 +20,10 @@
 | 5 | Phần còn lại: Goal Plan của Khối, 5 phương pháp tính | 03, 11 | **Large** (03) · KPI Rules (11) | Q40, Q55, Q56 |
 | 6 | Đánh giá thử việc (mục 3 của P1) | 10 | **Large** — module mới | Q53 |
 | 7 | Import dữ liệu lịch sử (ưu tiên thấp) | 12 | **Large** | Q57 |
+| 8 | Mục 4 — giao, nhận, đánh giá công việc tháng (kế hoạch riêng: `KPI_monthly_work_plan.md`) | 14 | **Large** — module mới · KPI Rules + Workflow | Q59–Q66; đợt 1, 2 |
 
-Thứ tự theo biên bản: **mục 1 và 4 trước** (đợt 1–5), **mục 3 sau** (đợt 6), import lịch sử cuối cùng.
+Thứ tự theo biên bản: **mục 1 và 4 trước** (đợt 1–5 và **đợt 8**), **mục 3 sau** (đợt 6), import lịch sử cuối
+cùng. Đợt 8 làm sau đợt 1 và 2 (dùng lại PEND-01, 02, 08), song song được với đợt 3, và trước đợt 4.
 
 ```mermaid
 flowchart LR
@@ -34,6 +36,9 @@ flowchart LR
   W2 --> W6[Đợt 6<br/>thử việc]
   W1 --> W6
   W3 --> W7[Đợt 7<br/>import lịch sử]
+  W1 --> W8[Đợt 8<br/>công việc tháng]
+  W2 --> W8
+  W8 --> W4
 ```
 
 Đợt 1 và đợt 2 sửa hai phần khác nhau của `workflowRules` / seed (đánh giá và đăng ký), nên làm **lần lượt**,
@@ -70,9 +75,12 @@ không song song trên cùng file. Đợt 5 độc lập, chen vào lúc nào c�
 | Q57 | Import lịch sử: dữ liệu gì, bao nhiêu năm | HR + C&B | PEND-12 |
 | Q58 | "6 tháng" là nửa năm của chu kỳ hay 6 tháng gần nhất | Product owner | PEND-13 |
 | Q2 | Bảng quy đổi % lương thật (chị Phương gửi) | C&B | Seed xếp loại |
+| Q59 | Mục 4 là "công việc tháng" của CMC hay chỉ theo dõi KPI tháng? (đảo Q10) | Product owner | PEND-14 (đợt 8) |
+| Q60–Q66 | Thay phiếu KPI_EVAL tháng; thang Hsnv; 70/30 và ngưỡng 80; liên kết KPI; việc hủy; hạn; vào / nghỉ giữa tháng | Product owner + HR | PEND-14 — chi tiết `KPI_monthly_work_plan.md` §4 |
 
 Việc tài liệu của đợt 0: cập nhật `docs/plans/KPI_repo_plan.md` §1 — P1 nay gồm **đánh giá thử việc** và
-**đánh giá theo quý / năm**; hiệu suất liên tục hằng tháng thuộc P1 (mục 4).
+**đánh giá theo quý / năm**; hiệu suất liên tục hằng tháng thuộc P1 (mục 4 = công việc tháng nếu Q59 chốt
+theo đề xuất). Thêm PEND-14 vào `business-rules.md` §12.
 
 Câu hỏi nào chưa có câu trả lời thì làm theo **giá trị "Đề xuất"** ở `new-flow.md` §6, ghi rõ `ASSUMPTION Qn`
 trong BR, để không đợi.
@@ -299,6 +307,23 @@ vai trò bước HR.
 
 ---
 
+## 10A. Đợt 8 — Giao, nhận, đánh giá công việc tháng (PEND-14)
+
+Kế hoạch chi tiết: **`docs/plans/KPI_monthly_work_plan.md`**. Tóm tắt:
+
+- **Nghiệp vụ (CMC mục 4).** Đầu tháng nhân viên (hoặc quản lý) lập danh sách việc có trọng số, quản lý duyệt;
+  trong tháng cập nhật tiến độ; cuối tháng hai bên chấm từng việc (KQcv, 70%) và kỷ luật (KLcv, 30%);
+  **Hsht = 70% × KQcv + 30% × KLcv**, dưới 80 quản lý phải quyết định Hsnv kèm giải trình; HR ghi nhận hoặc
+  import điểm hàng loạt.
+- **Thiết kế đề xuất.** Thực thể riêng `WorkPlan` / `WorkTask` (không dùng Goal Plan); hai phiếu `WORK_PLAN`
+  (đầu tháng) và `WORK_REVIEW` (đầu tháng sau); quy tắc trong `src/lib/workRules.ts`; trigger mới
+  `PERIOD_START`; trang `/my/work`, `/team/work`.
+- **Liên quan các đợt khác.** Dùng `startStepNo` (PEND-01), `autoApprove` + HR trả về (PEND-02), "HR ghi nhận"
+  (PEND-08). Nếu Q60 chốt theo đề xuất, **phiếu công việc tháng là đánh giá liên tục hằng tháng** và PEND-09
+  chỉ còn khởi chạy KPI_EVAL cho kỳ quý / năm. Thẻ công việc tháng vào dashboard của đợt 4.
+- **Bước.** 8.0 chốt câu hỏi → 8.1 dữ liệu, quy tắc → 8.2 kế hoạch tháng → 8.3 đánh giá tháng → 8.4 việc của HR →
+  8.5 kết quả, dashboard → 8.6 e2e, đóng PEND-14.
+
 ## 11. Rủi ro
 
 | Rủi ro | Ảnh hưởng | Cách giảm |
@@ -308,6 +333,7 @@ vai trò bước HR.
 | Hai nguồn số thực tế (phiếu và nhập tay) lệch nhau | Kết quả đơn vị khác kết quả cá nhân | PEND-06 ghi số của phiếu vào `GoalActual` khi hoàn thành; một quy tắc "mới nhất thắng" |
 | Ví dụ quý trong biên bản không cộng ra mục tiêu năm (Q50) | Hiểu sai "riêng từng quý" và "lũy kế" | Hỏi HR ở đợt 0 trước khi làm PEND-04 / 05 |
 | Phạm vi P1 tăng (thử việc, quý / năm) | Ước lượng của anh Dev lệch | Ước lượng theo đợt ở bảng §1; đợt 6–7 tách riêng |
+| Mục 4 bị hiểu khác nhau (công việc tháng hay theo dõi KPI tháng, Q10 ↔ Q59) | Làm thừa hoặc thiếu cả đợt 8 | Chốt Q59 ở đợt 0, trước mọi dòng code của đợt 8 |
 
 ## 12. Việc của các bên ngoài nhóm phát triển (theo biên bản)
 
