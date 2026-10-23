@@ -319,7 +319,8 @@ flowchart LR
 
 > Nguồn: biên bản NoteX "Thiết kế và Phát triển Hệ thống Quản trị KPI" (22/10/2026, `docs/source-map.md`).
 > Các mục dưới đây **thay thế** phần tương ứng ở mục 2, 4, 4E, 4F khi được làm; cho tới lúc đó prototype vẫn
-> chạy như các mục trên. Mã `PEND-xx` khớp với `business-rules.md` §12. Điểm chưa rõ nằm ở mục 6 (Q44–Q57).
+> chạy như các mục trên. Mã `PEND-xx` khớp với `business-rules.md` §12. Điểm chưa rõ nằm ở mục 6 (Q44–Q58).
+> Kế hoạch triển khai theo đợt: `docs/plans/KPI_update_plan_2210.md`.
 
 ### Đăng ký KPI: cả hai luồng chạy song song (PEND-01, 02, 03)
 

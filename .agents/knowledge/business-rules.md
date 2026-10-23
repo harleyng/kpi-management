@@ -971,6 +971,7 @@ proposal and diagrams: `docs/flows/new-flow.md` §4G). **None is in the prototyp
 is built, the rule it names stays authoritative. Building one moves its text into that rule, removes the
 *Pending* note there, and deletes the row here. Open points are `ASSUMPTION Q44`–`Q58` (§8). Lanes per
 `CLAUDE.md`: Workflow = workflow-expert + system-architect; KPI Rules = hr-performance-expert + qa.
+Rollout order, design and test cases per item: `docs/plans/KPI_update_plan_2210.md`.
 
 | Code | Change | Replaces / affects | Open points | Lane |
 |---|---|---|---|---|
