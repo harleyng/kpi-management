@@ -56,13 +56,14 @@ describe('NotificationBell', () => {
   });
 
   it('never counts or lists an e-mail row, and says when nothing is unread', async () => {
-    renderBell('E016'); // a read launch notice + a Queued e-mail
+    renderBell('E016'); // two read launch notices (T03, Q1) + a Queued e-mail
     const bell = await screen.findByRole('button', { name: 'Thông báo' });
     fireEvent.click(bell);
     // Nothing unread: the panel opens on "Tất cả".
     const list = await screen.findByRole('list');
-    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
     expect(within(list).getByText('Đợt Đánh giá KPI tháng 03/2027 đã bắt đầu')).toBeInTheDocument();
+    expect(within(list).getByText('Đợt Đánh giá KPI quý 1/2027 đã bắt đầu')).toBeInTheDocument();
     expect(screen.queryByText(/\[Syntra KPI\]/)).toBeNull();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Chưa đọc' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Chưa đọc' }));

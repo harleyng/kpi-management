@@ -37,6 +37,13 @@ export function RatingValue({ result, level }: { result: Pick<PeriodResult, 'rat
 export function PayoutValue({ state }: { state: PayoutState }) {
   if (state.kind === 'value') return <span className="tabular">{formatNumber(state.pct, 2)}</span>;
   if (state.kind === 'notApplicable') return <span className="text-xs text-muted-foreground">Không áp dụng</span>;
+  if (state.kind === 'tracked') {
+    return (
+      <span className="text-xs text-muted-foreground" title="Kết quả tháng dùng để theo dõi liên tục; lương chỉ tính theo quý và năm.">
+        Theo dõi — không tính lương
+      </span>
+    );
+  }
   const reason = state.kind === 'noRule' ? 'Chưa có quy tắc' : state.kind === 'notRated' ? 'Chưa xếp loại' : 'Không tìm thấy xếp loại';
   return (
     <span className="flex flex-col items-end">

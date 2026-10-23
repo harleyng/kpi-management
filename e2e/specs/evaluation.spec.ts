@@ -17,7 +17,8 @@ async function become(page: Page, name: string) {
 
 async function openFromInbox(page: Page, subject: string) {
   await page.goto('/my/tasks/inbox');
-  await page.getByRole('button', { name: `Mở phiếu Đánh giá KPI của ${subject}` }).click();
+  // Since PEND-09 the subject also holds a Q1 form beside March's: open the first; later steps see only the one sent on.
+  await page.getByRole('button', { name: `Mở phiếu Đánh giá KPI của ${subject}` }).first().click();
   await expect(page.getByRole('heading', { level: 1, name: `Đánh giá KPI — ${subject}` })).toBeVisible();
 }
 

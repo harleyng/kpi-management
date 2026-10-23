@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-10-23 — Plan A, A3: the KPI evaluation is quarterly and annual; a month is tracked, never paid
+
+**Decision.** One table, `workflowRules.LAUNCH_PERIOD_TYPES` (KPI_EVAL → Quarter / Year; WORK_* → Month), checked
+by `createLaunch`, by `saveLaunchRule` for an ACTIVE rule (a stopped monthly rule may stay) and by the scheduler,
+which never fires a stored launch or rule of the wrong type (the rule writes nothing, a Scheduled launch is
+cancelled — never a throw that aborts the tick). `resultRules.PAID_PERIOD_TYPES` = Quarter / Year: a Month / Half
+result is scored and rated, `payoutPct` null, shown "Theo dõi — không tính lương" (`payoutState(…, period)` →
+`tracked`); `buildPayrollSheet` refuses it (06 `PERIOD_NOT_PAID`) and `payrollPreview` says `notPaid`. Q67: a
+month with no split of its own takes its Quarter / Half / Year split (SUM ÷ calendar months, AVG / LAST as is,
+typed-in KPI null); a goal that IS split never scores a SUM month or quarter against the annual target (null).
+Seed `2027-04-06.A1.B1.A2.B2.A3`: monthly rule off (audited), quarterly + annual rules, Q1 launch 04-01 with
+E015 / E016 / E022 recorded and Final (paid), Demo Co Q1; budget 1.8 M.
+
+**Why.** With the monthly rule still on, the scheduler would launch a T04 KPI_EVAL beside the monthly work
+review (Q60) — two monthly evaluations of one person. Paying months as well as quarters would pay the KPI
+share three times a quarter. A month under a 3,75 tỷ quarter split used to be scored against the 15 tỷ year
+(a 1 tỷ month showed 6,67%), and a quarter with a gap in its month split against the year (25% instead of
+"not computable"). The scheduler guard exists because the rule must hold on its own, not only through a reseed.
+
+**Consequence.** Every payroll test and demo now runs on Q1. The dashboard (Plan B) still calls `payoutState`
+without the period, so a month there reads "chưa có quy tắc" until B5 passes it; `cumulativeRules` still
+reads `targetForPeriod` without the cycle's periods (Plan B). The seed has no Year period, so the annual rule
+is dormant.
+
+**Updated alongside.** `business-rules.md` BR-KPI-11, 19, 22, 40, 44, 81, Q3, Q52, Q67, §12 (PEND-04, PEND-09
+rows removed, PEND-05 note); `architecture.md` seed paragraph; `src/data/fixtures/README.md`;
+`docs/flows/new-flow.md` §4, §4G, §5; plan docs.
+
 ## 2026-10-23 — Plan B, B2: the WORK_PLAN form moves its plan; edits commit at once
 
 **Decision.** `checkAction` lets WORK_PLAN move (WORK_REVIEW still refused until 8.3). The plan follows its form

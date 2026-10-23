@@ -16,7 +16,6 @@ const hr = u(SYNTRA.personas.hr);
 const cycle2027 = SYNTRA.id('PerformanceCycle', '2027');
 const cycle2028 = SYNTRA.id('PerformanceCycle', '2028');
 const T03 = SYNTRA.id('CyclePeriod', 2027, 'T03');
-const T04 = SYNTRA.id('CyclePeriod', 2027, 'T04');
 const formId = (key: string) => SYNTRA.id('FormInstance', key);
 const NOBODY: RecipientFilter = { orgUnitIds: [], includeChildUnits: false, positionIds: [], jobLevels: [], employmentStatuses: [], employeeIds: [] };
 
@@ -55,14 +54,14 @@ describe('form.launched', () => {
     const { gateway, diagnostics } = setup();
     await rememberSeed(gateway);
     const launch = await gateway.forms.createLaunch(S, hr, {
-      workflowId: await workflowOf(gateway, 'KPI_EVAL'), name: 'Đánh giá KPI tháng 4/2027', cycleId: cycle2027, periodId: T04, dueDays: 12,
+      workflowId: await workflowOf(gateway, 'KPI_EVAL'), name: 'Đánh giá KPI quý 2/2027', cycleId: cycle2027, periodId: SYNTRA.id('CyclePeriod', 2027, 'Q2'), dueDays: 12,
       recipientMode: 'FILTER', recipientFilter: { ...NOBODY, employeeIds: [emp('E015'), emp('E016')] }, timing: 'NOW',
     } as never);
 
     const [notice, ...rest] = await inbox(gateway, u('E016'));
     expect(rest).toEqual([]);
     expect(notice).toMatchObject({ eventCode: 'FORM_LAUNCHED', refType: 'Launch', refId: launch.id, status: 'Sent', readAt: null });
-    expect(notice.subject).toBe('Đợt Đánh giá KPI tháng 04/2027 đã bắt đầu');
+    expect(notice.subject).toBe('Đợt Đánh giá KPI quý 2/2027 đã bắt đầu');
     expect(notice.body).toMatch(/^Quy trình gồm 3 bước; hiện bạn ở bước 1 – Tự đánh giá\. Hạn hoàn thành: \d{2}\/04\/2027\.$/);
     expect(await inbox(gateway, u('E015'), 'FORM_LAUNCHED')).toHaveLength(1);
     // HR launched it: HR is told nothing; the manager has nothing to do yet.
@@ -137,7 +136,8 @@ describe('form.dueSoon — the deadline reminder', () => {
     await gateway.scheduler.runDue(S);
     await gateway.scheduler.runDue(S);
 
-    const reminders = await inbox(gateway, subject, 'DEADLINE_REMIND');
+    // The subject's Q1 form (same launch tick, PEND-09) is reminded too — one each.
+    const reminders = (await inbox(gateway, subject, 'DEADLINE_REMIND')).filter((n) => n.refId === open[0].id);
     expect(reminders).toHaveLength(1);
     expect(reminders[0]).toMatchObject({ refType: 'Form', refId: open[0].id, subject: 'Sắp đến hạn bước Tự đánh giá' });
     expect(reminders[0].body).toMatch(/là 07\/04\/2027\. Quá hạn, phiếu sẽ tự chuyển sang bước tiếp theo\.$/);

@@ -18,6 +18,15 @@ describe('payoutState', () => {
     expect(payoutState(result({ payoutPct: null }), levels)).toEqual({ kind: 'noRule' });
     expect(payoutState(result({ payoutPct: null, ratingLevelId: 'gone' }), levels)).toEqual({ kind: 'levelMissing' });
   });
+
+  it('PEND-09: a Month / Half employee result is "tracked" — even with a stale stored payout; a quarter is not', () => {
+    expect(payoutState(result({ payoutPct: null }), levels, { periodType: 'Month' })).toEqual({ kind: 'tracked' });
+    expect(payoutState(result(), levels, { periodType: 'Month' })).toEqual({ kind: 'tracked' }); // an old copy with 80
+    expect(payoutState(result({ payoutPct: null }), levels, { periodType: 'Half' })).toEqual({ kind: 'tracked' });
+    expect(payoutState(result({ payoutPct: null }), levels, { periodType: 'Quarter' })).toEqual({ kind: 'noRule' });
+    expect(payoutState(result(), levels, { periodType: 'Year' })).toEqual({ kind: 'value', pct: 80 });
+    expect(payoutState(result({ ownerType: 'Company', payoutPct: null }), levels, { periodType: 'Month' })).toEqual({ kind: 'notApplicable' });
+  });
 });
 
 describe('buildResultRows', () => {

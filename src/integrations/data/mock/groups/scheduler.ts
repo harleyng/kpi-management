@@ -1,6 +1,7 @@
 import type { FormLaunch, FormStepAction, Id } from '@/data/types';
 import {
   dueScheduledLaunches,
+  launchPeriodIssues,
   launchRuleFirings,
   markHandled,
   overdueActions,
@@ -42,8 +43,17 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
         report.formsCreated.push(...fired.formIds);
       };
 
-      // 1. One-off launches whose time has come.
-      for (const launch of dueScheduledLaunches(tx.all('FormLaunch'), clock)) fire(launch);
+      /** PEND-09 — a launch for a period its form type does not take (`LAUNCH_PERIOD_TYPES`). */
+      const wrongPeriod = (formType: FormLaunch['formType'], periodId: Id | null) =>
+        launchPeriodIssues(formType, periodId === null ? null : (tx.find('CyclePeriod', periodId) ?? null)).length > 0;
+
+      // 1. One-off launches whose time has come. One stored for a period its type no longer takes (a
+      // monthly evaluation scheduled before PEND-09) is cancelled, never fired — and never throws, so
+      // the rest of the tick still runs.
+      for (const launch of dueScheduledLaunches(tx.all('FormLaunch'), clock)) {
+        if (wrongPeriod(launch.formType, launch.periodId)) tx.update('FormLaunch', { ...launch, status: 'Cancelled' });
+        else fire(launch);
+      }
 
       // 2. Recurring rules: one launch per (rule, period), missed periods caught up in order.
       const firings = launchRuleFirings(tx.all('FormLaunchRule'), tx.all('CyclePeriod'), tx.all('PerformanceCycle'), tx.all('FormLaunch'), clock);
@@ -51,6 +61,9 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
         const rule = tx.get('FormLaunchRule', firing.ruleId);
         const period = tx.get('CyclePeriod', firing.periodId);
         const workflow = tx.get('WorkflowTemplate', rule.workflowId);
+        // An active rule for a period its form type does not take (one stored before PEND-09, or written
+        // around `saveLaunchRule`) fires nothing and writes nothing.
+        if (wrongPeriod(workflow.formType, period.id)) continue;
         const launch = tx.insert('FormLaunch', {
           id: newId(),
           tenantId: tx.tenantId,

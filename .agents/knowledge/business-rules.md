@@ -146,10 +146,19 @@ A **link**'s `contributionPct` (0, 100] is informational only
   fit is a **warning, never a block** (product owner, T3): `SPLIT_MISMATCH` (SUM Σ / AVG mean / LAST last
   period by date ≠ target, tolerance relative 1e-6, 0.005 absolute below 1), `SPLIT_INCOMPLETE` (some periods
   of the type missing — that quarter / year then falls back to the FULL target), `SPLIT_MIXED_TYPES`,
-  `SPLIT_NO_AGGREGATION` (a typed-in KPI: the split applies to its months only). It shows on the goal row and
+  `SPLIT_NO_AGGREGATION` (a typed-in KPI: each period uses only its own split). It shows on the goal row and
   the plan's readiness strip, because quarters and the year are built from the month splits
   (`resultRules`). *Source: DATX column "Phân bổ mục tiêu theo tháng"; ERD `GOAL_PERIOD_TARGET`.*
-  > **Pending (22/10/2026 meeting, §12):** PEND-04, 05 — an annual target is split straight into quarters (even or typed in), and quarters are tracked cumulatively against the year (`Q50`, `Q51`).
+  **The target of a period** (PEND-04, built 2026-10-23 — `calcRules.targetForPeriod` with the cycle's
+  periods, `resultRules.periodTarget`): its own split; else, for a **Month**, the split of the Quarter, then
+  Half, then Year holding it (`monthTargetFromSplit`, `ASSUMPTION Q67`): SUM → that split ÷ the calendar months
+  it covers (Q1 3,75 tỷ → 1,25 tỷ a month), AVG / LAST → the split itself, no aggregation → not computable; for a
+  **longer** period, its months' targets added up by the aggregation. A goal that **is** split never scores a
+  SUM (or typed-in) month or quarter against the annual target: a period with no split of its own and none to
+  derive from is **not computable** (`null`, `SPLIT_INCOMPLETE` warns); AVG / LAST and the Year fall back to the
+  goal's target. A goal with no split at all keeps its target in every period. Labels: the goal row and the
+  split panel say "Phân bổ theo quý" / "theo tháng" (`goalPlanRules.splitPeriodType`); the panel opens on the
+  saved type. Cumulative tracking (PEND-05, `Q51`) is Plan B's.
 
 ## 2. Processes (P1)
 
@@ -258,14 +267,22 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   Manager guide p. 26.*
 - **BR-KPI-19** — Forms are created by a **launch**: form type and workflow template; the step they start at
   (step 1, or the owner's own step — bottom-up, BR-KPI-12); timing — now, on a
-  date, or recurring (e.g. day 1 of each month); the evaluation period; a due date rule (e.g. 7 days
+  date, or recurring (e.g. the day after each quarter ends); the evaluation period; a due date rule (e.g. 7 days
   after launch); recipients — everyone, or a filter (units ± children, positions, job levels, employment
   status, named people). One launch creates many forms; recipients are resolved when it fires, and a
   subject who already has a non-cancelled form of the same type for the same period (or cycle, for
   registration) is skipped. A registration launch creates the subject's Draft Employee plan when there is
   none; Company and OrgUnit plans are registered by a form started by hand for the unit head. The
   recurring launch (`FORM_LAUNCH_RULE`, trigger `PERIOD_END` + `offsetDays` ≥ 0) moves from P2 into P1
-  because the monthly evaluation must launch itself, and fires once per (rule, period) (D5). Starting a
+  because the formal evaluation must launch itself, and fires once per (rule, period) (D5). **Which periods
+  (PEND-09, built 2026-10-23, `ASSUMPTION Q52`, `Q60`):** one table, `workflowRules.LAUNCH_PERIOD_TYPES` —
+  KPI_EVAL is for a **Quarter or the Year** (a Month / Half → ERR-KPI-06 `EVAL_PERIOD_NOT_FORMAL`; the monthly
+  continuous evaluation is the work review), WORK_PLAN / WORK_REVIEW for a Month (`MONTH_REQUIRED`). It holds
+  for `createLaunch` (`launchPeriodIssues`), for `saveLaunchRule` (`validateLaunchRule` refuses an ACTIVE rule
+  of another type; a stopped one may keep it — the seed's monthly rule launched T01–T03 and is off), and for
+  the scheduler, which never fires a stored launch or active rule of the wrong type (the rule fires nothing;
+  a Scheduled launch is cancelled). The seed runs a quarterly rule (Q1 fired 04-01) and an annual one (no Year
+  period yet, so it waits). Starting a
   unit plan's registration by hand needs a Company / OrgUnit plan that is not Locked and has no open
   registration; its subject is the unit head. The screen is "Bắt đầu đăng ký" on the cycle's Goal Plan list
   (`StartRegistrationButton`, pre-checked with `canStartForm`); its default due date is today + the sum of
@@ -274,7 +291,7 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   the Company plan's steps 1 and 3 have no actor and HR acts as proxy. A launch is NOW (fires at once, `scheduledAt` = now) or
   SCHEDULED (strictly in the future, fires at the first tick after); RECURRING comes only from a rule
   (`launchTimingIssues`). Only a Scheduled launch can be cancelled (`canCancelLaunch`, 04). A recurring
-  rule launches the **evaluation only**, whole days ≥ 0 (`validateLaunchRule`). Rules fire for periods
+  rule launches the **evaluation only**, for a quarter or the year, whole days ≥ 0 (`validateLaunchRule`). Rules fire for periods
   of **Active or Evaluating** cycles (product owner, Gate 1: the last month ends after the cycle moved
   to Evaluating). An evaluation form's items snapshot the **current** actual of (goal, period) at the
   moment the launch fires (BR-KPI-17). *Source: HR guide pp. 89–93.*
@@ -356,9 +373,11 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   "Chuyển cho nhân viên" and 100% / 5–8 are information only. A screen that cannot load an input shows the
   plan read-only ("UNKNOWN"), never editable.
 - **BR-KPI-22** — Out of P1: "Lấy ý kiến", "Thêm người duyệt" and the collaboration step (`ASSUMPTION
-  Q7`); the monthly work plan of PMGM.08 (`ASSUMPTION Q10`). The primary evaluation cadence is
-  **monthly** (`ASSUMPTION Q3`).
-  > **Pending (22/10/2026 meeting, §12):** PEND-09, 10 — the formal evaluation is quarterly and annual, monthly is continuous evaluation (`Q52`); probation evaluation moves into P1 (`Q53`).
+  Q7`). **Evaluation cadence (PEND-09, built 2026-10-23, replaces `Q3`):** the formal KPI evaluation is
+  **quarterly and annual** (KPI_EVAL, BR-KPI-19); the monthly continuous evaluation is the monthly work review
+  (PEND-14, `ASSUMPTION Q60`), and a month's KPI result is tracked, never paid (BR-KPI-40, `Q52`). The monthly
+  work plan of PMGM.08 is P1 item 4 (`Q59`, reopens `Q10`).
+  > **Pending (22/10/2026 meeting, §12):** PEND-10 — probation evaluation moves into P1 (`Q53`).
 
 ## 3. Calculation
 
@@ -481,8 +500,11 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   stored on its own. `ResultDetail.achievementPct` is the per-goal % (floor and cap already applied, or
   the FINAL column of the form); `weightedScore` = achievement × weight / 100. Rating and payout are
   **null while the score is provisional** — a goal not scored, or weights that do not total 100% (within
-  the BR-KPI-07 tolerance; Gate 1 QA). **Payout only for Employee plans** — a Company / OrgUnit plan
-  is rated but has no payout figure. The payout is read as of the **period's end date**, for the
+  the BR-KPI-07 tolerance; Gate 1 QA). **Payout only for Employee plans of a paid period** — a Company /
+  OrgUnit plan is rated but has no payout figure, and so is any **Month / Half** result: only a Quarter or the
+  Year is paid (`resultRules.PAID_PERIOD_TYPES`, `isPaidPeriod`; PEND-09, built 2026-10-23, `ASSUMPTION Q52`).
+  Screens show such a result's payout as "Theo dõi — không tính lương" (`resultView.payoutState(…, period)` →
+  `tracked`). The payout is read as of the **period's end date**, for the
   employee's unit chain and position on their last working day in the period (BR-KPI-24). The scale is
   the cycle's `ratingScaleId`. An adjustment is set on a **Draft** only and re-scores from the result's
   **stored details** (what HR is looking at), so an adjustment that crosses a level boundary re-rates
@@ -525,13 +547,17 @@ what they change: the seed predates these rules, and saving a seed row unchanged
   The form is the snapshot of the goals Active when it opened (BR-KPI-17), so every goal on it counts
   even if since Changed / Cancelled (E026's T01). **Company / OrgUnit plan** — `calcRules.achievement`
   on the **current** actuals of its Active goals; a Quarter / Half / Year with no own actual adds up its
-  months by the KPI's aggregation (`aggregatePeriodActuals`), the target likewise from the months' split
-  targets; a goal flagged `rollUpFromChildren` sums its CASCADE children (`ASSUMPTION Q8`); NO_ACTUAL
+  months by the KPI's aggregation (`aggregatePeriodActuals`), the target is `periodTarget` (BR-KPI-11 — the
+  same one an evaluation form snapshots; a SUM quarter with a gap in its split is not computable, never the
+  annual target); a goal flagged `rollUpFromChildren` sums its CASCADE children (`ASSUMPTION Q8`); NO_ACTUAL
   and NOT_COMPUTABLE stay null, never 0.
 - **BR-KPI-81** — **Payroll export** (`results.exportPayroll`, T6; `payrollRules.buildPayrollSheet`).
   **Who:** `result.export` (C&B, ADMIN) — HR finalises but does not export. **Which results:** the
   period's **Employee** results that are **Final or Locked** (`ASSUMPTION Q38`); Drafts and Company /
   OrgUnit results (no payout, BR-KPI-40) are never in the file, and the screen counts what it leaves out.
+  **Which periods (PEND-09, built 2026-10-23):** a Quarter or the Year only — a Month / Half is refused
+  (ERR-KPI-06 `PERIOD_NOT_PAID`, `payrollPreview` agrees: `notPaid`), and the export screen offers paid
+  periods only, opening on the latest one over. The seed's Q1 holds three Final results (E015, E016, E022).
   None qualifies → ERR-KPI-04 `NO_FINAL_RESULT`. **What:** one row per person, sorted by employee code
   (ties by result id) — code, name, unit and position of `resultRules.subjectAssignment` (the assignment
   the payout % was read for, from the current assignment rows, by their current names), Điểm KPI,
@@ -784,7 +810,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 |---|---|---|---|
 | Q1 | Does LEVELS interpolate between L1–L2–L3? | Yes, linear, capped at the top level | BR-KPI-33 |
 | Q2 | The rating scale and payout table? | Sample A+/A/B/C/D, marked as an assumption — **22/10:** chị Phương to send the real conversion table | BR-KPI-41, 42 |
-| Q3 | Main evaluation monthly or quarterly? | Monthly — **22/10 answered: quarterly and annual; monthly is continuous** — not built (PEND-09, `Q52`) | BR-KPI-22, seed |
+| Q3 | Main evaluation monthly or quarterly? | **Closed:** quarterly and annual; monthly is continuous (22/10 meeting) — **built 2026-10-23** (PEND-09, superseded by `Q52`, `Q60`) | BR-KPI-19, 22, seed |
 | Q4 | Is "Tỉ lệ KH cũ" higher-is-better? | Yes | BR-KPI-34 |
 | Q5 | BSC or "Hiệu quả / Khối lượng / Chi phí"? | BSC primary, the other a secondary tag | BR-KPI-06 |
 | Q6 | What are KRItc / KRIpt? | Field hidden | BR-KPI-06 |
@@ -833,7 +859,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q49 | May the system-computed % be overridden? | Not by the employee; the manager may, with a comment — **built 2026-10-23** | PEND-07, BR-KPI-16, 32 |
 | Q50 | The minutes' quarterly example (500 tr + 2 tỷ + 5 tỷ + 10 tỷ = 17.5 tỷ) does not equal the 15 tỷ annual target — are quarter targets per quarter or cumulative? | Per quarter; a total that does not match is a warning (BR-KPI-11) | PEND-04, BR-KPI-11 |
 | Q51 | How is "lũy kế" (cumulative) computed for ratios and stock? | By the KPI's aggregation over the cycle's months up to the period viewed: SUM → running sum, AVG → mean of the months that have a number, LAST → the latest number. A month with no actual is never 0 — the figure uses the months that have one and is flagged incomplete. The cumulative target adds up the same way: SUM → the months' splits, else quarter / half splits that tile the window exactly, else the annual target only for the whole cycle — never prorated; AVG → mean of each month's target, the goal's own target where a month has no split; LAST → the last month's (same fallback). A period result still needs every month (`aggregatePeriodActuals` → `null` on a gap); only the running figure is partial. With a month missing, both comparisons are **provisional** ("tạm tính") — a partial actual against the whole window's target. Shown two ways: against the cumulative target (on track) and against the annual target (year progress). TEXT goals, roll-up goals (Q8) and goals with no aggregation are not cumulated (`cumulativeRules.ts`) | PEND-05, BR-KPI-11, 44 |
-| Q52 | Is the monthly continuous evaluation scored and paid? Which period produces the payout %? | Monthly is tracked, not paid; quarters and the year are scored and paid | PEND-09, BR-KPI-19, 40, 44 |
+| Q52 | Is the monthly continuous evaluation scored and paid? Which period produces the payout %? | Monthly is tracked, not paid; quarters and the year are scored and paid — **built 2026-10-23** (closed on its default per plan 22/10 §2.5; HR + C&B may still change it) | PEND-09, BR-KPI-19, 40, 81 |
 | Q53 | Probation evaluation: steps, criteria (KPI or competency), trigger? | Three steps like KPI_EVAL — employee self-assesses → direct manager decides → HR records (PEND-08); criteria = the probation KPIs only (competency is P2); outcome Đạt / Không đạt / Gia hạn, the manager's call with a comment; launched automatically 7 days before the probation end date (hire date + the probation length on the employee); Đạt moves the employment status from Thử việc to Chính thức when HR records it. Product owner + HR to confirm before Đợt 6 | PEND-10 |
 | Q54 | Does "manual only in P1" also drop the Excel import of actuals? | **Resolved (product owner, 2026-10-21):** no — hand entry and Excel import in P1; the API sync stays on simulated data, tagged "Phase sau" | PEND-11, BR-KPI-53…56 |
 | Q55 | The PMGM guide has 5 calculation methods; the prototype has 6 — which goes? | **Checked 2026-10-23 (Đợt 0):** no source lists five methods — the PMGM guides describe one levels mechanism (numeric or Đạt/Không đạt target, xuôi / ngược direction, L1–L3 with a % per level: HR guide p. 23, 28; Manager guide p. 54); DATX adds "% thực tế / mục tiêu", "% mục tiêu / thực tế" and one stepped rule (sheet 2, E65). Mapped: RATIO_UP, RATIO_DOWN, LEVELS, BINARY, TIERED; **FORMULA has no source** and no seeded method or goal uses it. Default: hide FORMULA from the method picker (not deleted — a FORMULA method keeps computing, like BR-KPI-78) — **built 2026-10-23**; HR + BA to confirm | PEND-11, BR-KPI-30 |
@@ -851,7 +877,7 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q68 | May a monthly task run across months (carried-over work)? | Yes: a task must overlap the month, not lie inside it (`workRules.planSubmitIssues` `DATES_OUTSIDE_PERIOD` only for a task wholly outside) | PEND-14 |
 | Q69 | Who gets a monthly work review when the month's plan was never approved, or has no live task? | Nobody: the review launch skips a plan that is not Locked (`NO_APPROVED_PLAN`) or has no live task (`NO_WORK_TASKS`) — once a review exists the task list is frozen, so it could never be fixed or scored. HR approves or completes the plan first, then launches that person's review | PEND-14 |
 | Q70 | Who sees a monthly task marked "Riêng tư"? | The employee and the managers who see their month; the flag is stored and shown as a tag, **not enforced on reads** — reads are tenant-wide until Phase 5 RLS, and only `team.view` scopes ever list other people's months | PEND-14 |
-| Q67 | A goal split by quarter only: what is a month's target? (Today the annual target — wrong for a SUM KPI) | SUM → the quarter's target ÷ the quarter's months; AVG / LAST → the quarter's target | PEND-04, BR-KPI-11 |
+| Q67 | A goal split by quarter only: what is a month's target? (Was the annual target — wrong for a SUM KPI) | SUM → the quarter's target ÷ the quarter's calendar months; AVG / LAST → the quarter's target (for LAST that is the quarter-end stock, strict for its first months); a typed-in KPI → not computable; a split goal's SUM month with nothing to derive from → not computable — **built 2026-10-23** | PEND-04, BR-KPI-11 |
 
 **Status after Đợt 0 (2026-10-23).** Q2, Q44–Q70 have no answer yet from HR, C&B, BA or the product owner.
 Each change builds on the **Default in use** above and cites it as `ASSUMPTION Qn` in the rule it writes, so
@@ -1045,9 +1071,7 @@ the merge order of the two streams: `docs/plans/KPI_plan_A_kpi.md` §2.
 | Code | Change | Replaces / affects | Open points | Lane |
 |---|---|---|---|---|
 | PEND-03 | **Cascade chain Company → Khối → Phòng → employee**; a superior's KPI can be cascaded to a unit or to a named employee. *Partly built 2026-10-21:* a Company / OrgUnit goal cascades to the nearest planned units below (BR-KPI-07 unit targets). Left: a plan for every Khối whose director receives KPIs, the dashboard's Khối score (Q40), the direct vs Khối manager | BR-KPI-01, 07, 85 | Q40, Q56 | Large (fixtures) |
-| PEND-04 | **Annual target split into quarters** (or months) in the same cycle — even split or typed in. *Checked 2026-10-23 (Đợt 0):* the split, `SPLIT_MISMATCH` / `SPLIT_INCOMPLETE` and Company / OrgUnit quarter results already work. *A1 (2026-10-23):* an evaluation form now snapshots the period's target and the months' sum (BR-KPI-17). Left (A3): a month under a quarter-only split takes the annual target (Q67), and `resultRules.actualLines` still falls back to the annual target for a quarter with no split; clearer split labels. List: `KPI_update_plan_2210.md` §6 | BR-KPI-11, 44 | Q50, Q67 | KPI Rules |
-| PEND-05 | **Cumulative (lũy kế) tracking** of quarter / month figures against the annual plan, on results and dashboards. *Rules built 2026-10-23 (Plan B, B0):* `src/lib/cumulativeRules.ts` — running actual and target by aggregation, on-track and year-progress achievements (`ASSUMPTION Q51`); not wired to any screen yet. Left: a read hook, the "Lũy kế" column on the Goal Plan and Results, the dashboard toggle (Đợt 4); the month target of a quarter-only split once Q67 is built | BR-KPI-44, 83…88 | Q51, Q67 | KPI Rules |
-| PEND-09 | **Evaluation cadence**: formal evaluation quarterly and annual; monthly is continuous evaluation | BR-KPI-19, 22, 40, 44; `Q3` | Q52 | Workflow + KPI Rules |
+| PEND-05 | **Cumulative (lũy kế) tracking** of quarter / month figures against the annual plan, on results and dashboards. *Rules built 2026-10-23 (Plan B, B0):* `src/lib/cumulativeRules.ts` — running actual and target by aggregation, on-track and year-progress achievements (`ASSUMPTION Q51`); not wired to any screen yet. Left: a read hook, the "Lũy kế" column on the Goal Plan and Results, the dashboard toggle (Đợt 4); `cumulativeTarget` still reads `calcRules.targetForPeriod` without the cycle's periods, so a month under a quarter-only split takes the annual target there — pass the `SplitContext` (Q67, built 2026-10-23 in A3) | BR-KPI-44, 83…88 | Q51, Q67 | KPI Rules |
 | PEND-10 | **Probation evaluation** (thử việc → chính thức) moves into P1 (item 3, after items 1 and 4) | `FORM_TYPES` (`PROBATION_EVAL`, P2 today) | Q53 | Large |
 | PEND-12 | **Historical data import** (e.g. 10 years of Excel) by C&B / HR — low priority | — (new) | Q57 | Large |
 | PEND-13 | **Role dashboards**: leadership (BSC by company / Khối / unit), manager (direct reports' KPIs, registration status, results), HR (registration forms, overdue forms, results by period); filters by month, quarter and 6 months, with cumulative figures | BR-KPI-83…88 | Q51, Q58 | Medium |

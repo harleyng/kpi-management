@@ -46,11 +46,11 @@ beforeAll(() => {
 
 describe('AuditLogPage', () => {
   it('lists the newest 50 entries; "Tải thêm" brings the rest and the count follows', async () => {
-    // The seed holds 46 entries: five audited template edits take the log past one page.
+    // The seed holds 49 entries (A3 added the launch-rule switch): two audited template edits take the log past one page.
     const { gateway } = newGateway();
     const admin = SYNTRA.user(SYNTRA.personas.admin);
     const [template] = await gateway.system.listNotificationTemplates(SYNTRA.tenantId);
-    for (let i = 1; i <= 5; i++) await gateway.system.saveNotificationTemplate(SYNTRA.tenantId, admin, { ...template, subject: `${template.subject} (${i})` });
+    for (let i = 1; i <= 2; i++) await gateway.system.saveNotificationTemplate(SYNTRA.tenantId, admin, { ...template, subject: `${template.subject} (${i})` });
     renderPage('/system/audit-log', gateway);
     await screen.findAllByRole('button', { name: /^Xem chi tiết/ });
     expect(bodyRows()).toHaveLength(50);

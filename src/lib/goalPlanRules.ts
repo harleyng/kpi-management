@@ -332,6 +332,22 @@ export function evenSplit(
   }));
 }
 
+/**
+ * The period type a goal's target is split by (BR-KPI-11, PEND-04 — the "Phân bổ theo quý / tháng" label
+ * on the goal row and the split panel): `null` when nothing is split; with mixed types
+ * (`SPLIT_MIXED_TYPES`) the type of the earliest split period. Rows of unknown periods are ignored.
+ */
+export function splitPeriodType(
+  goalId: Id,
+  targets: readonly Pick<GoalPeriodTarget, 'goalId' | 'periodId'>[],
+  periods: readonly Pick<CyclePeriod, 'id' | 'periodType' | 'startDate'>[],
+): PeriodType | null {
+  const byId = new Map(periods.map((p) => [p.id, p]));
+  const split = targets.flatMap((t) => (t.goalId === goalId && byId.has(t.periodId) ? [byId.get(t.periodId) as Pick<CyclePeriod, 'periodType' | 'startDate'>] : []));
+  if (split.length === 0) return null;
+  return split.reduce((first, p) => (p.startDate < first.startDate ? p : first)).periodType;
+}
+
 /** Within the split tolerance: relative 1e-6, with an absolute 0.005 floor only for a target below 1. */
 function splitMatches(expected: number, actual: number): boolean {
   const tolerance = Math.abs(expected) < 1 ? 0.005 : Math.abs(expected) * 1e-6;
@@ -346,9 +362,11 @@ function splitMatches(expected: number, actual: number): boolean {
  * - nothing split, a TEXT goal, or no target → none (the goal's own target applies to every period);
  * - `SPLIT_MIXED_TYPES` — months and quarters mixed in one split;
  * - `SPLIT_NO_AGGREGATION` — informational: a KPI typed in (no library item) has no aggregation, so
- *   the split applies to its months only and quarters fall back to the goal's target;
- * - `SPLIT_INCOMPLETE` — some periods of that type have no split (`data`: covered / total): such a
- *   quarter or year falls back to the goal's FULL target;
+ *   each period uses only its OWN split — a quarter is not added up from months, a month is not derived
+ *   from its quarter (`calcRules.monthTargetFromSplit` → not computable, ASSUMPTION Q67);
+ * - `SPLIT_INCOMPLETE` — some periods of that type have no split (`data`: covered / total): a SUM
+ *   quarter holding such a period has no target (not computable, never the annual one); an AVG / LAST
+ *   one, and the year, use the goal's target (`resultRules.periodTarget`);
  * - `SPLIT_MISMATCH` — SUM: Σ ≠ target; AVG: the mean ≠ target; LAST: the last period (by date) ≠
  *   target (`data`: expected, actual, aggregation).
  */

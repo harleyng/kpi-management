@@ -292,13 +292,15 @@ const byStart = (a: CyclePeriod, b: CyclePeriod) => (a.startDate < b.startDate ?
 
 /**
  * The period a results screen opens on (T6): the latest MONTH already over on `today` (in the tenant
- * zone) — its evaluation is the newest that can have a result — else the cycle's first month, else
- * its first period. `null` for no periods.
+ * zone) — its evaluation is the newest that can have a result — else the cycle's first month. A list
+ * with no month (the payroll screen offers quarters and the year only, PEND-09) works the same way on
+ * its own periods: the latest one over, else the first. `null` for no periods.
  */
 export function defaultResultPeriod(periods: readonly CyclePeriod[], today: string): CyclePeriod | null {
   const months = periods.filter((p) => p.periodType === 'Month').sort(byStart);
-  const over = months.filter((p) => p.endDate < today);
-  return over[over.length - 1] ?? months[0] ?? [...periods].sort(byStart)[0] ?? null;
+  const pool = months.length > 0 ? months : [...periods].sort(byStart);
+  const over = pool.filter((p) => p.endDate < today).sort((a, b) => (a.endDate < b.endDate ? -1 : a.endDate > b.endDate ? 1 : byStart(a, b)));
+  return over[over.length - 1] ?? pool[0] ?? null;
 }
 
 /**

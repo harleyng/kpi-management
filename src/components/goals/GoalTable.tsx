@@ -8,9 +8,10 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CALC_METHOD_TYPE_LABEL, type Goal } from '@/data/types';
 import type { GoalLookups, PlanWorkspaceData } from '@/hooks/queries/goals';
+import { splitPeriodType } from '@/lib/goalPlanRules';
 import type { QueryState } from '@/lib/queryState';
 import { cn, formatNumber } from '@/lib/utils';
-import { formatTarget, formatWeight, issueText } from './goalCopy';
+import { formatTarget, formatWeight, issueText, splitLabel } from './goalCopy';
 
 /** What a row menu may do, and why not (shown as the disabled item's tooltip — never hidden). */
 export interface GoalRowActions {
@@ -141,9 +142,11 @@ export function GoalTable({ data, lookups, query, actions, showBuckets }: GoalTa
       numeric: true,
       cell: (goal) => {
         const levels = data.levels.filter((l) => l.goalId === goal.id);
+        const split = splitPeriodType(goal.id, data.periodTargets, data.periods);
         return (
           <div>
             <div className="whitespace-nowrap">{formatTarget(goal, lookups.unit.get(goal.unitId))}</div>
+            {split && <div className="whitespace-nowrap text-xs text-muted-foreground">{splitLabel(split)}</div>}
             {levels.length > 0 && (
               <div className="text-xs text-muted-foreground" aria-label={`Có ${levels.length} định mức`}>
                 Định mức {levels.map((l) => l.levelCode).sort().join(', ')}

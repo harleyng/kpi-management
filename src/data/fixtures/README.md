@@ -9,9 +9,9 @@ The seven Phase 2 tracks (T1–T7, `docs/plans/KPI_repo_plan.md` §6.3) run **in
 they all read the same seed — no track waits for another track's screens.
 
 **Frozen at Gate 1 (2026-10-19), `SEED_VERSION` = `2027-04-06.G1`; re-frozen 2026-10-23 by Plan A's A1
-(evaluation items), Plan B 8.1 (monthly work, 55 entities), Plan A's A2 and Plan B 8.2 (3-step WORK_PLAN):
-`SEED_VERSION` = `2027-04-06.A1.B1.A2.B2`.** `freeze.test.ts` pins the seed
-hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (49). A failing
+(evaluation items), Plan B 8.1 (monthly work, 55 entities), Plan A's A2, Plan B 8.2 (3-step WORK_PLAN) and
+Plan A's A3 (PEND-09: quarterly evaluation, Q1): `SEED_VERSION` = `2027-04-06.A1.B1.A2.B2.A3`.** `freeze.test.ts`
+pins the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (55). A failing
 freeze test means a fixture or the `DataGateway` contract changed — a **Large** change:
 1. `system-architect` reviews it;
 2. every other track is told before merge;
@@ -57,7 +57,7 @@ wired `exportPayroll` without seeding one — a demo starts with no export; `EMP
 - Every state of every status set appears (plan §6.4); the few that cannot are listed with a reason in
   `seed.test.ts` (`STATE_EXEMPTIONS`).
 - Values that depend on an open question are marked `// ASSUMPTION Qn`.
-- The serialised seed stays under 1.5 M characters (localStorage holds about 5 M).
+- The serialised seed stays under 1.8 M characters (localStorage holds about 5 M; about 1.73 M after A3).
 
 ## The story (Syntra, as of `SEED_NOW` = 2027-04-06 09:00, Asia/Ho_Chi_Minh)
 
@@ -98,6 +98,10 @@ history produces; `seed.test.ts` checks that only the one named form is overdue 
   by 08:30. T03's CRM file is a **separate batch still Validating, with two row errors**, so CRM goals
   have no T03 actual. One T02 value was corrected by hand on 03-05 (the old snapshot kept, not current).
   A Library import batch was Rejected in February.
+- **Evaluation cadence (PEND-09, A3).** The monthly KPI_EVAL rule ran T01–T03 and HR switched it off on 04-01
+  (audited); the formal evaluation is quarterly and annual — an active **quarterly** rule (Q1 fired at the 04-01
+  tick) and an active **annual** rule that waits for a Year period (the seed has none, so the Year path has no
+  seed coverage). The months below are history: their results are scored and rated but carry **no payout**.
 - **Evaluations** (recurring rule PERIOD_END + 1, due 12 days, SLA 6/4/2). Recipients follow 1.5's
   `resolveRecipients`: staff employed in the period whose plan was Approved/Locked at launch — so the
   five AUTO_LOCKed staff are evaluated too; E018 is not (no plan on 04-01). 27 forms per month:
@@ -110,22 +114,29 @@ history produces; `seed.test.ts` checks that only the one named form is overdue 
     saved — EDIT, still Open — and three with evidence), E015, E016, E029, E034 at the manager, E020
     and E038 at HR (E020's manager step by the ACTIVE delegate E019 for E007); **E024 Cancelled** by
     HR on 04-02 (left on 03-10).
+  - **Q1** (`EVAL-Q1`, the quarterly rule, 04-01, due 04-13) to the same 27 people: **E015, E016, E022
+    Completed** (self 04-02, manager 04-03/04, HR 04-05; snapshots = the quarter as `resultRules` reads it from
+    the actuals recorded by 04-01 — months added up, the quarter's target, never the year's); 24 Open at
+    step 1, E024 included (worked until 03-10 — the step-1 AUTO_FORWARD hands it to the manager).
 - **The one unhandled overdue step:** E029's open adjustment (GOAL_CHANGE, started 03-30) — its step-2
   deadline 04-02 fell after the last tick. Move the clock or run the scheduler to see REMIND.
 - **Launches.** Registration 01-04 (Launched), new-hire 04-05 (Launched), T01–T03 evaluations
-  (RECURRING), "đợt 2" for Probation staff on 04-15 (Scheduled), "đợt 1" (Cancelled before it fired).
+  (RECURRING, the stopped monthly rule), Q1 (RECURRING, the quarterly rule), "đợt 2" for Probation staff on 04-15 (Scheduled), "đợt 1" (Cancelled before it fired).
 - **Delegations** (KPI_EVAL): active E007 → E019 (04-01…04-15), expired E008 → E006 (03-01…03-15),
   revoked E011 → E031 (03-01…04-30, revoked 03-20).
 - **Results** (`syntra/results.ts`, run last, through `resultRules` — the gateway recalculating a Draft
   reproduces its row exactly). An Employee plan has a result only from a COMPLETED evaluation form
   (FINAL column, `ASSUMPTION Q17`); Company / department plans are scored from the current actuals.
-  **T01** Locked — adjustments E016 −2 and E023 +2 (88.97 C → 90.97 B, payout 50% → 80%); E027 stays
+  Months are **tracked, not paid** (PEND-09): no payout % on any T0x result.
+  **T01** Locked — adjustments E016 −2 and E023 +2 (88.97 C → 90.97 B); E027 stays
   Draft (its plan stopped at 3 goals, 75%). **T02** Final — E040 −2 (100.30 A → 98.30 B); Draft: E023
   (held — its manager step was a delegate's), E027 (75%) and the company plan (an ERP Sale record never
   arrived); E025, E026, E028, E037, E041 have no completed form, so no result. **T03** calculated only:
   the ten unit plans Draft (CSKH and Mua hàng incomplete — the CRM batch is still Validating).
-  Finalised on the evaluation deadline at 09:00 (02-13, 03-13). No payroll export yet. Demo Co: T01
-  calculated, D003 Final, its company plan Draft (no actual).
+  **Q1** — E015, E016, E022 Final on 04-05 16:00 **with a payout %** (the payroll export's data); every
+  unit plan held Draft. Months finalised on the evaluation deadline at 09:00 (02-13, 03-13). No payroll
+  export yet. Demo Co: T01 calculated, D003 Final (tracked); its monthly rule off, a quarterly rule, a Q1
+  period and D003's completed Q1 form → Final and paid; its company plan Draft (no actual).
 - **Rating** "Thang mẫu A+/A/B/C/D (giả định Q2)": A+ [110,120] 120% · A [100,110) 100% · B [90,100)
   80% · C [70,90) 50% · D [0,70) 0%; Kinh doanh pays 130% for A+ (an OrgUnit payout rule). The 2026
   scale is Inactive.

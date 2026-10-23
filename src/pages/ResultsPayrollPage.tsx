@@ -26,7 +26,7 @@ const EMPTY_LEVELS: never[] = [];
  */
 export default function ResultsPayrollPage({ section }: { section: ResultsSection }) {
   const { title, description } = SECTIONS[section];
-  const selection = useResultPeriod();
+  const selection = useResultPeriod({ paidOnly: section === 'payroll' });
   const { cycle, period } = selection;
   const scaleId = cycle?.ratingScaleId ?? null;
   const scales = useRatingScales();

@@ -125,7 +125,7 @@ ghi nhận và khóa lại. Chỉ tiêu bị đổi hoặc hủy giữ lịch s�
 - Chỉ khi bước cuối duyệt, hệ thống mới áp dụng: chỉ tiêu sửa sinh bản mới (bản cũ chuyển "Đã thay đổi"
   và vẫn tra lại được), chỉ tiêu hủy chuyển "Đã hủy".
 
-## 4. Quy trình 3 — Đánh giá KPI tháng (KPI_EVAL)
+## 4. Quy trình 3 — Đánh giá KPI quý / năm (KPI_EVAL)
 
 ```mermaid
 sequenceDiagram
@@ -133,7 +133,7 @@ sequenceDiagram
   participant NV as Nhân viên
   participant QL as Quản lý trực tiếp
   participant HR as HR / C&B
-  SYS->>NV: Tự khởi chạy ngày 1 hằng tháng, hạn 7 ngày
+  SYS->>NV: Tự khởi chạy ngày đầu tiên sau khi quý (năm) kết thúc, hạn 12 ngày
   NV->>QL: B1. Nhập số thực tế từng chỉ tiêu + giải trình + bằng chứng — hệ thống tính %
   Note over NV,QL: Quá hạn → phiếu tự chuyển sang quản lý (SF4C PMGM.09)
   QL->>HR: B2. Quyết định % (mặc định = % hệ thống tính; chấm khác thì nhận xét)
@@ -150,9 +150,18 @@ sequenceDiagram
   **khóa** khi quá hạn, phiếu dừng tại bước đó; HR mở khóa Goal Plan phải nhập **hạn mới**, bước chạy lại
   từ lúc mở khóa.
 - Thao tác thay (HR làm thay) và ủy quyền đều ghi nhận **cả hai người**.
-- Đợt đánh giá tháng tự khởi chạy ngày 1 tháng sau (một lần cho mỗi kỳ), kể cả khi chu kỳ đã sang
-  *Đang đánh giá* (tháng 12). HR cũng có thể khởi chạy *ngay* hoặc *hẹn ngày*; đợt hẹn ngày chỉ hủy
+- **Nhịp đánh giá (PEND-09, đã làm 23/10):** phiếu đánh giá KPI là đánh giá **chính thức**, chỉ cho kỳ **quý và
+  năm**; hằng tháng là đánh giá liên tục bằng phiếu đánh giá công việc tháng (Q52, Q60). Khởi chạy cho một tháng
+  (hay nửa năm) bị từ chối ("Đánh giá KPI chính thức theo quý hoặc năm"). Lịch tự khởi chạy chỉ bật được cho quý
+  hoặc năm; lịch tháng cũ chỉ còn để tắt (dữ liệu mẫu: lịch tháng đã chạy T01–T03 rồi tắt, lịch quý chạy Q1 ngày
+  01/04). Hệ thống không bao giờ tự chạy một đợt tháng còn lưu từ trước (lịch bật nhầm không tạo gì; đợt hẹn
+  ngày bị hủy).
+- Đợt đánh giá quý tự khởi chạy ngày đầu tiên sau khi quý kết thúc (một lần cho mỗi kỳ); đợt năm tương tự, kể
+  cả khi chu kỳ đã sang *Đang đánh giá*. HR cũng có thể khởi chạy *ngay* hoặc *hẹn ngày*; đợt hẹn ngày chỉ hủy
   được khi chưa chạy.
+- **Kết quả tháng chỉ theo dõi:** vẫn có điểm và xếp loại nhưng **không có % hưởng lương KPI** (hiện "Theo dõi —
+  không tính lương"); chỉ kết quả **quý và năm** ra % lương và vào **file lương** (màn hình xuất file chỉ cho
+  chọn quý / năm).
 - Số thực tế trên phiếu là **ảnh chụp lúc khởi chạy**, không sửa trên phiếu.
 - Nhắc hạn gửi trước hạn bước **theo cấu hình của bước** ("Nhắc trước … ngày", mẫu hiện tại: 1 ngày);
   hệ thống có thể nhắc lại ở mỗi lần chạy nhưng mỗi người chỉ nhận **một** thông báo cho mỗi lần vào bước.
@@ -368,6 +377,11 @@ sequenceDiagram
 
 - KPI giao **cho cả năm** (ví dụ doanh thu 15 tỷ), rồi phân bổ cho từng **quý** (hoặc tháng) trong cùng chu
   kỳ — **chia đều** hoặc **nhập tay** từng quý (ví dụ Q1 500 triệu, Q2 2 tỷ, Q3 5 tỷ, Q4 10 tỷ — xem Q50).
+- *Đã làm 23/10 (A3):* **mục tiêu tháng khi chỉ phân bổ theo quý** (Q67): chỉ tiêu cộng dồn (Tổng) lấy mục tiêu
+  quý chia số tháng của quý (3,75 tỷ → 1,25 tỷ mỗi tháng, không còn dùng 15 tỷ của năm); trung bình / lấy kỳ cuối
+  dùng đúng mục tiêu quý; KPI ngoài thư viện thì tháng không tính được. Chỉ tiêu đã phân bổ mà thiếu kỳ: với
+  kiểu Tổng, kỳ thiếu và quý chứa nó **không tính được %** (không bao giờ so với mục tiêu năm). Dòng chỉ tiêu và
+  tiêu đề panel ghi rõ "Phân bổ theo quý" / "Phân bổ theo tháng".
 - Chỉ tiêu quý / tháng được theo dõi **lũy kế** (từ đầu chu kỳ đến kỳ đang xem) so với kế hoạch năm (Q51):
   cộng (SUM) thì cộng dồn, trung bình (AVG) thì trung bình các tháng có số, cuối kỳ (LAST) thì lấy số mới nhất.
   Tháng thiếu số không tính là 0 — số lũy kế ghi "chưa đủ". Hai cách so: với **mục tiêu lũy kế** (đúng tiến độ
@@ -408,7 +422,8 @@ sequenceDiagram
 - **Phase 1** gồm: (mục 1) giao nhận và đánh giá KPI **theo quý và năm**; (mục 4) đánh giá hiệu suất **liên
   tục hằng tháng** và dashboard; (mục 3) **đánh giá thử việc lên chính thức**. Làm mục 1 và 4 trước, rồi mục 3.
 - **Phase 2**: đánh giá 360 độ, Bell Curve (phân bổ chuẩn), đào tạo và phát triển (OD), năng lực (Competency).
-- **Nhịp đánh giá** (thay Q3): đánh giá chính thức theo quý và năm; hằng tháng là đánh giá liên tục (Q52).
+- **Nhịp đánh giá** (thay Q3): đánh giá chính thức theo quý và năm; hằng tháng là đánh giá liên tục (Q52). *Đã làm
+  23/10 (A3) — xem mục 4.*
 - **Đánh giá thử việc** chuyển từ P2 vào P1 (Q53).
 - **Nguồn số liệu**: Phase 1 **chỉ nhập tay** — đã làm 21/10 theo hướng nhập tay + import Excel, đồng bộ API để Phase
   sau (Q54). Thư viện KPI theo tài liệu PMGM có **5 phương pháp tính** (Q55).
@@ -490,7 +505,7 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 | 4 | Không thấy phần chưa giao | Hệ thống tính "chưa giao" cho từng KPI cascade | Quản lý giao đủ, không giao vượt | BR-KPI-07 |
 | 5 | Số liệu không nguồn, không bằng chứng | Mỗi KPI có nguồn; mỗi số ghi rõ tay / Excel (API: phase sau); bằng chứng đính kèm | Kiểm chứng được khi chấm | BR-KPI-05, 52 |
 | 6 | Tổng hợp cuối kỳ trong sheet TH KQ | Điểm, xếp loại, % hưởng lương KPI tính tự động; file lương xuất từ kết quả đã chốt; dashboard sống | Ban điều hành thấy ngay; C&B không chép số tay | BR-KPI-35, 40–46 |
-| 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch (ngày 1 hằng tháng) | Không quên kỳ nào | BR-KPI-19 (D5) |
+| 7 | Phiếu đánh giá tháng gửi tay | Tự khởi chạy theo lịch: quý và năm, ngày đầu tiên sau khi kỳ kết thúc (PEND-09) | Không quên kỳ nào | BR-KPI-19 (D5) |
 | 8 | Mỗi phòng tự gõ bộ KPI trong sheet riêng, tổng trọng số có bộ không đủ 100% | Thư viện chỉ tiêu mẫu và bộ mẫu dùng chung; trọng số lệch được cảnh báo | Cùng tên, cùng cách tính giữa các phòng | BR-KPI-74…80 |
 
 **Thay đổi so với prototype hiện tại (buổi họp 22/10/2026, chưa làm — mục 4G):**
@@ -498,9 +513,9 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 | Mã | Prototype hiện tại | Sau buổi họp | Lý do | Ảnh hưởng |
 |---|---|---|---|---|
 | PEND-03 | Đã giao được từ Goal Plan công ty / đơn vị xuống đơn vị gần nhất có kế hoạch (21/10); Khối có thể không có Goal Plan (Q40) | Công ty → Khối → Phòng → NV; giao cho đơn vị hoặc NV | Đúng cơ cấu tập đoàn | Còn lại: Goal Plan của mọi Khối, điểm Khối trên dashboard (Q40, Q56) |
-| PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | `goalPlanRules`, `resultRules`. Đã có: chia quý, cảnh báo; phiếu quý dùng mục tiêu quý (23/10). Còn: tháng khi chỉ chia quý (Q67), nhãn |
+| PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | **Đã làm 23/10 (A1, A3):** chia quý, cảnh báo, phiếu quý dùng mục tiêu quý, tháng khi chỉ chia quý (Q67), nhãn "Phân bổ theo quý / tháng" |
 | PEND-05 | Không có số lũy kế | Theo dõi lũy kế so với kế hoạch năm | Quản lý thấy tiến độ năm | Quy tắc mới, kết quả, dashboard |
-| PEND-09 | Đánh giá chính theo tháng (Q3) | Chính thức theo quý và năm; tháng là đánh giá liên tục | Phạm vi P1 mục 1 và 4 | Khởi chạy, kết quả, % lương |
+| PEND-09 | Đánh giá chính theo tháng (Q3) | Chính thức theo quý và năm; tháng là đánh giá liên tục | Phạm vi P1 mục 1 và 4 | **Đã làm 23/10 (A3):** khởi chạy và lịch chỉ quý / năm, kết quả tháng không % lương, file lương chỉ quý / năm |
 | PEND-10 | Đánh giá thử việc để P2 | Vào P1 (mục 3) | Phạm vi P1 | Loại phiếu mới (lớn) |
 | PEND-12 | Chưa có import dữ liệu lịch sử | Có, do C&B / HR, ưu tiên thấp | Dữ liệu tham chiếu | Tính năng mới |
 | PEND-13 | Dashboard: Tổng quan + Vận hành | Ba góc nhìn lãnh đạo / quản lý / HR; lọc tháng, quý, 6 tháng; lũy kế | Mỗi vai trò cần số khác nhau | `dashboardRules`, màn hình Dashboard |
@@ -513,7 +528,7 @@ trực tiếp đến quy trình:
 
 | # | Câu hỏi | Mặc định | Người trả lời |
 |---|---|---|---|
-| Q3 | Đánh giá chính theo tháng hay quý? | Tháng — **buổi họp 22/10 đã trả lời: quý và năm, tháng là đánh giá liên tục** (PEND-09; chi tiết còn mở ở Q52) | HR |
+| Q3 | Đánh giá chính theo tháng hay quý? | **Đã đóng:** quý và năm; tháng là đánh giá liên tục (buổi họp 22/10; làm 23/10 theo Q52, Q60) | HR |
 | Q7 | P1 có "Lấy ý kiến", "Thêm người duyệt", bước hợp tác không? | Không (để P2) | Product owner + HR |
 | Q10 | "Kế hoạch công việc tháng" (PMGM.08) có thuộc P1 không? | Không — **22/10: mở lại**, xem Q59 | Product owner |
 | — | Goal Plan có trạng thái "Bị trả lại" riêng không? (Plan có, ERD chưa có) | Có — chốt ở Phase 1.1 | System architect + HR |

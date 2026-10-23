@@ -10,12 +10,12 @@ import { Switch } from '@/components/ui/switch';
 import { DataTable, type DataTableColumn } from '@/components/shared/DataTable';
 import { FormField } from '@/components/shared/FormField';
 import { toastError } from '@/components/shared/toastError';
-import { PERIOD_TYPES, PERIOD_TYPE_LABEL, type FormLaunchRule, type PeriodType, type RecipientFilter, type RecipientMode } from '@/data/types';
+import { PERIOD_TYPE_LABEL, type FormLaunchRule, type PeriodType, type RecipientFilter, type RecipientMode } from '@/data/types';
 import type { Upsert } from '@/integrations/data/types';
 import { useLaunchRules, useSaveLaunchRule, useWorkflows } from '@/hooks/queries/forms';
 import { ERROR_CATALOG } from '@/lib/errorCatalog';
 import { combineQueries } from '@/lib/queryState';
-import { validateLaunchRule } from '@/lib/workflowRules';
+import { LAUNCH_PERIOD_TYPES, validateLaunchRule } from '@/lib/workflowRules';
 import { RecipientFilterFields } from './RecipientFilterFields';
 import { EMPTY_RECIPIENT_FILTER, recipientSummary } from './recipients';
 
@@ -24,12 +24,14 @@ const RULE_HINT: Record<string, string> = {
   OFFSET_DAYS_INVALID: 'Nhập số ngày nguyên, không âm.',
   DUE_DAYS_INVALID: 'Nhập số ngày nguyên, không âm.',
   FILTER_REQUIRED: 'Chọn điều kiện người nhận.',
+  EVAL_PERIOD_NOT_FORMAL: 'Đánh giá KPI chạy theo quý hoặc năm. Lịch theo tháng chỉ để tắt.',
 };
 
 /**
- * "Lịch tự khởi chạy" (D5, BR-KPI-19): the recurring rules that launch the monthly evaluation by
- * themselves — `PERIOD_END` + N days (`ASSUMPTION Q3`: monthly). Evaluation only (`validateLaunchRule`);
- * a rule fires once per (rule, period) when the scheduler runs.
+ * "Lịch tự khởi chạy" (D5, BR-KPI-19): the recurring rules that launch the formal evaluation by
+ * themselves — `PERIOD_END` + N days, for a quarter or the year (PEND-09, `ASSUMPTION Q52`, `Q60`).
+ * Evaluation only (`validateLaunchRule`); an old monthly rule may stay, switched off. A rule fires once
+ * per (rule, period) when the scheduler runs.
  */
 export function LaunchRulesTab() {
   const rules = useLaunchRules();
@@ -89,9 +91,9 @@ export function LaunchRulesTab() {
 function LaunchRuleDialog({ rule, onClose }: { rule: FormLaunchRule | null; onClose: () => void }) {
   const workflows = useWorkflows('KPI_EVAL');
   const save = useSaveLaunchRule();
-  const [name, setName] = useState(rule?.name ?? 'Đánh giá KPI hằng tháng');
+  const [name, setName] = useState(rule?.name ?? 'Đánh giá KPI hằng quý');
   const [workflowId, setWorkflowId] = useState(rule?.workflowId ?? null);
-  const [periodType, setPeriodType] = useState<PeriodType>(rule?.periodType ?? 'Month');
+  const [periodType, setPeriodType] = useState<PeriodType>(rule?.periodType ?? 'Quarter');
   const [offsetDays, setOffsetDays] = useState(String(rule?.offsetDays ?? 1));
   const [dueDays, setDueDays] = useState(String(rule?.dueDays ?? 7));
   const [mode, setMode] = useState<RecipientMode>(rule?.recipientMode ?? 'ALL');
@@ -100,6 +102,9 @@ function LaunchRuleDialog({ rule, onClose }: { rule: FormLaunchRule | null; onCl
   const [tried, setTried] = useState(false);
 
   const workflow = workflows.data?.find((w) => w.id === workflowId) ?? workflows.data?.find((w) => w.isDefault) ?? workflows.data?.[0];
+  // PEND-09 — a quarter or the year; a stopped monthly rule keeps showing its own type.
+  const allowedTypes = LAUNCH_PERIOD_TYPES[workflow?.formType ?? 'KPI_EVAL'] ?? [];
+  const periodTypeChoices = rule && !allowedTypes.includes(rule.periodType) ? [rule.periodType, ...allowedTypes] : allowedTypes;
   const asInt = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text) : Number.NaN);
   const draft: Upsert<FormLaunchRule> = {
     ...(rule ? { id: rule.id } : {}),
@@ -167,14 +172,14 @@ function LaunchRuleDialog({ rule, onClose }: { rule: FormLaunchRule | null; onCl
               </Select>
             )}
           </FormField>
-          <FormField label="Loại kỳ" required>
+          <FormField label="Loại kỳ" required error={hint('periodType')}>
             {(control) => (
               <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
                 <SelectTrigger {...control}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PERIOD_TYPES.map((t) => (
+                  {periodTypeChoices.map((t) => (
                     <SelectItem key={t} value={t}>
                       {PERIOD_TYPE_LABEL[t]}
                     </SelectItem>

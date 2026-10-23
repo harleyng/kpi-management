@@ -5,6 +5,7 @@ import type { CyclePeriod, Id, PerformanceCycle } from '@/data/types';
 import { useCycles, usePeriods } from '@/hooks/queries/goals';
 import { defaultResultCycle, defaultResultPeriod } from '@/lib/cycleRules';
 import { combineQueries, type QueryState } from '@/lib/queryState';
+import { isPaidPeriod } from '@/lib/resultRules';
 
 export interface ResultPeriodSelection {
   cycles: PerformanceCycle[] | undefined;
@@ -22,8 +23,10 @@ export interface ResultPeriodSelection {
  * falls back to the default (`cycleRules.defaultResult*`) and the URL is REPLACED, never pushed — and
  * nothing is decided before both lists have loaded.
  */
-export function useResultPeriod(options: { withPeriod?: boolean } = {}): ResultPeriodSelection {
+export function useResultPeriod(options: { withPeriod?: boolean; paidOnly?: boolean } = {}): ResultPeriodSelection {
   const withPeriod = options.withPeriod ?? true;
+  // The payroll screen offers only the paid periods: quarters and the year (PEND-09).
+  const paidOnly = options.paidOnly ?? false;
   const { today } = useSession();
   const [params, setParams] = useSearchParams();
   const cyclesQuery = useCycles();
@@ -35,7 +38,7 @@ export function useResultPeriod(options: { withPeriod?: boolean } = {}): ResultP
   }, [cycles, params, today]);
 
   const periodsQuery = usePeriods(cycle?.id ?? null);
-  const periods = periodsQuery.data;
+  const periods = useMemo(() => (paidOnly ? periodsQuery.data?.filter(isPaidPeriod) : periodsQuery.data), [paidOnly, periodsQuery.data]);
   const period = useMemo(() => {
     if (!withPeriod || !periods) return null;
     return periods.find((p) => p.id === params.get('period')) ?? defaultResultPeriod(periods, today);

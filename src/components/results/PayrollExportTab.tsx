@@ -25,7 +25,7 @@ interface PayrollExportTabProps {
 export function PayrollExportTab({ cycle, period }: PayrollExportTabProps) {
   const { can, people } = useSession();
   const mayExport = can('result.export');
-  const { preview, query } = usePayrollPreview(period.id, cycle.id);
+  const { preview, query } = usePayrollPreview(period, cycle.id);
   const exports = usePayrollExports(period.id);
   const exportPayroll = useExportPayroll();
   const download = useDownloadFile();
@@ -78,7 +78,11 @@ export function PayrollExportTab({ cycle, period }: PayrollExportTabProps) {
         {preview && (
           <div className="space-y-2 text-sm">
             <p className="font-medium">
-              {preview.exportable > 0 ? `${preview.exportable} kết quả cá nhân sẽ có trong file.` : 'Chưa có kết quả cá nhân đã chốt trong kỳ này.'}
+              {preview.notPaid
+                ? 'Kỳ này chỉ để theo dõi; file lương chỉ xuất kết quả quý và năm.'
+                : preview.exportable > 0
+                  ? `${preview.exportable} kết quả cá nhân sẽ có trong file.`
+                  : 'Chưa có kết quả cá nhân đã chốt trong kỳ này.'}
             </p>
             {preview.noPayout > 0 && (
               <p className="flex items-start gap-2 text-support-warning">

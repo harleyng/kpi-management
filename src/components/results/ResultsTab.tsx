@@ -138,7 +138,7 @@ export function ResultsTab({ cycle, period, levels, scaleName }: ResultsTabProps
     { id: 'score', header: 'Điểm KPI', numeric: true, sortValue: (r) => r.result.totalScore, cell: (r) => <ScoreValue result={r.result} /> },
     { id: 'adjustment', header: 'Điều chỉnh (điểm)', numeric: true, sortValue: (r) => r.result.adjustmentPct, cell: (r) => <AdjustmentValue points={r.result.adjustmentPct} /> },
     { id: 'rating', header: 'Xếp loại', sortValue: (r) => r.level?.minScore ?? null, cell: (r) => <RatingValue result={r.result} level={r.level} /> },
-    { id: 'payout', header: '% hưởng lương KPI', numeric: true, sortValue: (r) => r.result.payoutPct, cell: (r) => <PayoutValue state={payoutState(r.result, levels)} /> },
+    { id: 'payout', header: '% hưởng lương KPI', numeric: true, sortValue: (r) => r.result.payoutPct, cell: (r) => <PayoutValue state={payoutState(r.result, levels, period)} /> },
     { id: 'status', header: 'Trạng thái', sortValue: (r) => r.result.status, cell: (r) => <PeriodResultStatusBadge status={r.result.status} /> },
   ];
 

@@ -3,7 +3,7 @@ import { SEED_NOW, SYNTRA } from '@/data/fixtures';
 import { vn } from '@/data/fixtures/timeline';
 import type { EvaluationColumn, FormInstance, Goal, Id, PersonFormAction, RecipientFilter } from '@/data/types';
 import type { DataGateway, DomainEvent, EvaluationItemPatch } from '../types';
-import { flush, newGateway, rejection } from './gateway.test-util';
+import { flush, newGateway, rejection, testSeed } from './gateway.test-util';
 
 /**
  * Gate 1 — the workflow lane, end to end through the mock gateway against the seed: forms move only
@@ -20,6 +20,8 @@ const cycle2027 = SYNTRA.id('PerformanceCycle', '2027');
 const cycle2028 = SYNTRA.id('PerformanceCycle', '2028');
 const T03 = SYNTRA.id('CyclePeriod', 2027, 'T03');
 const T04 = SYNTRA.id('CyclePeriod', 2027, 'T04');
+const Q1 = SYNTRA.id('CyclePeriod', 2027, 'Q1');
+const Q2 = SYNTRA.id('CyclePeriod', 2027, 'Q2');
 const formId = (key: string) => SYNTRA.id('FormInstance', key);
 const planId = (owner: string) => SYNTRA.id('GoalPlan', cycle2027, owner);
 const delegationId = (key: 'active' | 'expired' | 'revoked') => SYNTRA.id('Delegation', key);
@@ -91,10 +93,12 @@ describe('scheduler.runDue — the first tick at SEED_NOW is what the seed story
     // Reminders: every step whose deadline is 04-07 (remindDaysBefore 1) — T03 at step 1, E015/E016
     // at the manager, E020/E038 at HR, and E040's re-entered registration at HR; the monthly work
     // reviews of T03 likewise (two at step 1, E017's at the manager since 04-03), and E016's April
-    // work plan at the manager since 04-04.
+    // work plan at the manager since 04-04; and every Q1 form still at step 1 (PEND-09, same launch tick).
     const t03Open = (await gateway.forms.listForms(S, { periodId: T03, status: 'Open' }, { limit: 500 })).items.map((f) => f.id);
     expect(t03Open).toHaveLength(22);
-    const expected = [...t03Open, ...['E015', 'E016', 'E020', 'E038'].map((c) => formId(`EVAL:T03:${c}`)), formId('GS:E040'), formId('WR:T03:E017'), formId('WP:T04:E016')];
+    const q1Open = (await gateway.forms.listForms(S, { periodId: Q1, status: 'Open' }, { limit: 500 })).items.map((f) => f.id);
+    expect(q1Open).toHaveLength(24); // everyone T03 reached, bar the three recorded (E015, E016, E022)
+    const expected = [...t03Open, ...q1Open, ...['E015', 'E016', 'E020', 'E038'].map((c) => formId(`EVAL:T03:${c}`)), formId('GS:E040'), formId('WR:T03:E017'), formId('WP:T04:E016')];
     expect(report.remindersDue.map((r) => r.formId).sort()).toEqual(expected.sort());
 
     const after = await snapshotOf(gateway, formId('GC:open'));
@@ -314,7 +318,7 @@ describe('proxy and delegation (BR-KPI-21)', () => {
     expect(inbox).not.toContain(formId('EVAL:T03:E017')); // at E017's own step
     expect(inbox).toEqual(expect.arrayContaining([formId('WR:T03:E017'), formId('WP:T04:E016')]));
     expect((await gateway.forms.listInbox(S, u('E016'))).map((f) => f.id)).toEqual([formId('WR:T03:E016')]);
-    expect((await gateway.forms.listInbox(S, u('E017'))).map((f) => f.id).sort()).toEqual([formId('EVAL:T03:E017'), formId('WP:T04:E017')].sort());
+    expect((await gateway.forms.listInbox(S, u('E017'))).map((f) => f.id).sort()).toEqual([formId('EVAL:T03:E017'), formId('EVAL:Q1:E017'), formId('WP:T04:E017')].sort());
   });
 });
 
@@ -390,7 +394,7 @@ describe('forms.saveGoalChangeItems and startForm', () => {
 describe('forms.createLaunch / cancelLaunch', () => {
   const evalLaunch = async (gw: Gw, o: object = {}) =>
     gw.forms.createLaunch(S, hr, {
-      workflowId: await workflowOf(gw, 'KPI_EVAL'), name: 'Đánh giá KPI tháng 4/2027', cycleId: cycle2027, periodId: T04, dueDays: 12,
+      workflowId: await workflowOf(gw, 'KPI_EVAL'), name: 'Đánh giá KPI quý 2/2027', cycleId: cycle2027, periodId: Q2, dueDays: 12,
       recipientMode: 'FILTER', recipientFilter: { ...STAFF, orgUnitIds: [SYNTRA.unit('KDBH')] }, timing: 'NOW', ...o,
     } as never);
 
@@ -403,7 +407,7 @@ describe('forms.createLaunch / cancelLaunch', () => {
     const forms = (await gateway.forms.listForms(S, { launchId: launch.id }, { limit: 500 })).items;
     // E017 (plan Submitted) and E018 (plan Draft) have no Approved/Locked plan: skipped.
     expect(forms.map((f) => f.subjectEmployeeId).sort()).toEqual([emp('E015'), emp('E016')].sort());
-    expect(forms.every((f) => f.status === 'Open' && f.dueDate === '2027-04-18' && f.periodId === T04)).toBe(true);
+    expect(forms.every((f) => f.status === 'Open' && f.dueDate === '2027-04-18' && f.periodId === Q2)).toBe(true);
     expect(await gateway.forms.listEvaluationItems(S, forms[0].id)).toHaveLength(5);
     await flush();
     expect(heard.find((e) => e.type === 'form.launched')).toMatchObject({ launchId: launch.id });
@@ -411,17 +415,25 @@ describe('forms.createLaunch / cancelLaunch', () => {
 
   it('a subject who already has the period\'s form is skipped; a new form snapshots the CURRENT actual', async () => {
     const { gateway } = newGateway();
-    const again = await evalLaunch(gateway, { periodId: T03, recipientFilter: { ...STAFF, orgUnitIds: [SYNTRA.unit('KDBH')] } });
+    const again = await evalLaunch(gateway, { periodId: Q1, recipientFilter: { ...STAFF, orgUnitIds: [SYNTRA.unit('KDBH')] } });
     expect((await gateway.forms.listForms(S, { launchId: again.id })).items).toEqual([]);
-    // E024's March form was cancelled: a new one reaches her (she worked in March), with March's actuals.
-    const leaver = await evalLaunch(gateway, { periodId: T03, recipientFilter: { ...STAFF, jobLevels: [], employeeIds: [emp('E024')] } });
+    // HR cancels E024's open Q1 form: a new one reaches them (they worked in the quarter), snapshotting
+    // the quarter as a result reads it — its months added up.
+    await act(gateway, hr, formId('EVAL:Q1:E024'), 'CANCEL', { comment: 'Khởi chạy lại.' });
+    const leaver = await evalLaunch(gateway, { periodId: Q1, recipientFilter: { ...STAFF, jobLevels: [], employeeIds: [emp('E024')] } });
     const [form] = (await gateway.forms.listForms(S, { launchId: leaver.id })).items;
     const items = await gateway.forms.listEvaluationItems(S, form.id);
-    const actuals = await gateway.actuals.listActuals(S, { goalIds: items.map((i) => i.goalId), periodId: T03 });
-    for (const item of items) {
-      const actual = actuals.find((a) => a.goalId === item.goalId);
-      expect([item.actualSnapshot, item.actualTextSnapshot]).toEqual([actual?.actualValue ?? null, actual?.actualText ?? null]);
+    const old = await gateway.forms.listEvaluationItems(S, formId('EVAL:Q1:E024'));
+    expect(items.map((i) => [i.goalId, i.actualSnapshot, i.targetSnapshot])).toEqual(old.map((i) => [i.goalId, i.actualSnapshot, i.targetSnapshot]));
+  });
+
+  it('PEND-09: an evaluation launch for a month or a half is refused (06 EVAL_PERIOD_NOT_FORMAL); a quarter and the year are not', async () => {
+    const { gateway } = newGateway();
+    for (const periodId of [T04, T03]) {
+      const error = await rejection(evalLaunch(gateway, { periodId }));
+      expect([error.code, error.detail]).toEqual(['ERR-KPI-06', 'EVAL_PERIOD_NOT_FORMAL']);
     }
+    expect((await evalLaunch(gateway, { periodId: Q2 })).status).toBe('Launched'); // the year: workflowRules.test.ts
   });
 
   it('SCHEDULED waits for the first tick after its time; one in the past is refused', async () => {
@@ -440,10 +452,10 @@ describe('forms.createLaunch / cancelLaunch', () => {
   it('refuses a launch without its period (06), an evaluation into a Planning cycle and a registration into an Evaluating one (04)', async () => {
     const { gateway } = newGateway();
     expect((await rejection(evalLaunch(gateway, { periodId: null }))).detail).toBe('PERIOD_REQUIRED');
-    const [jan] = await gateway.goals.savePeriods(S, admin, cycle2028, [
-      { periodType: 'Month', label: 'T01', startDate: '2028-01-01', endDate: '2028-01-31', inputDeadline: null, evalDeadline: null, isLocked: false },
+    const [q1of2028] = await gateway.goals.savePeriods(S, admin, cycle2028, [
+      { periodType: 'Quarter', label: 'Q1', startDate: '2028-01-01', endDate: '2028-03-31', inputDeadline: null, evalDeadline: null, isLocked: false },
     ]);
-    expect((await rejection(evalLaunch(gateway, { cycleId: cycle2028, periodId: jan.id }))).code).toBe('ERR-KPI-04');
+    expect((await rejection(evalLaunch(gateway, { cycleId: cycle2028, periodId: q1of2028.id }))).code).toBe('ERR-KPI-04');
     await gateway.goals.setCycleStatus(S, admin, cycle2027, 'Evaluating');
     const registration = { workflowId: await workflowOf(gateway, 'GOAL_SETTING'), periodId: null, recipientFilter: { ...STAFF, employeeIds: [emp('E018')] } };
     expect((await rejection(evalLaunch(gateway, registration))).code).toBe('ERR-KPI-04');
@@ -458,16 +470,55 @@ describe('forms.createLaunch / cancelLaunch', () => {
     expect((await rejection(gateway.forms.cancelLaunch(S, hr, SYNTRA.id('FormLaunch', 'GS-2027')))).code).toBe('ERR-KPI-04');
   });
 
-  it('a recurring rule fires once per (rule, period): T04 on 1 May, not again on the next tick', async () => {
+  it('a recurring rule fires once per (rule, period): Q2 on 1 July, not again on the next tick; the stopped monthly rule never', async () => {
     const { gateway } = newGateway();
+    gateway.dev?.setNow(vn('2027-07-01 09:00'));
+    await gateway.scheduler.runDue(S);
+    await gateway.scheduler.runDue(S);
+    const launches = await gateway.forms.listLaunches(S);
+    const q2 = launches.filter((l) => l.launchRuleId === SYNTRA.id('FormLaunchRule', 'quarterly-eval') && l.periodId === Q2);
+    expect(q2).toHaveLength(1);
+    expect(q2[0]).toMatchObject({ timing: 'RECURRING', status: 'Launched', createdBy: null });
+    expect((await gateway.forms.listForms(S, { launchId: q2[0].id }, { limit: 500 })).items.length).toBeGreaterThan(20);
+    expect(launches.filter((l) => l.launchRuleId === SYNTRA.id('FormLaunchRule', 'monthly-eval')).map((l) => l.periodId).sort()).toEqual(
+      ['T01', 'T02', 'T03'].map((m) => SYNTRA.id('CyclePeriod', 2027, m)).sort(),
+    );
+    expect(launches.filter((l) => l.launchRuleId === SYNTRA.id('FormLaunchRule', 'quarterly-eval') && l.periodId === Q1)).toHaveLength(1);
+  });
+
+  it('PEND-09: the scheduler never fires a stored monthly evaluation — an old active rule writes nothing, an old scheduled launch is cancelled', async () => {
+    // A browser copy from before PEND-09: the monthly rule still on, and a monthly launch scheduled for 04-10.
+    const base = testSeed();
+    const [syntra, ...rest] = base.tenants;
+    const rows = {
+      ...syntra.rows,
+      FormLaunchRule: syntra.rows.FormLaunchRule.map((r) => (r.id === SYNTRA.id('FormLaunchRule', 'monthly-eval') ? { ...r, isActive: true } : r)),
+      FormLaunch: [
+        ...syntra.rows.FormLaunch,
+        { ...syntra.rows.FormLaunch.find((l) => l.id === SYNTRA.id('FormLaunch', 'EVAL-T03'))!, id: 'old-scheduled', timing: 'SCHEDULED' as const, launchRuleId: null, periodId: T04, scheduledAt: vn('2027-04-10 09:00'), status: 'Scheduled' as const, launchedAt: null },
+      ],
+    };
+    const { gateway } = newGateway({ seed: () => ({ ...base, tenants: [{ ...syntra, rows }, ...rest] }) });
     gateway.dev?.setNow(vn('2027-05-01 09:00'));
-    await gateway.scheduler.runDue(S);
-    await gateway.scheduler.runDue(S);
-    const rule = SYNTRA.id('FormLaunchRule', 'monthly-eval');
-    const t04 = (await gateway.forms.listLaunches(S)).filter((l) => l.launchRuleId === rule && l.periodId === T04);
-    expect(t04).toHaveLength(1);
-    expect(t04[0]).toMatchObject({ timing: 'RECURRING', status: 'Launched', createdBy: null });
-    expect((await gateway.forms.listForms(S, { launchId: t04[0].id }, { limit: 500 })).items.length).toBeGreaterThan(20);
+    const report = await gateway.scheduler.runDue(S);
+    const launches = await gateway.forms.listLaunches(S);
+    // Only the seed's registration round of 04-15 fires.
+    expect(report.launchesFired).toEqual([SYNTRA.id('FormLaunch', 'GS-2027-round-2')]);
+    expect(launches.filter((l) => l.periodId === T04 && l.launchRuleId !== null)).toEqual([]);
+    expect(launches.find((l) => l.id === 'old-scheduled')?.status).toBe('Cancelled');
+  });
+
+  it('PEND-09: saveLaunchRule refuses an ACTIVE monthly evaluation rule (switching the stopped one back on too); a stopped one saves', async () => {
+    const { gateway } = newGateway();
+    const monthly = (await gateway.forms.listLaunchRules(S)).find((r) => r.id === SYNTRA.id('FormLaunchRule', 'monthly-eval'));
+    if (!monthly) throw new Error('seed: no monthly rule');
+    const { tenantId: _t, ...row } = monthly;
+    const error = await rejection(gateway.forms.saveLaunchRule(S, hr, { ...row, isActive: true }));
+    expect([error.code, error.detail]).toEqual(['ERR-KPI-06', 'EVAL_PERIOD_NOT_FORMAL']);
+    expect((await gateway.forms.saveLaunchRule(S, hr, { ...row, name: 'Đánh giá KPI hằng tháng (đã dừng)' })).isActive).toBe(false);
+    const { id: _id, ...fresh } = row;
+    expect((await rejection(gateway.forms.saveLaunchRule(S, hr, { ...fresh, isActive: true }))).detail).toBe('EVAL_PERIOD_NOT_FORMAL');
+    expect((await gateway.forms.saveLaunchRule(S, hr, { ...fresh, periodType: 'Year', name: 'Đánh giá năm (2)' })).periodType).toBe('Year');
   });
 });
 

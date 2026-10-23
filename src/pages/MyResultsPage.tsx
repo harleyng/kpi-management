@@ -111,7 +111,7 @@ function MyResults({ employeeId, name }: { employeeId: Id; name: string }) {
       id: 'payout',
       header: '% hưởng lương KPI',
       numeric: true,
-      cell: (r) => (isShownToEmployee(r.result) ? <PayoutValue state={payoutState(r.result, levels.data ?? [])} /> : <MissingValue />),
+      cell: (r) => (isShownToEmployee(r.result) ? <PayoutValue state={payoutState(r.result, levels.data ?? [], r.period)} /> : <MissingValue />),
     },
     { id: 'status', header: 'Trạng thái', cell: (r) => <PeriodResultStatusBadge status={r.result.status} /> },
     {

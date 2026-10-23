@@ -1,6 +1,7 @@
-import type { Delegation, FormInstance, FormLaunch, FormStatus, FormType, Goal, GoalDraft, Id, IsoDate, RecipientFilter, StepAction } from '@/data/types';
+import type { Delegation, FormInstance, FormLaunch, FormStatus, FormType, Goal, GoalActual, GoalDraft, Id, IsoDate, RecipientFilter, StepAction } from '@/data/types';
 import { targetForPeriod } from '@/lib/calcRules';
 import { computedItemPct } from '@/lib/formRules';
+import { periodActual, periodTarget, type ActualContext } from '@/lib/resultRules';
 import { EVAL_DUE_DAYS } from '../catalog';
 import { createPrng } from '../prng';
 import type { IdFn, SeedRows, Workflows } from '../shared';
@@ -37,6 +38,7 @@ export interface SyntraForms {
   delegations: { active: Delegation; expired: Delegation; revoked: Delegation };
   /** Forms by key: `GS:E017`, `EVAL:T03:E020`, `GC:open`… */
   form(key: string): FormInstance;
+  /** `evaluation` by month (T01–T03, the monthly rule's — stopped after T03) and `Q1` (the quarterly rule's). */
   launches: { registration: FormLaunch; newHire: FormLaunch; evaluation: Record<string, FormLaunch> };
 }
 
@@ -240,10 +242,22 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
     reason: 'Đề xuất giảm mục tiêu do thay đổi đối tác vận chuyển từ tháng 4.',
   });
 
-  // ─── Monthly evaluation (KPI_EVAL, BR-KPI-16, D5) ───────────────────────────────────────────
+  // ─── Evaluation (KPI_EVAL, BR-KPI-16, 19, D5) ────────────────────────────────────────────────
+  // PEND-09 (ASSUMPTION Q52, Q60): the formal evaluation is quarterly and annual. The monthly rule ran
+  // January to March — its three launches stay as history — and HR switched it off after the T03 launch
+  // (a stopped rule may keep its Month type); the monthly continuous evaluation is now the work review.
   const rule = s.add('FormLaunchRule', {
     id: id('FormLaunchRule', 'monthly-eval'), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng tháng', triggerEvent: 'PERIOD_END',
-    periodType: 'Month', offsetDays: 1, dueDays: EVAL_DUE_DAYS, recipientMode: 'FILTER', recipientFilter: STAFF_LEVELS, isActive: true,
+    periodType: 'Month', offsetDays: 1, dueDays: EVAL_DUE_DAYS, recipientMode: 'FILTER', recipientFilter: STAFF_LEVELS, isActive: false,
+  });
+  const quarterlyRule = s.add('FormLaunchRule', {
+    id: id('FormLaunchRule', 'quarterly-eval'), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng quý', triggerEvent: 'PERIOD_END',
+    periodType: 'Quarter', offsetDays: 1, dueDays: EVAL_DUE_DAYS, recipientMode: 'FILTER', recipientFilter: STAFF_LEVELS, isActive: true,
+  });
+  // The cycle has no Year period yet: the annual rule waits for one (it fires on the day after it ends).
+  s.add('FormLaunchRule', {
+    id: id('FormLaunchRule', 'annual-eval'), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI cả năm', triggerEvent: 'PERIOD_END',
+    periodType: 'Year', offsetDays: 1, dueDays: 14, recipientMode: 'FILTER', recipientFilter: STAFF_LEVELS, isActive: true,
   });
   const evaluation: Record<string, FormLaunch> = {};
   for (const month of ['T01', 'T02', 'T03']) {
@@ -284,10 +298,46 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
   });
   /** HR's one special-case edit (Q47): a FINAL that differs from the manager's, with its reason. */
   const HR_EDIT = { key: 'EVAL:T01:E027', reason: 'Điều chỉnh theo kết quả đối soát cuối kỳ của C&B (trường hợp đặc biệt).' };
+  /** What a month's form shows: the month's actual current at launch, its split target. */
+  const monthSnapshot = (goal: Goal, month: string, at: string) => {
+    const actual = a.currentAt(goal.id, month, at);
+    return { actualValue: actual?.actualValue ?? null, actualText: actual?.actualText ?? null, targetSnapshot: targetForPeriod(goal, s.rows.GoalPeriodTarget, g.period(month).id) };
+  };
+  /**
+   * What a quarter's form shows (BR-KPI-17): the period's actual and target as `resultRules` reads them —
+   * the months added up by the KPI's aggregation — from the actuals current at the launch, exactly as
+   * the gateway's launch snapshots them (`periodActual` / `periodTarget`).
+   */
+  const asOf = (instant: string): ActualContext['actuals'] => {
+    const seen = s.rows.GoalActual.filter((x) => x.recordedAt <= instant);
+    const latest = new Map<string, GoalActual>();
+    for (const x of seen) {
+      const key = `${x.goalId}|${x.periodId}`;
+      const held = latest.get(key);
+      if (!held || held.recordedAt < x.recordedAt) latest.set(key, x);
+    }
+    const current = new Set([...latest.values()].map((x) => x.id));
+    return seen.map((x) => ({ ...x, isCurrent: current.has(x.id) }));
+  };
+  const periodSnapshot = (goal: Goal, label: string, at: string) => {
+    const ctx: ActualContext = {
+      period: g.period(label),
+      periods: s.rows.CyclePeriod,
+      actuals: asOf(at),
+      periodTargets: s.rows.GoalPeriodTarget,
+      methods: s.rows.CalcMethod,
+      tiers: s.rows.CalcTier,
+      levels: s.rows.GoalTargetLevel,
+      kpiDefinitions: s.rows.KpiDefinition,
+      allGoals: s.rows.Goal,
+      alignments: s.rows.GoalAlignment,
+    };
+    const actual = periodActual(goal, ctx.period, ctx);
+    return { actualValue: actual?.actualValue ?? null, actualText: actual?.actualText ?? null, targetSnapshot: periodTarget(goal, ctx.period, ctx) };
+  };
   const addItems = (form: FormInstance, code: string, month: string, stage: Stage) => {
     goalsAt(code, month).forEach((goal, i) => {
-      const actual = a.currentAt(goal.id, month, form.launchedAt);
-      const onForm = { actualValue: actual?.actualValue ?? null, actualText: actual?.actualText ?? null, targetSnapshot: targetForPeriod(goal, s.rows.GoalPeriodTarget, g.period(month).id) };
+      const onForm = g.period(month).periodType === 'Month' ? monthSnapshot(goal, month, form.launchedAt) : periodSnapshot(goal, month, form.launchedAt);
       const system = computedItemPct(onForm, calcContext(goal));
       const leftSelf = !['open', 'selfSaved'].includes(stage);
       const scored = ['atFinal', 'returnedToManager', 'done'].includes(stage);
@@ -410,6 +460,37 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
         // "Lưu nháp": some people have saved self-scores already — EDIT, so still Open.
         addItems(form, code, month, ['E019', 'E022', 'E023', 'E025', 'E031', 'E035'].includes(code) ? 'selfSaved' : 'open');
       }
+    }
+  }
+
+  // ─── Q1 — the first formal (quarterly) evaluation, PEND-09 ────────────────────────────────────
+  // Fired by the quarterly rule at the 04-01 tick, for the same people as T03 (everyone who worked in
+  // the quarter with an Approved / Locked plan — E024 too, who worked until 03-10). Three are recorded
+  // by HR on 04-05 and their results finalised (the payroll export's data); the rest are at step 1.
+  evaluation.Q1 = launch('EVAL-Q1', {
+    workflowId: wf.id('KPI_EVAL'), formType: 'KPI_EVAL', name: 'Đánh giá KPI quý 1/2027', timing: 'RECURRING',
+    scheduledAt: T.evalQ1, launchRuleId: quarterlyRule.id, cycleId: g.cycleId, periodId: g.period('Q1').id, dueDays: EVAL_DUE_DAYS,
+    recipientMode: 'FILTER', recipientFilter: STAFF_LEVELS, status: 'Launched', launchedAt: T.evalQ1, createdBy: null, createdAt: T.evalQ1,
+  });
+  /** Self, manager, HR — each before its step deadline (entered + 6 / 4 / 2 days). */
+  const Q1_DONE: Record<string, readonly [string, string, string]> = {
+    E015: [vn('2027-04-02 10:30'), vn('2027-04-03 15:00'), vn('2027-04-05 11:00')],
+    E016: [vn('2027-04-02 14:00'), vn('2027-04-03 16:00'), vn('2027-04-05 11:30')],
+    E022: [vn('2027-04-02 16:30'), vn('2027-04-04 10:00'), vn('2027-04-05 14:00')],
+  };
+  for (const person of allStaff) {
+    const code = person.code;
+    const base = { type: 'KPI_EVAL' as const, subject: code, planOwner: code, periodLabel: 'Q1', launchId: evaluation.Q1.id, launchedAt: T.evalQ1, dueDate: T.evalQ1Due };
+    const done = Q1_DONE[code];
+    if (done) {
+      const form = addForm(`EVAL:Q1:${code}`, { ...base, status: 'Completed', step: null, enteredAt: null });
+      act(form, 1, code, 'SUBMIT', done[0]);
+      act(form, 2, managerOf(code), 'SUBMIT', done[1]);
+      act(form, 3, hrFor(code), 'APPROVE', done[2]);
+      addItems(form, code, 'Q1', 'done');
+    } else {
+      const form = addForm(`EVAL:Q1:${code}`, { ...base, status: 'Open', step: 1, enteredAt: T.evalQ1 });
+      addItems(form, code, 'Q1', 'open');
     }
   }
 

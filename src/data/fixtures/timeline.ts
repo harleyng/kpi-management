@@ -16,7 +16,7 @@ export function vn(local: string): IsoDateTime {
 
 /** The seed's "now" — the simulated clock starts here (decision D-b). */
 export const SEED_NOW = vn('2027-04-06 09:00');
-/** The last scheduler run of the story — it fired the T03 evaluation launch. */
+/** The last scheduler run of the story — it fired the T03 evaluation launch (the last monthly one) and Q1's. */
 export const LAST_SCHEDULER_TICK = vn('2027-04-01 09:00');
 
 export const CYCLE_2026 = { start: '2026-01-01', end: '2026-12-31' } as const;
@@ -62,6 +62,14 @@ export const T = {
   evalT01: vn('2027-02-01 09:00'),
   evalT02: vn('2027-03-01 09:00'),
   evalT03: vn('2027-04-01 09:00'),
+  /**
+   * The formal evaluation of Q1 (PEND-09): the quarterly rule fires on 04-01 (PERIOD_END + 1), at the
+   * same tick as the last monthly launch; due 12 days later. HR records three forms by 04-05 and
+   * finalises those results the same afternoon.
+   */
+  evalQ1: vn('2027-04-01 09:00'),
+  evalQ1Due: '2027-04-13' as IsoDate,
+  evalQ1Finalised: vn('2027-04-05 16:00'),
 
   /** The completed adjustment (GOAL_CHANGE) in February. */
   changeDoneStart: vn('2027-02-15 09:30'),

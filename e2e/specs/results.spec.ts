@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * T6 — Kết quả & lương. The seed's story (src/data/fixtures/README.md, "Results"): T01 Locked, T02 Final
- * plus Drafts, T03 unit Drafts only. The full lifecycle (evaluate → finalise → export) is Phase 4's.
+ * plus Drafts, T03 unit Drafts only — months tracked, not paid; Q1 three Final, paid results (PEND-09). The full lifecycle (evaluate → finalise → export) is Phase 4's.
  */
 
 /** Switch to a seeded person by name through the top-bar picker. */
@@ -25,7 +25,7 @@ function collectErrors(page: Page): string[] {
 }
 
 test.describe('@smoke T6 results', () => {
-  test('C&B sees a period\'s results and exports the payroll file of a locked period', async ({ page }) => {
+  test('C&B sees a period\'s results and exports the payroll file of a quarter', async ({ page }) => {
     const errors = collectErrors(page);
     await become(page, 'Tôn Văn Quân'); // E036, C&B
     const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
@@ -36,17 +36,18 @@ test.describe('@smoke T6 results', () => {
     // T03 (the default: the latest month over) has unit results only.
     await expect(page.getByRole('table', { name: /Kết quả T03/ })).toBeVisible();
 
-    // The sibling sub-page keeps the cycle and period.
+    // The payroll sub-page offers the paid periods only — quarters and the year (PEND-09) — and opens on Q1.
     await nav.getByRole('link', { name: 'Xuất file lương', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Xuất file lương' })).toBeVisible();
     await page.getByRole('combobox', { name: 'Kỳ', exact: true }).click();
-    await page.getByRole('option', { name: /^T01/ }).click();
-    await expect(page.getByText(/kết quả cá nhân sẽ có trong file/)).toBeVisible();
+    await expect(page.getByRole('option', { name: /^T01/ })).toHaveCount(0);
+    await page.getByRole('option', { name: /^Q1/ }).click();
+    await expect(page.getByText('3 kết quả cá nhân sẽ có trong file.')).toBeVisible();
     await expect(page.getByText('Chưa xuất file nào cho kỳ này.')).toBeVisible();
 
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Xuất file lương' }).click();
-    expect((await download).suggestedFilename()).toMatch(/^luong-kpi_kpi-2027_t01_\d{8}-\d{4}\.xlsx$/);
+    expect((await download).suggestedFilename()).toMatch(/^luong-kpi_kpi-2027_q1_\d{8}-\d{4}\.xlsx$/);
     await expect(page.getByRole('button', { name: /^Tải xuống file lương xuất lúc/ })).toHaveCount(1);
     expect(errors).toEqual([]);
   });

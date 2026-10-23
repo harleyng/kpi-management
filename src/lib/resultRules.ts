@@ -10,7 +10,8 @@
  *   stored on its own. Rating and payout are `null` while the score is incomplete.
  * - `ResultDetail.achievementPct` is the raw per-goal % (floor and cap already applied by calcRules,
  *   or the FINAL column of the evaluation form); `weightedScore` = its points out of 100.
- * - `payoutPct` only for an Employee plan; a Company / OrgUnit plan is rated but carries no payout.
+ * - `payoutPct` only for an Employee plan of a paid period (Quarter / Year, PEND-09); a Company / OrgUnit
+ *   plan, and any Month / Half result, is rated but carries no payout.
  */
 
 import type {
@@ -37,10 +38,11 @@ import type {
   PerformanceCycle,
   PeriodResult,
   PeriodResultStatus,
+  PeriodType,
   RatingLevel,
   ResultDetail,
 } from '@/data/types';
-import { achievement, goalAchievementInput, targetForPeriod, type NotComputableReason } from './calcRules';
+import { achievement, goalAchievementInput, monthTargetFromSplit, targetForPeriod, type NotComputableReason } from './calcRules';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { columnPct } from './formRules';
 import { weightIssue } from './goalPlanRules';
@@ -163,7 +165,13 @@ function aggregatedTarget(goal: Goal, period: CyclePeriod, ctx: Pick<ActualConte
   const aggregation = aggregationOf(goal, ctx);
   const months = monthsOf(period, ctx.periods);
   if (aggregation === null || months.length === 0) return null;
-  const monthly = months.map((m) => ctx.periodTargets.find((t) => t.goalId === goal.id && t.periodId === m.id)?.targetValue ?? null);
+  // Each month's split, else the one derived from a split Quarter / Half (Q67) — never the annual target:
+  // a SUM quarter of three annual targets would be three years' worth.
+  const monthly = months.map((m) => {
+    const own = ctx.periodTargets.find((t) => t.goalId === goal.id && t.periodId === m.id)?.targetValue;
+    if (own !== undefined) return own;
+    return monthTargetFromSplit(goal, ctx.periodTargets, m.id, { periods: ctx.periods, aggregation }) ?? null;
+  });
   return monthly.some((v) => v === null) ? null : aggregatePeriodActuals(monthly, aggregation);
 }
 
@@ -178,14 +186,15 @@ export function periodActual(goal: Goal, period: CyclePeriod, ctx: ActualContext
 
 /**
  * The target of a goal for a period, as an evaluation form snapshots it (`EvaluationItem.targetSnapshot`):
- * - a Month: `calcRules.targetForPeriod` (its split, else the goal's target — ASSUMPTION Q67 is A3's);
+ * - a Month: `calcRules.targetForPeriod` — its split, else derived from a split Quarter / Half (ASSUMPTION
+ *   Q67, possibly `null`), else the goal's target;
  * - a longer period: its own split; else its months' splits aggregated (a SUM quarter = Σ months);
  *   else the goal's target when it holds for any period — a Year, or a KPI averaged / taken last (a
  *   ratio, a stock); else `null`. A SUM quarter never borrows the annual target: that would score a
  *   quarter's actual against a year's target. `null` → the % is not computable, never wrong.
  */
 export function periodTarget(goal: Goal, period: CyclePeriod, ctx: Pick<ActualContext, 'periods' | 'periodTargets' | 'kpiDefinitions'>): number | null {
-  if (isMonth(period)) return targetForPeriod(goal, ctx.periodTargets, period.id);
+  if (isMonth(period)) return targetForPeriod(goal, ctx.periodTargets, period.id, { periods: ctx.periods, aggregation: aggregationOf(goal, ctx) });
   const own = ctx.periodTargets.find((t) => t.goalId === goal.id && t.periodId === period.id);
   if (own) return own.targetValue;
   const aggregated = aggregatedTarget(goal, period, ctx);
@@ -204,15 +213,12 @@ export function actualLines(goals: readonly Goal[], ctx: ActualContext): ResultL
     .filter((g) => g.status === 'Active')
     .map((goal) => {
       const method = ctx.methods.find((m) => m.id === goal.calcMethodId);
-      const split = aggregatedTarget(goal, ctx.period, ctx);
-      const periodTargets =
-        split === null ? ctx.periodTargets : [...ctx.periodTargets, { id: '', tenantId: goal.tenantId, goalId: goal.id, periodId: ctx.period.id, targetValue: split }];
-      const input = goalAchievementInput(goal, actualFor(goal, ctx.period, ctx, new Set()), {
-        periodId: ctx.period.id,
-        periodTargets,
-        tiers: ctx.tiers,
-        levels: ctx.levels,
-      });
+      // The period's target as a form snapshots it (`periodTarget`): a month derived from a split quarter
+      // (Q67), a SUM quarter never the annual target.
+      const input = {
+        ...goalAchievementInput(goal, actualFor(goal, ctx.period, ctx, new Set()), { periodId: ctx.period.id, periodTargets: ctx.periodTargets, tiers: ctx.tiers, levels: ctx.levels }),
+        targetValue: periodTarget(goal, ctx.period, ctx),
+      };
       const result = method ? achievement(method, input) : ({ status: 'NOT_COMPUTABLE', reason: 'INVALID_VALUE' } as const);
       return {
         goalId: goal.id,
@@ -393,9 +399,17 @@ export function subjectAssignment(
   );
 }
 
-/** The payout subject of an Employee plan — its `subjectAssignment`'s unit chain and position. */
+/**
+ * PEND-09 (`ASSUMPTION Q52`) — the periods whose results are PAID: the formal evaluation, quarterly and
+ * annual. A Month (continuous evaluation) or Half result is scored and rated, and "theo dõi": no payout %.
+ */
+export const PAID_PERIOD_TYPES: readonly PeriodType[] = ['Quarter', 'Year'];
+export const isPaidPeriod = (period: Pick<CyclePeriod, 'periodType'>): boolean => PAID_PERIOD_TYPES.includes(period.periodType);
+
+/** The payout subject of an Employee plan of a paid period — its `subjectAssignment`'s unit chain and position. */
 function payoutSubject(plan: GoalPlan, period: CyclePeriod, data: ResultData): PayoutSubject | null {
   if (plan.ownerType !== 'Employee' || plan.ownerEmployeeId === null) return null;
+  if (!isPaidPeriod(period)) return null;
   const assignment = subjectAssignment(plan, period, data);
   return assignment ? { unitAncestry: unitAncestry(assignment.orgUnitId, data.OrgUnit), positionId: assignment.positionId } : { unitAncestry: [], positionId: null };
 }

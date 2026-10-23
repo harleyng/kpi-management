@@ -29,6 +29,7 @@ import {
   evaluationLines,
   finalizeCheck,
   finalizePeriodResults,
+  isPaidPeriod,
   lockPeriodResults,
   RESULT_TRANSITIONS,
   type ActualContext,
@@ -279,11 +280,50 @@ function applied(d: ResultData, outcome: ReturnType<typeof buildPeriodResults>):
   return { ...d, PeriodResult: results, ResultDetail: details };
 }
 
+/** `data()` with a quarter, a half and the year, and the employee's completed form for `periodId`. */
+function paidData(periodId: string): ResultData {
+  const extra = [
+    period({ id: 'Q1', periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31' }),
+    period({ id: 'H1', periodType: 'Half', label: 'H1', startDate: '2027-01-01', endDate: '2027-06-30' }),
+    period({ id: 'Y', periodType: 'Year', label: 'Năm 2027', startDate: '2027-01-01', endDate: '2027-12-31' }),
+  ];
+  return data({ CyclePeriod: [...months2027(), ...extra], FormInstance: [form({ status: 'Completed', currentStepId: null, periodId })] });
+}
+
+describe('PEND-09 — which periods are paid (ASSUMPTION Q52)', () => {
+  it.each([
+    ['Month', false],
+    ['Quarter', true],
+    ['Half', false],
+    ['Year', true],
+  ] as const)('%s → paid %s', (periodType, paid) => {
+    expect(isPaidPeriod({ periodType })).toBe(paid);
+  });
+
+  it.each([
+    ['Q1', 80],
+    ['Y', 80],
+    ['H1', null],
+    ['T01', null],
+  ] as const)('the same B (92) employee result in %s carries payout %s; it is rated either way', (periodId, payout) => {
+    const d = paidData(periodId);
+    const built = applied(d, buildPeriodResults(d, periodId, ids));
+    const mine = built.PeriodResult.find((r) => r.goalPlanId === 'plan1');
+    expect(mine).toMatchObject({ totalScore: 92, ratingLevelId: level('B'), payoutPct: payout });
+  });
+
+  it('a unit plan has no payout in a paid period either', () => {
+    const d = paidData('Q1');
+    const unit = applied(d, buildPeriodResults(d, 'Q1', ids)).PeriodResult.find((r) => r.goalPlanId === 'unit');
+    expect(unit?.payoutPct ?? null).toBeNull();
+  });
+});
+
 describe('buildPeriodResults — calculateResults', () => {
-  it('a Draft per eligible plan: the employee from the form, the unit from the actuals (rated, no payout)', () => {
+  it('a Draft per eligible plan: the employee from the form, the unit from the actuals (rated; a month is tracked — no payout)', () => {
     const d = applied(data(), buildPeriodResults(data(), 'T01', ids));
     expect(d.PeriodResult).toEqual([
-      { id: 'r:T01:plan1', tenantId: TENANT, periodId: 'T01', goalPlanId: 'plan1', ownerType: 'Employee', totalScore: 92, ratingLevelId: level('B'), payoutPct: 80, adjustmentPct: 0, status: 'Draft', finalizedAt: null },
+      { id: 'r:T01:plan1', tenantId: TENANT, periodId: 'T01', goalPlanId: 'plan1', ownerType: 'Employee', totalScore: 92, ratingLevelId: level('B'), payoutPct: null, adjustmentPct: 0, status: 'Draft', finalizedAt: null },
       { id: 'r:T01:unit', tenantId: TENANT, periodId: 'T01', goalPlanId: 'unit', ownerType: 'OrgUnit', totalScore: 95, ratingLevelId: level('B'), payoutPct: null, adjustmentPct: 0, status: 'Draft', finalizedAt: null },
     ]);
     expect(d.ResultDetail.filter((x) => x.resultId === 'r:T01:plan1').map((x) => x.weightedScore)).toEqual([60, 32]);
@@ -321,7 +361,15 @@ describe('applyAdjustment — setAdjustment', () => {
   it('re-scores from the STORED details, not live data', () => {
     const live = { ...built, EvaluationItem: [] };
     const after = applied(live, applyAdjustment(live, 'r:T01:plan1', 10));
-    expect(after.PeriodResult[0]).toMatchObject({ adjustmentPct: 10, totalScore: 102, ratingLevelId: level('A'), payoutPct: 100 });
+    expect(after.PeriodResult[0]).toMatchObject({ adjustmentPct: 10, totalScore: 102, ratingLevelId: level('A'), payoutPct: null });
+  });
+
+  it('in a paid period the re-rating moves the payout too (B 80% → A 100%)', () => {
+    const d = paidData('Q1');
+    const q1 = applied(d, buildPeriodResults(d, 'Q1', ids));
+    expect(q1.PeriodResult[0]).toMatchObject({ ratingLevelId: level('B'), payoutPct: 80 });
+    const after = applied(q1, applyAdjustment(q1, 'r:Q1:plan1', 10));
+    expect(after.PeriodResult[0]).toMatchObject({ totalScore: 102, ratingLevelId: level('A'), payoutPct: 100 });
   });
 
   it('refuses a non-finite number (06) and a non-Draft result (04)', () => {

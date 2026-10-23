@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CalcMethod } from '@/data/types';
-import { calcMethod, goal, level, periodTarget, tier } from '@/test/builders';
+import { calcMethod, goal, level, months2027, period, periodTarget, tier } from '@/test/builders';
 import {
   achievement,
   achievementPct,
@@ -385,5 +385,80 @@ describe('levelsMissingIssue — LEVELS needs at least two levels', () => {
     expect(levelsMissingIssue('LEVELS', 2, 'g1')).toBeNull();
     expect(levelsMissingIssue('RATIO_UP', 0, 'g1')).toBeNull();
     expect(levelsMissingIssue(undefined, 0, null)).toBeNull();
+  });
+});
+
+describe('targetForPeriod — a month under a quarter-only split (ASSUMPTION Q67)', () => {
+  const g = goal({ targetValue: 15_000 });
+  const q1 = period({ id: 'Q1', periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31' });
+  const h1 = period({ id: 'H1', periodType: 'Half', label: 'H1', startDate: '2027-01-01', endDate: '2027-06-30' });
+  const periods = [...months2027(), q1, h1];
+  const quarterSplit = [periodTarget({ id: 'q', periodId: 'Q1', targetValue: 3_750 })];
+
+  it.each([
+    ['SUM: the quarter ÷ its months', 'SUM' as const, 1_250],
+    ['AVG: the quarter itself (a ratio)', 'AVG' as const, 3_750],
+    ['LAST: the quarter itself (a stock)', 'LAST' as const, 3_750],
+    ['no aggregation (outside the library): not computable, never a quarter-sized month', null, null],
+  ])('%s', (_label, aggregation, expected) => {
+    expect(targetForPeriod(g, quarterSplit, 'T02', { periods, aggregation })).toBe(expected);
+  });
+
+  it('the month\'s own split wins; a month of an UNSPLIT quarter is not computable (SUM, none) — never the year — or the goal\'s target (AVG / LAST)', () => {
+    const both = [...quarterSplit, periodTarget({ id: 'm', periodId: 'T02', targetValue: 900 })];
+    expect(targetForPeriod(g, both, 'T02', { periods, aggregation: 'SUM' })).toBe(900);
+    expect(targetForPeriod(g, quarterSplit, 'T05', { periods, aggregation: 'SUM' })).toBeNull();
+    expect(targetForPeriod(g, quarterSplit, 'T05', { periods, aggregation: null })).toBeNull();
+    expect(targetForPeriod(g, quarterSplit, 'T05', { periods, aggregation: 'AVG' })).toBe(15_000);
+    expect(targetForPeriod(g, quarterSplit, 'T05', { periods, aggregation: 'LAST' })).toBe(15_000);
+  });
+
+  it('a goal with no split at all keeps its own target in every month (BR-KPI-11)', () => {
+    expect(targetForPeriod(g, [], 'T05', { periods, aggregation: 'SUM' })).toBe(15_000);
+  });
+
+  it('a month split with a gap: the missing SUM month is not computable, an AVG one takes the goal\'s target', () => {
+    const gap = months2027().filter((p) => p.id !== 'T02').map((p, i) => periodTarget({ id: `m${i}`, periodId: p.id, targetValue: 1_250 }));
+    expect(targetForPeriod(g, gap, 'T02', { periods, aggregation: 'SUM' })).toBeNull();
+    expect(targetForPeriod(g, gap, 'T02', { periods, aggregation: 'AVG' })).toBe(15_000);
+    expect(targetForPeriod(g, gap, 'T02')).toBe(15_000); // without the cycle's periods: the old answer
+  });
+
+  it('the quarter wins over the half; a Year split is the last holder (÷ 12 for SUM)', () => {
+    const halfToo = [...quarterSplit, periodTarget({ id: 'h', periodId: 'H1', targetValue: 9_000 })];
+    expect(targetForPeriod(g, halfToo, 'T02', { periods, aggregation: 'SUM' })).toBe(1_250);
+    const y = period({ id: 'Y', periodType: 'Year', label: 'Năm', startDate: '2027-01-01', endDate: '2027-12-31' });
+    const yearSplit = [periodTarget({ id: 'y', periodId: 'Y', targetValue: 12_000 })];
+    expect(targetForPeriod(g, yearSplit, 'T07', { periods: [...periods, y], aggregation: 'SUM' })).toBe(1_000);
+    expect(targetForPeriod(g, yearSplit, 'T07', { periods: [...periods, y], aggregation: 'AVG' })).toBe(12_000);
+  });
+
+  it('a quarter split of 0 gives months of 0 — a number, not "missing" (the method then decides)', () => {
+    expect(targetForPeriod(g, [periodTarget({ id: 'z', periodId: 'Q1', targetValue: 0 })], 'T02', { periods, aggregation: 'SUM' })).toBe(0);
+  });
+
+  it('a cycle starting in April (ASSUMPTION Q32): its Q1 is April–June', () => {
+    const fy = Array.from({ length: 3 }, (_, i) => period({ id: `M${i + 4}`, label: `T0${i + 4}`, cycleId: 'fy', startDate: `2027-0${i + 4}-01`, endDate: `2027-0${i + 4}-${[30, 31, 30][i]}` }));
+    const fq1 = period({ id: 'FQ1', cycleId: 'fy', periodType: 'Quarter', label: 'Q1', startDate: '2027-04-01', endDate: '2027-06-30' });
+    const fsplit = [periodTarget({ id: 'f', periodId: 'FQ1', targetValue: 3_000 })];
+    expect(targetForPeriod(g, fsplit, 'M5', { periods: [...fy, fq1], aggregation: 'SUM' })).toBe(1_000);
+    expect(targetForPeriod(g, fsplit, 'M5', { periods: [...fy, fq1], aggregation: 'AVG' })).toBe(3_000);
+  });
+
+  it('a Half split is the fallback when the quarter has none; without context, the old answer', () => {
+    const halfSplit = [periodTarget({ id: 'h', periodId: 'H1', targetValue: 6_000 })];
+    expect(targetForPeriod(g, halfSplit, 'T05', { periods, aggregation: 'SUM' })).toBe(1_000);
+    expect(targetForPeriod(g, quarterSplit, 'T02')).toBe(15_000);
+  });
+
+  it('the divisor is the quarter\'s calendar months, even when a month row is missing', () => {
+    const missing = periods.filter((p) => p.id !== 'T03');
+    expect(targetForPeriod(g, quarterSplit, 'T02', { periods: missing, aggregation: 'SUM' })).toBe(1_250);
+  });
+
+  it('another cycle\'s quarter never applies; a quarter period itself is not derived', () => {
+    const other = [...months2027(), { ...q1, cycleId: 'c2028' }];
+    expect(targetForPeriod(g, quarterSplit, 'T02', { periods: other, aggregation: 'SUM' })).toBe(15_000);
+    expect(targetForPeriod(g, [], 'Q1', { periods, aggregation: 'SUM' })).toBe(15_000);
   });
 });

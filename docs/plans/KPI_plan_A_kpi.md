@@ -66,7 +66,7 @@ flowchart TB
 | A0 ✅ 23/10 | Chốt Q44–Q58 và Q2 (cùng Plan B chốt **Q59, Q60**); kiểm chứng PEND-04; đối chiếu 5 phương pháp (PEND-11) | Plan 22/10 §3, §6 (PEND-04), §8 (PEND-11) | Không — tài liệu và kiểm chứng, merge lúc nào cũng được | Mọi câu hỏi có câu trả lời hoặc `ASSUMPTION Qn`; PEND-04 ghi "đã chạy" hoặc danh sách việc phải sửa |
 | A1 ✅ 23/10 | **Đợt 1**: PEND-07 → 06 → 08 (+ phiếu quý dùng mục tiêu quý) | Plan 22/10 §4 | Lượt 1 — không chờ | BR-KPI-16, 17, 23 viết lại; e2e phiếu đánh giá qua 3 bước |
 | A2 ✅ 23/10 | **Đợt 2**: PEND-01, 02 | Plan 22/10 §5 | Lượt 3 — chờ Plan B merge 8.1 | BR-KPI-12, 14, 20 viết lại; `autoApprove` và HR trả về chạy được |
-| A3 | **PEND-09** (và PEND-04 nếu phải sửa `calcRules.targetForPeriod`) | Plan 22/10 §6 | Lượt 5 — chờ Plan B merge 8.2; **Q60 đã chốt** | KPI_EVAL chỉ khởi chạy kỳ quý / năm (nếu Q60 theo đề xuất); file lương chỉ có quý / năm |
+| A3 ✅ 23/10 | **PEND-09** (và PEND-04: `calcRules.targetForPeriod`, Q67, nhãn) | Plan 22/10 §6 | Lượt 5 — chờ Plan B merge 8.2; **Q60 đã chốt** | KPI_EVAL chỉ khởi chạy kỳ quý / năm; file lương chỉ có quý / năm; BR-KPI-11, 19, 22, 40, 44, 81 viết lại; Q3, Q52, Q67 đóng |
 | A4 | **PEND-03**: Goal Plan của Khối | Plan 22/10 §8 | Lượt 8 — chờ Plan B merge 8.4 | E2E Công ty → Khối → Phòng → NV |
 | A5 | **Đợt 6**: đánh giá thử việc | Plan 22/10 §9 | Lượt 10 — chờ Plan B merge Đợt 4 + 8.5; **Q53 đã chốt** | Phiếu thử việc chạy hết một vòng |
 | A6 | **Đợt 7**: import lịch sử | Plan 22/10 §10 | Lượt 11 — ngay sau A5 | Import một năm mẫu, kết quả chỉ đọc |

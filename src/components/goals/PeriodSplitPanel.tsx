@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AGGREGATION_LABEL, PERIOD_TYPE_LABEL, type Goal, type PeriodType } from '@/data/types';
 import { useSetPeriodTargets, type GoalLookups, type PlanWorkspaceData } from '@/hooks/queries/goals';
 import { toastSaved } from '@/hooks/queries/toasts';
-import { evenSplit, periodTargetIssues } from '@/lib/goalPlanRules';
+import { evenSplit, periodTargetIssues, splitPeriodType } from '@/lib/goalPlanRules';
 import { formatDecimalInput, parseDecimalInput } from '@/lib/numberInput';
 import { formatDate } from '@/lib/utils';
 import { formatTarget, issueText } from './goalCopy';
@@ -33,7 +33,8 @@ interface PeriodSplitPanelProps {
 export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose, onDirtyChange }: PeriodSplitPanelProps) {
   const stored = data.periodTargets.filter((t) => t.goalId === goal.id);
   const typesInCycle = useMemo(() => [...new Set(data.periods.map((p) => p.periodType))] as PeriodType[], [data.periods]);
-  const storedType = data.periods.find((p) => p.id === stored[0]?.periodId)?.periodType;
+  // The select opens on the type already saved (PEND-04), else Month.
+  const storedType = splitPeriodType(goal.id, data.periodTargets, data.periods) ?? undefined;
   const [type, setType] = useState<PeriodType>(storedType ?? (typesInCycle.includes('Month') ? 'Month' : (typesInCycle[0] ?? 'Month')));
   const periods = useMemo(() => data.periods.filter((p) => p.periodType === type).sort((a, b) => (a.startDate < b.startDate ? -1 : 1)), [data.periods, type]);
   const [initialValues] = useState<Record<string, string>>(() => Object.fromEntries(stored.map((t) => [t.periodId, formatDecimalInput(t.targetValue)])));
@@ -60,7 +61,7 @@ export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose, onDir
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
-        <SectionTitle icon={CalendarRange} title="Phân bổ mục tiêu theo kỳ">
+        <SectionTitle icon={CalendarRange} title={storedType ? `Phân bổ mục tiêu theo ${PERIOD_TYPE_LABEL[storedType].toLowerCase()}` : 'Phân bổ mục tiêu theo kỳ'}>
           Mục tiêu {formatTarget(goal, lookups.unit.get(goal.unitId))}
           {aggregation ? ` · cộng dồn kiểu "${AGGREGATION_LABEL[aggregation]}"` : ''}
         </SectionTitle>
@@ -93,11 +94,20 @@ export function PeriodSplitPanel({ data, lookups, goal, readOnly, onClose, onDir
                 </Button>
               )}
             </div>
-            {aggregation === null && (
+            {aggregation === null ? (
               <p className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                KPI không thuộc thư viện — phân bổ chỉ áp dụng cho từng tháng; quý và năm dùng mục tiêu của chỉ tiêu.
+                KPI không thuộc thư viện — chỉ kỳ có mục tiêu phân bổ riêng (và cả năm) tính được %: quý không cộng từ tháng, tháng không chia từ quý.
               </p>
+            ) : (
+              type !== 'Month' && (
+                <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  {aggregation === 'SUM'
+                    ? `Mỗi tháng trong ${PERIOD_TYPE_LABEL[type].toLowerCase()} lấy mục tiêu của ${PERIOD_TYPE_LABEL[type].toLowerCase()} chia đều cho số tháng (kết quả theo dõi tháng).`
+                    : `Mỗi tháng trong ${PERIOD_TYPE_LABEL[type].toLowerCase()} dùng đúng mục tiêu của ${PERIOD_TYPE_LABEL[type].toLowerCase()} (kết quả theo dõi tháng).`}
+                </p>
+              )
             )}
 
             <Table aria-label="Mục tiêu theo kỳ">

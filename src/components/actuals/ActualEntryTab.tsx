@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/shared/SearchInput';
 import { useSession } from '@/contexts/useSession';
 import { SOURCE_TYPE_LABEL, SOURCE_TYPES, type CyclePeriod, type Id, type SourceType } from '@/data/types';
 import { useActuals } from '@/hooks/queries/actuals';
+import { usePeriods } from '@/hooks/queries/goals';
 import { usePeriodResults } from '@/hooks/queries/results';
 import {
   actualEntrySummary,
@@ -38,18 +39,20 @@ export function ActualEntryTab({ cycleId, period }: { cycleId: Id | null; period
   const cycleData = useCycleGoalData(cycleId);
   const actuals = useActuals({ periodId: period?.id }, { enabled: period !== null });
   const results = usePeriodResults({ periodId: period?.id }, { enabled: period !== null });
+  // The cycle's quarters: a month under a quarter-only split shows the target derived from it (Q67).
+  const periods = usePeriods(cycleId);
   const [filter, setFilter] = useState<ActualEntryFilter>(EMPTY_ACTUAL_ENTRY_FILTER);
   const [openGoalId, setOpenGoalId] = useState<Id | null>(null);
 
   const mayEnter = useCallback((plan: Parameters<typeof resourceOfOwner>[1]) => can('actual.enter', resourceOfOwner(tenantId, plan)), [can, tenantId]);
   const rows = useMemo(() => {
-    if (!cycleData.data || !period || !actuals.data || !results.data) return undefined;
-    return buildActualEntryRows({ ...cycleData.data, period, actuals: actuals.data, results: results.data, asOf: today, mayEnter });
-  }, [cycleData.data, period, actuals.data, results.data, today, mayEnter]);
+    if (!cycleData.data || !period || !actuals.data || !results.data || !periods.data) return undefined;
+    return buildActualEntryRows({ ...cycleData.data, period, periods: periods.data, actuals: actuals.data, results: results.data, asOf: today, mayEnter });
+  }, [cycleData.data, period, periods.data, actuals.data, results.data, today, mayEnter]);
   const visible = useMemo(() => (rows ? filterActualEntryRows(rows, filter) : undefined), [rows, filter]);
   const summary = rows ? actualEntrySummary(rows) : null;
   const units = useMemo(() => [...new Map((rows ?? []).filter((r) => r.orgUnit).map((r) => [r.orgUnit!.id, r.orgUnit!.name])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'vi')), [rows]);
-  const query = combineQueries([cycleData.query, actuals, results]);
+  const query = combineQueries([cycleData.query, actuals, results, periods]);
 
   // The open row comes from ALL rows: saving a number may take it out of the filtered list.
   const openRow = (openGoalId && rows?.find((r) => r.goal.id === openGoalId)) || null;

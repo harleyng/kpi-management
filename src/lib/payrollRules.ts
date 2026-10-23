@@ -26,7 +26,7 @@ import type {
 } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { toZonedLocalInput } from './isoDate';
-import { subjectAssignment } from './resultRules';
+import { isPaidPeriod, subjectAssignment } from './resultRules';
 import { foldDiacritics } from './utils';
 
 /**
@@ -81,6 +81,8 @@ export interface PayrollPreview {
   drafts: number;
   /** Company / OrgUnit results — never in the file. */
   unitResults: number;
+  /** A Month / Half period: nothing is exported (`PERIOD_NOT_PAID`, PEND-09); every count above is 0. */
+  notPaid: boolean;
 }
 
 const ownerOf = (result: PeriodResult, plans: readonly GoalPlan[], employees: readonly Employee[]) => {
@@ -90,8 +92,14 @@ const ownerOf = (result: PeriodResult, plans: readonly GoalPlan[], employees: re
 };
 
 /** The counts `buildPayrollSheet` would produce for the period, from rows a screen already reads. */
-export function payrollPreview(data: Pick<PayrollData, 'PeriodResult' | 'GoalPlan' | 'Employee'>, periodId: Id): PayrollPreview {
-  const preview: PayrollPreview = { exportable: 0, noPayout: 0, missingEmployee: 0, drafts: 0, unitResults: 0 };
+export function payrollPreview(
+  data: Pick<PayrollData, 'PeriodResult' | 'GoalPlan' | 'Employee'>,
+  period: Pick<CyclePeriod, 'id' | 'periodType'>,
+): PayrollPreview {
+  const periodId = period.id;
+  const preview: PayrollPreview = { exportable: 0, noPayout: 0, missingEmployee: 0, drafts: 0, unitResults: 0, notPaid: !isPaidPeriod(period) };
+  // Agrees with `buildPayrollSheet`: a period that is not paid exports nothing.
+  if (preview.notPaid) return preview;
   for (const result of data.PeriodResult) {
     if (result.periodId !== periodId) continue;
     if (result.ownerType !== 'Employee') preview.unitResults += 1;
@@ -158,13 +166,16 @@ const byCodeThenId = (a: PayrollRow, b: PayrollRow): number => {
 
 /**
  * `results.exportPayroll`'s whole decision (BR-KPI-81): one row per Employee result of the period that
- * is Final or Locked, sorted by employee code. No such result → ERR-KPI-04 `NO_FINAL_RESULT`; an
+ * is Final or Locked, sorted by employee code. A Month / Half period → ERR-KPI-06 `PERIOD_NOT_PAID` (only
+ * quarters and the year are paid, PEND-09). No such result → ERR-KPI-04 `NO_FINAL_RESULT`; an
  * unknown period → ERR-KPI-02. Exporting changes nothing, so a Closed cycle exports too.
  */
 export function buildPayrollSheet(data: PayrollData, periodId: Id, meta: PayrollMeta): PayrollOutcome {
   const period = data.CyclePeriod.find((p) => p.id === periodId);
   const cycle = period && data.PerformanceCycle.find((c) => c.id === period.cycleId);
   if (!period || !cycle) return { ok: false, issues: [ruleIssue('ERR-KPI-02', periodId, 'PERIOD_NOT_FOUND')] };
+  // PEND-09 — only the formal (paid) periods go to payroll: a Month / Half result is tracked only.
+  if (!isPaidPeriod(period)) return { ok: false, issues: [ruleIssue('ERR-KPI-06', periodId, 'PERIOD_NOT_PAID')] };
   const results = data.PeriodResult.filter((r) => r.periodId === period.id && r.tenantId === period.tenantId && isPayrollResult(r));
   if (results.length === 0) return { ok: false, issues: [ruleIssue('ERR-KPI-04', periodId, 'NO_FINAL_RESULT')] };
 

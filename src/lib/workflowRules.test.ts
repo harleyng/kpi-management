@@ -46,6 +46,7 @@ import {
   isOverdue,
   isReminderDue,
   launchDueDate,
+  launchPeriodIssues,
   launchRuleFirings,
   mayEditAtCurrentStep,
   onUnlock,
@@ -920,11 +921,47 @@ describe('launch timing, cancellation and recurring rules', () => {
   });
 
   it('a recurring rule launches the evaluation only, with whole days ≥ 0 and its filter', () => {
-    expect(validateLaunchRule(launchRule(), 'KPI_EVAL')).toEqual([]);
+    const quarterly = (o: Parameters<typeof launchRule>[0] = {}) => launchRule({ periodType: 'Quarter', ...o });
+    expect(validateLaunchRule(quarterly(), 'KPI_EVAL')).toEqual([]);
     const details = (...args: Parameters<typeof validateLaunchRule>) => validateLaunchRule(...args).map((i) => i.detail);
-    expect(details(launchRule(), 'GOAL_SETTING')).toEqual(['RULE_KPI_EVAL_ONLY']);
-    expect(details(launchRule({ offsetDays: 1.5, dueDays: -1 }), 'KPI_EVAL')).toEqual(['OFFSET_DAYS_INVALID', 'DUE_DAYS_INVALID']);
-    expect(details(launchRule({ recipientMode: 'FILTER', recipientFilter: null }), 'KPI_EVAL')).toEqual(['FILTER_REQUIRED']);
+    expect(details(quarterly(), 'GOAL_SETTING')).toEqual(['RULE_KPI_EVAL_ONLY']);
+    expect(details(quarterly({ offsetDays: 1.5, dueDays: -1 }), 'KPI_EVAL')).toEqual(['OFFSET_DAYS_INVALID', 'DUE_DAYS_INVALID']);
+    expect(details(quarterly({ recipientMode: 'FILTER', recipientFilter: null }), 'KPI_EVAL')).toEqual(['FILTER_REQUIRED']);
+  });
+
+  it.each([
+    ['Month', true, ['EVAL_PERIOD_NOT_FORMAL']],
+    ['Half', true, ['EVAL_PERIOD_NOT_FORMAL']],
+    ['Quarter', true, []],
+    ['Year', true, []],
+    ['Month', false, []], // a stopped monthly rule may stay (PEND-09: the history it launched)
+  ] as const)('PEND-09: an evaluation rule for a %s (active %s) → %j', (periodType, isActive, expected) => {
+    const issues = validateLaunchRule(launchRule({ periodType, isActive }), 'KPI_EVAL');
+    expect(issues.map((i) => i.detail)).toEqual(expected);
+    if (expected.length) expect(issues[0]).toMatchObject({ code: 'ERR-KPI-06', ref: 'periodType' });
+  });
+
+  it('PEND-09: a quarterly rule fires once, on the day after the quarter ends; its months never fire it', () => {
+    const q = [1, 2].map((n) => period({ id: `Q${n}`, periodType: 'Quarter', label: `Q${n}`, startDate: n === 1 ? '2027-01-01' : '2027-04-01', endDate: n === 1 ? '2027-03-31' : '2027-06-30' }));
+    const rule = launchRule({ periodType: 'Quarter' });
+    const cycles = [{ id: 'c2027', status: 'Active' as const }];
+    const all = [...months2027(), ...q];
+    expect(launchRuleFirings([rule], all, cycles, [], at('2027-03-31T16:59:00.000Z'))).toEqual([]);
+    const firings = launchRuleFirings([rule], all, cycles, [], at('2027-03-31T17:00:00.000Z')); // 04-01 00:00 in Vietnam
+    expect(firings).toEqual([{ ruleId: 'lr1', periodId: 'Q1', cycleId: 'c2027', fireDate: '2027-04-01' }]);
+    expect(launchRuleFirings([rule], all, cycles, [{ launchRuleId: 'lr1', periodId: 'Q1' }], at('2027-05-15T03:00:00.000Z'))).toEqual([]);
+  });
+
+  it.each([
+    ['KPI_EVAL', 'Month', ['EVAL_PERIOD_NOT_FORMAL']],
+    ['KPI_EVAL', 'Half', ['EVAL_PERIOD_NOT_FORMAL']],
+    ['KPI_EVAL', 'Quarter', []],
+    ['KPI_EVAL', 'Year', []],
+    ['WORK_PLAN', 'Quarter', ['MONTH_REQUIRED']],
+    ['WORK_REVIEW', 'Month', []],
+    ['GOAL_SETTING', 'Month', []],
+  ] as const)('launchPeriodIssues: %s for a %s → %j (LAUNCH_PERIOD_TYPES)', (formType, periodType, expected) => {
+    expect(launchPeriodIssues(formType, { periodType }).map((i) => i.detail)).toEqual(expected);
   });
 
   it('launchRuleFirings also fires for an Evaluating cycle (its last period ends after it moved on)', () => {

@@ -150,15 +150,16 @@ export function useResultRows(period: CyclePeriod | null, levels: Parameters<typ
 }
 
 /** What the export tab shows before exporting (`payrollRules.payrollPreview`). */
-export function usePayrollPreview(periodId: Id | null, cycleId: Id | null) {
+export function usePayrollPreview(period: Pick<CyclePeriod, 'id' | 'periodType'> | null, cycleId: Id | null) {
+  const periodId = period?.id ?? null;
   const results = usePeriodResults({ periodId: periodId ?? undefined }, { enabled: periodId !== null });
   const plans = useGoalPlans({ cycleId: cycleId ?? undefined }, { enabled: cycleId !== null });
   const employees = useEmployees({ includeResigned: true });
   const query = combineQueries([results, plans, employees]);
   const preview = useMemo(() => {
-    if (periodId === null || !results.data || !plans.data || !employees.data) return undefined;
-    return payrollPreview({ PeriodResult: results.data, GoalPlan: plans.data, Employee: employees.data }, periodId);
-  }, [periodId, results.data, plans.data, employees.data]);
+    if (period === null || !results.data || !plans.data || !employees.data) return undefined;
+    return payrollPreview({ PeriodResult: results.data, GoalPlan: plans.data, Employee: employees.data }, period);
+  }, [period, results.data, plans.data, employees.data]);
   return { preview, query };
 }
 

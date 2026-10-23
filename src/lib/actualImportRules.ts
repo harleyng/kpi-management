@@ -281,15 +281,18 @@ export function actualTemplateRows(input: {
   plans: readonly Pick<GoalPlan, 'id' | 'cycleId' | 'status' | 'ownerType' | 'ownerEmployeeId' | 'ownerOrgUnitId'>[];
   employees: readonly Pick<Employee, 'id' | 'fullName' | 'employeeCode'>[];
   users: readonly Pick<UserAccount, 'login' | 'employeeId' | 'status'>[];
-  kpiDefinitions: readonly Pick<KpiDefinition, 'id' | 'code'>[];
+  kpiDefinitions: readonly Pick<KpiDefinition, 'id' | 'code' | 'aggregation'>[];
   units: readonly Pick<MeasureUnit, 'id' | 'name'>[];
   periodTargets: readonly GoalPeriodTarget[];
+  /** The cycle's periods: a month under a quarter-only split shows its derived target (ASSUMPTION Q67). */
+  periods: readonly Pick<CyclePeriod, 'id' | 'cycleId' | 'periodType' | 'startDate' | 'endDate'>[];
   ownerName: (plan: Pick<GoalPlan, 'ownerType' | 'ownerEmployeeId' | 'ownerOrgUnitId'>) => string;
   includeGoal?: (goal: Goal) => boolean;
 }): Record<keyof typeof ACTUAL_COLUMNS, string | number | null>[] {
   const planById = new Map(input.plans.map((p) => [p.id, p]));
   const loginOf = new Map(input.users.filter((u) => u.employeeId !== null && u.status === 'Active').map((u) => [u.employeeId as Id, u.login]));
   const codeOf = new Map(input.kpiDefinitions.map((k) => [k.id, k.code]));
+  const aggregationOf = new Map(input.kpiDefinitions.map((k) => [k.id, k.aggregation]));
   const unitOf = new Map(input.units.map((u) => [u.id, u.name]));
   const rows = input.goals
     .filter((g) => {
@@ -309,7 +312,10 @@ export function actualTemplateRows(input: {
           goalName: g.name,
           unit: unitOf.get(g.unitId) ?? null,
           period: input.period.label,
-          target: g.targetType === 'TEXT' ? g.targetText : targetForPeriod(g, input.periodTargets, input.period.id),
+          target:
+            g.targetType === 'TEXT'
+              ? g.targetText
+              : targetForPeriod(g, input.periodTargets, input.period.id, { periods: input.periods, aggregation: g.kpiDefId ? (aggregationOf.get(g.kpiDefId) ?? null) : null }),
           actualValue: null,
           actualText: null,
           note: null,

@@ -16,7 +16,7 @@ import { ERROR_CATALOG } from '@/lib/errorCatalog';
 import { cycleAllowsLaunch } from '@/lib/cycleRules';
 import { addDaysToInstant, fromZonedLocalInput, toZonedLocalInput } from '@/lib/isoDate';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { launchDueDate, launchTimingIssues, startStepChoices, validateLaunch } from '@/lib/workflowRules';
+import { LAUNCH_PERIOD_TYPES, launchDueDate, launchTimingIssues, startStepChoices, validateLaunch } from '@/lib/workflowRules';
 import { RecipientFilterFields } from './RecipientFilterFields';
 import { EMPTY_RECIPIENT_FILTER } from './recipients';
 
@@ -215,7 +215,8 @@ export function LaunchPanel({
                   </SelectTrigger>
                   <SelectContent>
                     {(periods.data ?? [])
-                      .slice()
+                      // PEND-09 — the KPI evaluation is formal: a quarter or the year, never a month.
+                      .filter((p) => LAUNCH_PERIOD_TYPES.KPI_EVAL?.includes(p.periodType) ?? true)
                       .sort((a, b) => (a.startDate === b.startDate ? a.periodType.localeCompare(b.periodType) : a.startDate < b.startDate ? -1 : 1))
                       .map((p) => (
                         <SelectItem key={p.id} value={p.id}>

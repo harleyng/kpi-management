@@ -7,7 +7,7 @@
  * reason — the weighted score treats it as missing too, so a broken goal can never move a score.
  */
 
-import type { CalcMethod, CalcMethodType, CalcTier, Goal, GoalPeriodTarget, GoalTargetLevel, Id, TargetLevelCode, TargetType } from '@/data/types';
+import type { Aggregation, CalcMethod, CalcMethodType, CalcTier, CyclePeriod, Goal, GoalPeriodTarget, GoalTargetLevel, Id, TargetLevelCode, TargetType } from '@/data/types';
 import { TARGET_LEVEL_CODES } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { foldDiacritics } from './utils';
@@ -221,21 +221,78 @@ export function achievementPct(method: CalcMethod, input: AchievementInput): num
   return result.status === 'SCORED' ? result.pct : null;
 }
 
-/** The target that applies to a period: its `GoalPeriodTarget` when split (BR-KPI-11), else the goal's. */
-export function targetForPeriod(goal: Goal, periodTargets: readonly GoalPeriodTarget[], periodId: Id): number | null {
-  const split = periodTargets.find((t) => t.goalId === goal.id && t.periodId === periodId);
-  return split ? split.targetValue : goal.targetValue;
+/** What `targetForPeriod` needs to derive a month's target from a longer period's split (ASSUMPTION Q67). */
+export interface SplitContext {
+  /** The cycle's periods (months, quarters, halves…); other cycles' rows are ignored. */
+  periods: readonly Pick<CyclePeriod, 'id' | 'cycleId' | 'periodType' | 'startDate' | 'endDate'>[];
+  /** The KPI's aggregation; `null` for a goal outside the library. */
+  aggregation: Aggregation | null;
+}
+
+/** Calendar months covered by a period, from its dates ("2027-01-01".."2027-03-31" → 3). */
+function calendarMonths(p: Pick<CyclePeriod, 'startDate' | 'endDate'>): number {
+  const [sy, sm] = p.startDate.split('-').map(Number);
+  const [ey, em] = p.endDate.split('-').map(Number);
+  return (ey * 12 + em) - (sy * 12 + sm) + 1;
+}
+
+/**
+ * A Month's target derived from the split of the Quarter (then Half, then Year) of its cycle that holds
+ * it — `ASSUMPTION Q67`: SUM → that split ÷ the calendar months it covers (a 3,75 tỷ quarter gives 1,25
+ * tỷ a month, not the 15 tỷ year); AVG / LAST (a ratio, a stock) → the split itself; no aggregation (a
+ * goal outside the library) → `null`: how to share the quarter out is unknown, so the month is not
+ * computable rather than wrong.
+ * A goal that IS split but not for this month nor any period holding it (`SPLIT_INCOMPLETE`): SUM / no
+ * aggregation → `null` (a split goal never scores a month against the annual target); AVG / LAST →
+ * `undefined`. A goal with no split at all → `undefined` (its target holds for every period, BR-KPI-11).
+ * `undefined` = nothing to derive from (the caller falls back to the goal's target).
+ */
+export function monthTargetFromSplit(
+  goal: Pick<Goal, 'id'>,
+  periodTargets: readonly GoalPeriodTarget[],
+  monthId: Id,
+  split: SplitContext,
+): number | null | undefined {
+  const month = split.periods.find((p) => p.id === monthId);
+  if (!month || month.periodType !== 'Month') return undefined;
+  for (const type of ['Quarter', 'Half', 'Year'] as const) {
+    const holder = split.periods.find((p) => p.periodType === type && p.cycleId === month.cycleId && p.startDate <= month.startDate && p.endDate >= month.endDate);
+    const target = holder ? periodTargets.find((t) => t.goalId === goal.id && t.periodId === holder.id) : undefined;
+    if (!holder || !target) continue;
+    if (split.aggregation === null) return null;
+    if (split.aggregation !== 'SUM') return target.targetValue;
+    const months = calendarMonths(holder);
+    return months > 0 ? target.targetValue / months : null;
+  }
+  // Split, but not for this month nor its quarter / half / year: a SUM month is not computable.
+  const inCycle = new Set(split.periods.filter((p) => p.cycleId === month.cycleId).map((p) => p.id));
+  const isSplit = periodTargets.some((t) => t.goalId === goal.id && inCycle.has(t.periodId));
+  if (isSplit && (split.aggregation === 'SUM' || split.aggregation === null)) return null;
+  return undefined;
+}
+
+/**
+ * The target that applies to a period (BR-KPI-11): its own `GoalPeriodTarget` when split; else, with
+ * `split` and for a Month, the target derived from a split Quarter / Half (`monthTargetFromSplit`,
+ * ASSUMPTION Q67 — possibly `null`, not computable); else the goal's own target. Without `split`, the
+ * old answer (own split or the goal's target).
+ */
+export function targetForPeriod(goal: Goal, periodTargets: readonly GoalPeriodTarget[], periodId: Id, split?: SplitContext): number | null {
+  const own = periodTargets.find((t) => t.goalId === goal.id && t.periodId === periodId);
+  if (own) return own.targetValue;
+  const derived = split ? monthTargetFromSplit(goal, periodTargets, periodId, split) : undefined;
+  return derived !== undefined ? derived : goal.targetValue;
 }
 
 /** Builds the input for `achievement` from a goal, the period's current actual and the method's children. */
 export function goalAchievementInput(
   goal: Goal,
   actual: { actualValue: number | null; actualText: string | null } | null,
-  ctx: { periodId: Id; periodTargets: readonly GoalPeriodTarget[]; tiers: readonly CalcTier[]; levels: readonly GoalTargetLevel[] },
+  ctx: { periodId: Id; periodTargets: readonly GoalPeriodTarget[]; tiers: readonly CalcTier[]; levels: readonly GoalTargetLevel[]; split?: SplitContext },
 ): AchievementInput {
   return {
     targetType: goal.targetType,
-    targetValue: targetForPeriod(goal, ctx.periodTargets, ctx.periodId),
+    targetValue: targetForPeriod(goal, ctx.periodTargets, ctx.periodId, ctx.split),
     targetText: goal.targetText,
     actualValue: actual?.actualValue ?? null,
     actualText: actual?.actualText ?? null,

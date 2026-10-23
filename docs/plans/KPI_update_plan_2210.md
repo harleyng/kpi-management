@@ -241,10 +241,10 @@ ghi nhận; lịch chạy không chuyển phiếu đang bị HR khóa Goal Plan.
     `calcRules.targetForPeriod` trên phiếu — làm cùng `formRules.computedItemPct` của PEND-07 (KPI Rules + Workflow).
   - [x] Số thực tế của phiếu kỳ quý: không có số riêng thì tổng hợp các tháng theo cách tổng hợp, như
     `resultRules.actualFor`.
-  - [ ] Tháng khi chỉ phân bổ quý (Q67, đề xuất: SUM → quý / số tháng của quý; AVG / LAST → số của quý) — sửa
-    `calcRules.targetForPeriod`, cập nhật BR-KPI-11 (KPI Rules).
-  - [ ] Nhãn "Phân bổ theo quý" / "theo tháng" trên dòng chỉ tiêu và tiêu đề panel; ô chọn mặc định theo loại đã lưu.
-  - [ ] Sửa ghi chú "chỉ áp dụng theo tháng" cho KPI ngoài thư viện.
+  - [x] Tháng khi chỉ phân bổ quý (Q67, đề xuất: SUM → quý / số tháng của quý; AVG / LAST → số của quý) — sửa
+    `calcRules.targetForPeriod`, cập nhật BR-KPI-11 (KPI Rules). *A3, 23/10.*
+  - [x] Nhãn "Phân bổ theo quý" / "theo tháng" trên dòng chỉ tiêu và tiêu đề panel; ô chọn mặc định theo loại đã lưu.
+  - [x] Sửa ghi chú "chỉ áp dụng theo tháng" cho KPI ngoài thư viện.
   - [ ] (PEND-05) Năm không có số tháng thì cộng số quý.
 - **Kiểm thử.** Chia đều SUM / AVG / LAST; nhập tay lệch tổng → cảnh báo, không chặn; quý thiếu → dùng mục tiêu
   năm (`SPLIT_INCOMPLETE`).
@@ -278,7 +278,7 @@ ghi nhận; lịch chạy không chuyển phiếu đang bị HR khóa Goal Plan.
 - **Kiểm thử.** Quy tắc khởi chạy quý bắn đúng một lần sau ngày cuối quý; kết quả tháng không có % lương; file
   lương chỉ có kỳ quý / năm; Q3 cũ (tháng) không còn ở seed.
 - **Chuyên gia.** `workflow-expert` + `system-architect` + `hr-performance-expert`.
-- **Xong khi.** BR-KPI-19, 22, 40, 44, 81 viết lại; Q3 và Q52 đóng.
+- **Xong khi.** BR-KPI-19, 22, 40, 44, 81 viết lại; Q3 và Q52 đóng. **✅ Đã làm 23/10 (Plan A, A3).**
 
 ---
 

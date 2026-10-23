@@ -199,9 +199,10 @@ describe('the actuals template', () => {
       plans: c.plans.map((p) => plan(p)),
       employees: [],
       users: c.users.map((u) => user(u)),
-      kpiDefinitions: c.kpiDefinitions,
+      kpiDefinitions: c.kpiDefinitions.map((k) => ({ ...k, aggregation: 'SUM' as const })),
       units: [{ id: 'u-pct', name: '%' }],
       periodTargets: [periodTarget({ goalId: 'g1', periodId: 'T03', targetValue: 12 })],
+      periods: c.periods.map((p) => period(p)),
       ownerName: (p) => (p.ownerEmployeeId === 'e1' ? 'An' : 'Bình'),
     });
     expect(rows.map((r) => r.goalId)).toEqual(['g1', 'g2', 'g3', 'g4']); // not the Changed, 2026 or Draft-plan goals

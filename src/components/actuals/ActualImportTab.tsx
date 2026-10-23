@@ -50,6 +50,7 @@ export function ActualImportTab({ cycleId, search }: { cycleId: Id | null; searc
       kpiDefinitions: d.kpiDefinitions,
       units: d.units,
       periodTargets: d.periodTargets,
+      periods: periods.data ?? [],
       ownerName: (p) => (p.ownerEmployeeId ? (employees.get(p.ownerEmployeeId) ?? '') : p.ownerOrgUnitId ? (units.get(p.ownerOrgUnitId) ?? '') : rootName),
     });
     const blob = await writeTemplate(ACTUAL_IMPORT_SPEC, rows, [{ title: 'Kỳ', values: monthsOf(periods.data ?? []).map((p) => p.label) }]);

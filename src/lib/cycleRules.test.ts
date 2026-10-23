@@ -263,6 +263,15 @@ describe('defaultResultPeriod / defaultResultCycle (T6 screens)', () => {
     expect(defaultResultPeriod([], '2027-06-01')).toBeNull();
   });
 
+  it('a list without months (the payroll screen: quarters and the year, PEND-09) opens on its latest period over', () => {
+    const q2 = period({ id: 'Q2', periodType: 'Quarter', label: 'Q2', startDate: '2027-04-01', endDate: '2027-06-30' });
+    const year = period({ id: 'Y', periodType: 'Year', label: 'Năm 2027', startDate: '2027-01-01', endDate: '2027-12-31' });
+    expect(defaultResultPeriod([year, q2, q1], '2027-04-06')?.id).toBe('Q1');
+    expect(defaultResultPeriod([year, q2, q1], '2027-07-02')?.id).toBe('Q2');
+    expect(defaultResultPeriod([year, q2, q1], '2028-01-02')?.id).toBe('Y');
+    expect(defaultResultPeriod([year, q2, q1], '2027-03-01')?.id).toBe('Q1');
+  });
+
   const c = (id: string, status: CycleStatus, startDate: string): PerformanceCycle => ({
     id, tenantId: 't1', name: id, startDate, endDate: `${startDate.slice(0, 4)}-12-31`, ratingScaleId: null, status,
   });

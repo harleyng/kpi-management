@@ -33,6 +33,7 @@ import type {
   OrgUnit,
   OverdueBehaviour,
   PerformanceCycle,
+  PeriodType,
   PersonFormAction,
   Role,
   StepAction,
@@ -750,10 +751,22 @@ export function validateLaunch(
   return issues;
 }
 
-/** A monthly-work launch is for one month (PEND-14): its period must be a `Month` (ERR-KPI-06 `MONTH_REQUIRED`). */
+/**
+ * The period types a form type is launched for — ONE table for launches and rules: monthly work is for a
+ * Month (PEND-14); the KPI evaluation is the FORMAL one, for a Quarter or the Year (PEND-09, `ASSUMPTION
+ * Q52, Q60` — the monthly continuous evaluation is the work review). A type not listed takes no period.
+ */
+export const LAUNCH_PERIOD_TYPES: Readonly<Partial<Record<FormType, readonly PeriodType[]>>> = {
+  KPI_EVAL: ['Quarter', 'Year'],
+  WORK_PLAN: ['Month'],
+  WORK_REVIEW: ['Month'],
+};
+
+/** A launch's period fits its form type (`LAUNCH_PERIOD_TYPES`): 06 `MONTH_REQUIRED` (monthly work) / `EVAL_PERIOD_NOT_FORMAL` (evaluation). */
 export function launchPeriodIssues(formType: FormType, period: Pick<CyclePeriod, 'periodType'> | null): RuleIssue[] {
-  if (!isWorkFormType(formType) || period === null || period.periodType === 'Month') return [];
-  return [ruleIssue('ERR-KPI-06', 'periodId', 'MONTH_REQUIRED')];
+  const allowed = LAUNCH_PERIOD_TYPES[formType];
+  if (!allowed || period === null || allowed.includes(period.periodType)) return [];
+  return [ruleIssue('ERR-KPI-06', 'periodId', isWorkFormType(formType) ? 'MONTH_REQUIRED' : 'EVAL_PERIOD_NOT_FORMAL')];
 }
 
 /**
@@ -971,7 +984,7 @@ export function canCancelLaunch(launch: Pick<FormLaunch, 'status'>): Decision {
  * names its filter.
  */
 export function validateLaunchRule(
-  rule: Pick<FormLaunchRule, 'offsetDays' | 'dueDays' | 'recipientMode' | 'recipientFilter'>,
+  rule: Pick<FormLaunchRule, 'offsetDays' | 'dueDays' | 'recipientMode' | 'recipientFilter'> & Partial<Pick<FormLaunchRule, 'periodType' | 'isActive'>>,
   formType: FormType,
 ): RuleIssue[] {
   const issues: RuleIssue[] = [];
@@ -980,6 +993,11 @@ export function validateLaunchRule(
   if (!Number.isInteger(rule.offsetDays) || rule.offsetDays < 0) bad('offsetDays', 'OFFSET_DAYS_INVALID');
   if (!Number.isInteger(rule.dueDays) || rule.dueDays < 0) bad('dueDays', 'DUE_DAYS_INVALID');
   if (rule.recipientMode === 'FILTER' && rule.recipientFilter === null) bad('recipientFilter', 'FILTER_REQUIRED');
+  // An ACTIVE rule fires for its period type: it must fit the form type (a stopped monthly rule may stay).
+  const allowed = LAUNCH_PERIOD_TYPES[formType];
+  if (rule.isActive !== false && rule.periodType !== undefined && allowed && !allowed.includes(rule.periodType)) {
+    bad('periodType', isWorkFormType(formType) ? 'MONTH_REQUIRED' : 'EVAL_PERIOD_NOT_FORMAL');
+  }
   return issues;
 }
 

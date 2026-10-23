@@ -11,6 +11,7 @@ import {
   isWeightComplete,
   nextSortOrder,
   periodTargetIssues,
+  splitPeriodType,
   planAfterChanges,
   planStatusOnEnterStep,
   planSummaries,
@@ -350,6 +351,20 @@ describe('periodTargetIssues — warnings, never a block (BR-KPI-11)', () => {
   });
 });
 
+describe('splitPeriodType — the "Phân bổ theo quý / tháng" label (PEND-04)', () => {
+  const row = (periodId: string, goalId = 'g1') => ({ goalId, periodId });
+  it('names the type of the goal\'s own split; nothing split → null', () => {
+    expect(splitPeriodType('g1', [row('T01'), row('T02')], cyclePeriods)).toBe('Month');
+    expect(splitPeriodType('g1', [row(quarters[1].id), row(quarters[0].id)], cyclePeriods)).toBe('Quarter');
+    expect(splitPeriodType('g1', [row('T01', 'other')], cyclePeriods)).toBeNull();
+    expect(splitPeriodType('g1', [], cyclePeriods)).toBeNull();
+  });
+  it('mixed types: the earliest period\'s; a row of an unknown period is ignored', () => {
+    expect(splitPeriodType('g1', [row('T05'), row(quarters[0].id)], cyclePeriods)).toBe('Quarter');
+    expect(splitPeriodType('g1', [row('gone')], cyclePeriods)).toBeNull();
+  });
+});
+
 describe('why the warning matters — a split feeds quarter results (resultRules)', () => {
   const kpi = { id: 'k1', aggregation: 'SUM' } as KpiDefinition;
   const g = goal({ kpiDefId: 'k1', targetValue: 120, weight: 100 });
@@ -368,9 +383,15 @@ describe('why the warning matters — a split feeds quarter results (resultRules
     expect(q1(split([20, 20, 20, ...Array(9).fill(10)]))).toBe(50);
   });
 
-  it('a split missing one month of the quarter falls back to the FULL goal target', () => {
+  it('a split missing one month of the quarter leaves Q1 with no target — not computable, never the annual one (PEND-04)', () => {
     const partial = split(Array(12).fill(10)).filter((t) => t.periodId !== 'T02');
-    expect(q1(partial)).toBe(25); // 30 / 120 — what SPLIT_INCOMPLETE warns about
+    // Before A3 this scored 30 / 120 = 25%; what SPLIT_INCOMPLETE warns about now is a quarter with no %.
+    expect(q1(partial)).toBeNull();
+  });
+
+  it('a quarter-only split: Q1 uses its own split, never the months', () => {
+    const quarterOnly = [{ id: 'q', tenantId: TENANT, goalId: 'g1', periodId: quarters[0].id, targetValue: 30 }];
+    expect(q1(quarterOnly)).toBe(100);
   });
 });
 

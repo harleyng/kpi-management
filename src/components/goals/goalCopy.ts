@@ -1,7 +1,7 @@
 import { ERROR_CATALOG, type RuleIssue } from '@/lib/errorCatalog';
 import type { PlanEditReason } from '@/lib/planAccessRules';
 import type { TemplateSkipReason } from '@/lib/templateApplyRules';
-import { OWNER_TYPE_LABEL, type Goal, type GoalPlan, type MeasureUnit } from '@/data/types';
+import { OWNER_TYPE_LABEL, PERIOD_TYPE_LABEL, type Goal, type GoalPlan, type MeasureUnit, type PeriodType } from '@/data/types';
 import type { GoalLookups } from '@/hooks/queries/goals';
 import { formatNumber } from '@/lib/utils';
 
@@ -26,6 +26,9 @@ export const EDIT_REASON_COPY: Readonly<Record<PlanEditReason, string | null>> =
   NO_PERMISSION: 'Bạn không có quyền sửa Goal Plan này.',
 };
 
+/** "Phân bổ theo quý" / "Phân bổ theo tháng" — what a goal's target is split by (PEND-04). */
+export const splitLabel = (type: PeriodType): string => `Phân bổ theo ${PERIOD_TYPE_LABEL[type].toLowerCase()}`;
+
 /** Extra words for an issue `detail` (the catalogue title is shown beside it). */
 const DETAIL_COPY: Readonly<Record<string, string>> = {
   KGI_COUNT: 'Goal Plan nên có 3–5 KGI.',
@@ -35,9 +38,9 @@ const DETAIL_COPY: Readonly<Record<string, string>> = {
   TARGET_REQUIRED: 'Chưa có mục tiêu.',
   DATES_INVALID: 'Ngày kết thúc trước ngày bắt đầu.',
   SPLIT_MISMATCH: 'Phân bổ theo kỳ không khớp mục tiêu.',
-  SPLIT_INCOMPLETE: 'Phân bổ theo kỳ còn thiếu kỳ — kỳ thiếu sẽ dùng mục tiêu cả năm khi tính quý/năm.',
+  SPLIT_INCOMPLETE: 'Phân bổ theo kỳ còn thiếu kỳ — KPI kiểu Cộng dồn: kỳ thiếu, các tháng trong kỳ đó và quý chứa nó không tính được %; kiểu Trung bình / Lấy kỳ cuối và cả năm dùng mục tiêu của chỉ tiêu.',
   SPLIT_MIXED_TYPES: 'Phân bổ lẫn kỳ tháng và kỳ quý.',
-  SPLIT_NO_AGGREGATION: 'KPI không thuộc thư viện — phân bổ chỉ áp dụng theo tháng.',
+  SPLIT_NO_AGGREGATION: 'KPI không thuộc thư viện — chỉ kỳ có mục tiêu phân bổ riêng (và cả năm) tính được %: quý không cộng từ tháng, tháng không chia từ quý.',
   LEVELS_MISSING: 'Phương pháp định mức cần ít nhất 2 mức L1/L2/L3.',
   TARGET_TYPE_MISMATCH: 'Mục tiêu dạng chữ nhưng phương pháp tính chỉ tính được số.',
   SELF_ASSIGNED_INVALID: '"Tự giao" phải là số không âm.',

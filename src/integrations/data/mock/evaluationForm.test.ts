@@ -186,9 +186,12 @@ describe('a quarter form snapshots the quarter (PEND-04 leftover)', () => {
     expect(q1).toBeDefined();
     const months = periods.filter((p) => p.periodType === 'Month' && ['T01', 'T02', 'T03'].includes(p.label)).map((p) => p.id);
     const workflowId = (await gateway.forms.listWorkflows(S, 'KPI_EVAL'))[0].id;
+    // The seed's Q1 launch (PEND-09) already reached E019: HR cancels that form and launches again, so
+    // the new form snapshots today's actuals.
+    await act(gateway, hr, formId('EVAL:Q1:E019'), 'CANCEL', 'Khởi chạy lại.');
     const launch = await gateway.forms.createLaunch(S, hr, {
-      workflowId, name: 'Đánh giá KPI quý 1/2027', cycleId: cycle2027, periodId: q1?.id as Id, dueDays: 12,
-      recipientMode: 'FILTER', recipientFilter: { ...STAFF, employeeIds: [emp('E016')] }, timing: 'NOW',
+      workflowId, name: 'Đánh giá KPI quý 1/2027 (lại)', cycleId: cycle2027, periodId: q1?.id as Id, dueDays: 12,
+      recipientMode: 'FILTER', recipientFilter: { ...STAFF, employeeIds: [emp('E019')] }, timing: 'NOW',
     } as never);
     const [form] = (await gateway.forms.listForms(S, { launchId: launch.id })).items;
     const goals = await gateway.goals.listGoals(S, { goalPlanIds: [form.goalPlanId as Id] });

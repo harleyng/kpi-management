@@ -7,7 +7,7 @@
 import type { CyclePeriod, Employee, EmployeeAssignment, GoalPlan, Id, OrgUnit, PeriodResult, PeriodResultStatus, RatingLevel } from '@/data/types';
 import { PERIOD_RESULT_STATUSES } from '@/data/types';
 import { payoutNote } from './payrollRules';
-import { subjectAssignment } from './resultRules';
+import { isPaidPeriod, subjectAssignment } from './resultRules';
 import { formatNumber } from './utils';
 
 /** Why the "% hưởng lương KPI" cell shows what it shows. */
@@ -20,10 +20,17 @@ export type PayoutState =
   /** Rated, but no payout rule in force (BR-KPI-42 "chưa có quy tắc", ASSUMPTION Q39). */
   | { kind: 'noRule' }
   /** The rating level the result names no longer exists. */
-  | { kind: 'levelMissing' };
+  | { kind: 'levelMissing' }
+  /** A Month / Half result: continuous evaluation, tracked, never paid (PEND-09, ASSUMPTION Q52). */
+  | { kind: 'tracked' };
 
-export function payoutState(result: Pick<PeriodResult, 'ownerType' | 'payoutPct' | 'ratingLevelId'>, levels: readonly Pick<RatingLevel, 'id'>[]): PayoutState {
+export function payoutState(
+  result: Pick<PeriodResult, 'ownerType' | 'payoutPct' | 'ratingLevelId'>,
+  levels: readonly Pick<RatingLevel, 'id'>[],
+  period?: Pick<CyclePeriod, 'periodType'> | null,
+): PayoutState {
   if (result.ownerType !== 'Employee') return { kind: 'notApplicable' };
+  if (period && !isPaidPeriod(period)) return { kind: 'tracked' };
   if (result.payoutPct !== null) return { kind: 'value', pct: result.payoutPct };
   const note = payoutNote(result, levels);
   return note === 'NOT_RATED' ? { kind: 'notRated' } : note === 'LEVEL_MISSING' ? { kind: 'levelMissing' } : { kind: 'noRule' };

@@ -383,7 +383,7 @@ describe('tenant isolation — coverage', () => {
   it('Demo Co is not empty where it is read, so the scans below can fail', async () => {
     const { gateway } = newGateway();
     // The seed has no payroll export (none is seeded, by choice): Demo Co makes one first.
-    await gateway.results.exportPayroll(D, demoActor, DEMO.id('CyclePeriod', 'T01'));
+    await gateway.results.exportPayroll(D, demoActor, DEMO.id('CyclePeriod', 'Q1'));
     for (const [name, read] of Object.entries(LIST_READS)) {
       const result = await read(gateway);
       const size = Array.isArray(result) ? result.length : (result as { items: unknown[] }).items.length;

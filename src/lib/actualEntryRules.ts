@@ -6,6 +6,7 @@
 
 import type {
   CyclePeriod,
+  KpiDefinition,
   DataSource,
   Employee,
   EmployeeAssignment,
@@ -54,6 +55,13 @@ export interface ActualEntryInput {
   dataSources: readonly Pick<DataSource, 'id' | 'code' | 'name' | 'sourceType'>[];
   units: readonly Pick<MeasureUnit, 'id' | 'name'>[];
   periodTargets: readonly GoalPeriodTarget[];
+  /**
+   * The cycle's periods and the library's KPIs — a month under a quarter-only split shows the target
+   * derived from it (`calcRules.targetForPeriod`, ASSUMPTION Q67). Both required: a KPI missing from
+   * the list would read as "no aggregation" and its month target as not computable.
+   */
+  periods: readonly CyclePeriod[];
+  kpiDefinitions: readonly Pick<KpiDefinition, 'id' | 'aggregation'>[];
   /** The period's actuals (current ones are picked here). */
   actuals: readonly GoalActual[];
   results: readonly Pick<PeriodResult, 'goalPlanId' | 'periodId' | 'status'>[];
@@ -108,7 +116,15 @@ export function buildActualEntryRows(input: ActualEntryInput): ActualEntryRow[] 
       orgUnit: orgUnit ? { id: orgUnit.id, name: orgUnit.name } : null,
       dataSource: sources.get(goal.dataSourceId) ?? null,
       measureUnit: measures.get(goal.unitId) ?? null,
-      target: goal.targetType === 'TEXT' ? goal.targetText : targetForPeriod(goal, input.periodTargets, input.period.id),
+      target:
+        goal.targetType === 'TEXT'
+          ? goal.targetText
+          : targetForPeriod(
+              goal,
+              input.periodTargets,
+              input.period.id,
+              { periods: input.periods, aggregation: input.kpiDefinitions.find((k) => k.id === goal.kpiDefId)?.aggregation ?? null },
+            ),
       current: currentActual(periodActuals, goal.id, input.period.id),
       blockers,
       canEnter: blockers.length === 0 && input.mayEnter(plan),

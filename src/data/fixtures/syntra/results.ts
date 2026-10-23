@@ -1,7 +1,7 @@
 import type { CyclePeriod, Id } from '@/data/types';
 import { ResultScript } from '../results';
 import type { IdFn, SeedRows } from '../shared';
-import { vn } from '../timeline';
+import { T, vn } from '../timeline';
 import type { SyntraGoals } from './goals';
 
 /**
@@ -17,8 +17,11 @@ import type { SyntraGoals } from './goals';
  *   ERR-KPI-09). E025, E026, E028, E037 and E041 have no completed T02 form, so no result (ASSUMPTION Q17).
  * - **T03**: calculate only ⇒ the company and department plans are Draft (CSKH and Mua hàng are
  *   incomplete — the CRM file is still Validating); no employee has a completed T03 form yet.
+ * - **Q1** — the first formal evaluation (PEND-09): calculate ⇒ E015, E016 and E022 (the three completed
+ *   Q1 forms) → finalised on 04-05 ⇒ Final, WITH a payout % (a quarter is paid); every unit plan held
+ *   Draft. The months above are tracked, never paid: their payout % is empty (ASSUMPTION Q52).
  *
- * Finalised on the period's evaluation deadline at 09:00. No payroll export yet (T6).
+ * Months are finalised on the period's evaluation deadline at 09:00. No payroll export yet (T6).
  */
 export function buildResults(s: SeedRows, id: IdFn, g: SyntraGoals): void {
   const script = new ResultScript(s, id);
@@ -38,4 +41,11 @@ export function buildResults(s: SeedRows, id: IdFn, g: SyntraGoals): void {
   script.finalizeAll(t02.id, finalisedAt(t02), [plan('E023')]);
 
   script.calculate(g.period('T03').id);
+
+  const q1 = g.period('Q1');
+  script.calculate(q1.id);
+  const recorded = ['E015', 'E016', 'E022'].map(plan);
+  const held = s.rows.PeriodResult.filter((r) => r.periodId === q1.id && !recorded.includes(r.goalPlanId)).map((r) => r.goalPlanId);
+  const blocked = script.finalizeAll(q1.id, T.evalQ1Finalised, held);
+  if (blocked.length > 0) throw new Error(`seed: Q1 results not finalised: ${blocked.join(', ')}`);
 }

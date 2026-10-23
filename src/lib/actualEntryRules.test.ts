@@ -45,6 +45,8 @@ const input = (o: Partial<ActualEntryInput> = {}): ActualEntryInput => ({
   ],
   units: [{ id: 'u-pct', name: '%' }],
   periodTargets: [periodTarget({ goalId: 'g1', periodId: 'T03', targetValue: 12 })],
+  periods: [period({ id: 'T03', label: 'T03', startDate: '2027-03-01', endDate: '2027-03-31' })],
+  kpiDefinitions: [],
   actuals: [actual({ goalId: 'g1' }), actual({ id: 'old', goalId: 'g1', isCurrent: false }), actual({ id: 'other', goalId: 'g5', periodId: 'T02' })],
   results: [],
   asOf: '2027-04-06',
@@ -65,6 +67,21 @@ describe('buildActualEntryRows', () => {
     expect([g1.target, g1.current?.id, g1.dataSource?.sourceType, g1.measureUnit]).toEqual([12, 'a1', 'API', '%']);
     expect([g2.target, g2.current]).toEqual(['Đạt', null]);
     expect(g5.current).toBeNull(); // its T02 actual is not this month's
+  });
+
+  it('a month under a quarter-only split shows the derived target (ASSUMPTION Q67): SUM ÷ 3, AVG the quarter\'s', () => {
+    const t03 = period({ id: 'T03', label: 'T03', startDate: '2027-03-01', endDate: '2027-03-31' });
+    const q1 = period({ id: 'Q1', periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31' });
+    const kpiGoals = [goal({ id: 'g1', goalPlanId: 'p-an', kpiDefId: 'k-sum', dataSourceId: 'ds-erp' }), goal({ id: 'g7', goalPlanId: 'p-an', kpiDefId: 'k-avg', dataSourceId: 'ds-erp', sortOrder: 2 })];
+    const rows = buildActualEntryRows(
+      input({
+        goals: kpiGoals,
+        periods: [t03, q1],
+        kpiDefinitions: [{ id: 'k-sum', aggregation: 'SUM' }, { id: 'k-avg', aggregation: 'AVG' }],
+        periodTargets: [periodTarget({ id: 'a', goalId: 'g1', periodId: 'Q1', targetValue: 30 }), periodTarget({ id: 'b', goalId: 'g7', periodId: 'Q1', targetValue: 80 })],
+      }),
+    );
+    expect(rows.map((r) => [r.goal.id, r.target])).toEqual([['g1', 10], ['g7', 80]]);
   });
 
   it('names the company plan after the root unit', () => {

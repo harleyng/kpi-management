@@ -15,13 +15,16 @@ import {
   TENANT_STATUSES,
   WORK_PLAN_STATUSES,
   WORK_TASK_STATUSES,
+  type CyclePeriod,
   type FormInstance,
   type WorkflowStep,
 } from '@/data/types';
 import { addDays, toZonedDate } from '@/lib/isoDate';
 import { isWeightComplete } from '@/lib/goalPlanRules';
 import { ratingFor } from '@/lib/ratingRules';
-import { currentLinesOf, finalizeCheck } from '@/lib/resultRules';
+import { currentLinesOf, finalizeCheck, isPaidPeriod } from '@/lib/resultRules';
+import { buildPayrollSheet } from '@/lib/payrollRules';
+import { LAUNCH_PERIOD_TYPES, launchRuleFirings, validateLaunchRule } from '@/lib/workflowRules';
 import { ratedScore, roundScore } from '@/lib/scoreRules';
 import { DEFAULT_WORK_SCORING, taskWeightIssues, workResultOf } from '@/lib/workRules';
 import { validateTransaction } from '@/integrations/data/mock/integrity';
@@ -103,8 +106,9 @@ describe('seed — structure', () => {
 
   it('stays under the size budget (localStorage holds about 5 M characters)', () => {
     // 1.5 M until 2026-10-23: A1's evaluation items (form actual, target, submitted actual) added ~20 k and
-    // Plan B 8.1's monthly-work seed more; still a third of what localStorage holds.
-    expect(JSON.stringify(seed).length).toBeLessThan(1_600_000);
+    // Plan B 8.1's monthly-work seed more; 1.6 M until A3, whose Q1 evaluation (a form per person, its
+    // items, results, notices) adds the rest. Still about a third of what localStorage holds.
+    expect(JSON.stringify(seed).length).toBeLessThan(1_800_000);
   });
 });
 
@@ -404,11 +408,24 @@ describe('seed — period results (produced by resultRules, BR-KPI-40…43)', ()
       expect(isWeightComplete(mine.reduce((sum, d) => sum + d.weight, 0)), r.id).toBe(true);
       expect(r.totalScore, r.id).toBe(roundScore(r.totalScore as number));
       expect(r.ratingLevelId, r.id).toBe(ratingFor(roundScore(r.totalScore as number), levels)?.id ?? null);
-      expect(r.payoutPct === null, r.id).toBe(r.ownerType !== 'Employee');
+      // PEND-09 — paid only for an Employee plan of a quarter or the year; a month is tracked.
+      const paid = isPaidPeriod(rows(syntra, 'CyclePeriod').find((p) => p.id === r.periodId) as CyclePeriod);
+      expect(r.payoutPct === null, r.id).toBe(r.ownerType !== 'Employee' || !paid);
     }
     for (const r of results.filter((x) => x.status === 'Draft' && x.ratingLevelId !== null)) {
       expect(r.ratingLevelId).toBe(ratingFor(ratedScore(r.totalScore, 0), levels)?.id);
     }
+  });
+
+  it('tells the story: Q1 Final for the three recorded forms, paid; every Q1 unit plan Draft', () => {
+    const q1 = results.filter((r) => r.periodId === period('Q1'));
+    const final = q1.filter((r) => r.status === 'Final');
+    expect(final.map((r) => r.goalPlanId).sort()).toEqual(['E015', 'E016', 'E022'].map(plan).sort());
+    for (const r of final) {
+      expect(r.payoutPct, r.id).not.toBeNull();
+      expect(r.finalizedAt).toBe('2027-04-05T09:00:00.000Z');
+    }
+    expect(q1.filter((r) => r.status !== 'Final').every((r) => r.status === 'Draft' && r.ownerType !== 'Employee')).toBe(true);
   });
 
   it('tells the story: T01 Locked (E027 Draft at 75%), T02 Final with E023 held Draft, T03 unit plans Draft', () => {
@@ -430,7 +447,61 @@ describe('seed — period results (produced by resultRules, BR-KPI-40…43)', ()
     expect(crossing?.adjustmentPct).toBeGreaterThan(0);
     expect(code(crossing?.totalScore as number)).toBe('B');
     expect(code((crossing?.totalScore as number) - (crossing?.adjustmentPct as number))).toBe('C');
-    expect(crossing?.payoutPct).toBe(80);
+    // A month is tracked, not paid (PEND-09): re-rated, still no payout.
+    expect(crossing?.payoutPct).toBeNull();
+  });
+});
+
+describe('seed — evaluation cadence (PEND-09, ASSUMPTION Q52, Q60)', () => {
+  const clock = { now: SEED_NOW, tz: syntra.tenant.timezone };
+  const evalWorkflow = (t: TenantSeed) => new Set(rows(t, 'WorkflowTemplate').filter((w) => w.formType === 'KPI_EVAL').map((w) => w.id));
+
+  it.each([['Syntra', 0], ['Demo Co', 1]] as const)('%s: every ACTIVE evaluation rule is for a quarter or the year; the monthly one is stopped', (_, i) => {
+    const t = seed.tenants[i];
+    const rules = rows(t, 'FormLaunchRule').filter((r) => evalWorkflow(t).has(r.workflowId));
+    for (const r of rules) expect(validateLaunchRule(r, 'KPI_EVAL'), r.name).toEqual([]);
+    expect(rules.filter((r) => r.isActive).every((r) => LAUNCH_PERIOD_TYPES.KPI_EVAL?.includes(r.periodType))).toBe(true);
+    expect(rules.some((r) => r.isActive && r.periodType === 'Quarter')).toBe(true);
+    expect(rules.some((r) => !r.isActive && r.periodType === 'Month')).toBe(true);
+  });
+
+  it.each([['Syntra', 0], ['Demo Co', 1]] as const)('%s: the scheduler owes nothing at SEED_NOW — Q1 already fired from the quarterly rule', (_, i) => {
+    const t = seed.tenants[i];
+    expect(launchRuleFirings(rows(t, 'FormLaunchRule'), rows(t, 'CyclePeriod'), rows(t, 'PerformanceCycle'), rows(t, 'FormLaunch'), clock)).toEqual([]);
+    const q1 = rows(t, 'CyclePeriod').find((p) => p.label === 'Q1') as CyclePeriod;
+    const launch = rows(t, 'FormLaunch').find((l) => l.periodId === q1.id);
+    expect(rows(t, 'FormLaunchRule').find((r) => r.id === launch?.launchRuleId)?.periodType).toBe('Quarter');
+  });
+
+  it('E024 (left 03-10) worked in Q1: their Q1 form waits at step 1 with no action — the manager scores it after AUTO_FORWARD', () => {
+    const form = rows(syntra, 'FormInstance').find((f) => f.id === SYNTRA.id('FormInstance', 'EVAL:Q1:E024'));
+    expect(form).toMatchObject({ status: 'Open' });
+    expect(rows(syntra, 'FormStepAction').filter((a) => a.formId === form?.id)).toEqual([]);
+  });
+
+  it('Q1 goes to the same people as the last monthly launch (everyone who worked in the quarter)', () => {
+    const forms = rows(syntra, 'FormInstance').filter((f) => f.formType === 'KPI_EVAL');
+    const subjects = (label: string) => forms.filter((f) => f.periodId === SYNTRA.id('CyclePeriod', 2027, label)).map((f) => f.subjectEmployeeId).sort();
+    expect(subjects('Q1')).toEqual(subjects('T03'));
+    // A quarter's form snapshots its months added up, never the annual target for a SUM goal.
+    for (const f of forms.filter((x) => x.periodId === SYNTRA.id('CyclePeriod', 2027, 'Q1'))) {
+      for (const item of rows(syntra, 'EvaluationItem').filter((x) => x.formId === f.id)) {
+        const goal = rows(syntra, 'Goal').find((g) => g.id === item.goalId);
+        if (goal?.targetValue && item.targetSnapshot !== null && rows(syntra, 'GoalPeriodTarget').some((t) => t.goalId === goal.id)) {
+          expect(item.targetSnapshot, item.id).toBeLessThan(goal.targetValue);
+        }
+      }
+    }
+  });
+
+  it.each([['Syntra', 0], ['Demo Co', 1]] as const)('%s: the payroll export has a paid period (Q1) and refuses a month', (_, i) => {
+    const t = seed.tenants[i];
+    const meta = { tenantName: t.tenant.name, timeZone: t.tenant.timezone, exportedAt: SEED_NOW, exportedByName: 'C&B' };
+    const periodOf = (label: string) => (rows(t, 'CyclePeriod').find((p) => p.label === label) as CyclePeriod).id;
+    const q1 = buildPayrollSheet(t.rows, periodOf('Q1'), meta);
+    expect(q1.ok && q1.sheet.rows.length).toBe(i === 0 ? 3 : 1);
+    const t01 = buildPayrollSheet(t.rows, periodOf('T01'), meta);
+    expect(t01.ok ? null : t01.issues.map((x) => [x.code, x.detail])).toEqual([['ERR-KPI-06', 'PERIOD_NOT_PAID']]);
   });
 });
 

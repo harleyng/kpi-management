@@ -47,6 +47,18 @@ export function buildSystem(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoal
       readAt: ['E016', 'E019', 'E022', 'E031'].includes(code) ? vn('2027-04-01 10:15') : undefined,
     });
   }
+  // The Q1 launch (the quarterly rule, PEND-09), same tick, to every subject.
+  const q1 = f.launches.evaluation.Q1;
+  for (const form of s.rows.FormInstance.filter((x) => x.launchId === q1.id)) {
+    const code = s.rows.Employee.find((e) => e.id === form.subjectEmployeeId)?.employeeCode as string;
+    notify(`launch-Q1-${code}`, {
+      event: 'FORM_LAUNCHED', to: code, refType: 'Launch', refId: q1.id,
+      subject: 'Đợt Đánh giá KPI quý 1/2027 đã bắt đầu',
+      body: 'Quy trình gồm 3 bước; hiện bạn ở bước 1 – Tự đánh giá. Hạn hoàn thành: 13/04/2027.',
+      at: T.evalQ1,
+      readAt: ['E015', 'E016', 'E022'].includes(code) ? vn('2027-04-01 10:20') : undefined,
+    });
+  }
   // Forms waiting for a manager or HR at SEED_NOW.
   const assigned: [string, string, string, string][] = [
     ['EVAL:T03:E015', 'E006', 'Mai Quang Huy', '2027-04-03 10:00'],
@@ -127,5 +139,14 @@ export function buildSystem(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoal
   }
   audit('form-T03-E024-cancel', { entity: 'FormInstance', entityId: f.form('EVAL:T03:E024').id, action: 'UPDATE', by: 'E035', at: vn('2027-04-02 10:00'), before: { status: 'Open' }, after: { status: 'Cancelled' }, reason: 'Nhân viên nghỉ việc từ 10/03/2027, không đánh giá tháng 3.' });
   audit('launch-round-1-cancel', { entity: 'FormLaunch', entityId: id('FormLaunch', 'GS-2027-round-1'), action: 'UPDATE', by: 'E035', at: vn('2027-03-10 16:00'), before: { status: 'Scheduled' }, after: { status: 'Cancelled' }, reason: 'Gộp vào đợt bổ sung tháng 4.' });
+  // PEND-09: HR switched on the quarterly and annual rules before Q1 ended, and off the monthly rule
+  // once it had launched March (its last month).
+  for (const [key, name, periodType] of [['quarterly-eval', 'Đánh giá KPI hằng quý', 'Quarter'], ['annual-eval', 'Đánh giá KPI cả năm', 'Year']] as const) {
+    audit(`rule-${key}-create`, { entity: 'FormLaunchRule', entityId: id('FormLaunchRule', key), action: 'CREATE', by: 'E035', at: vn('2027-03-25 10:00'), after: { name, periodType, isActive: true } });
+  }
+  audit('rule-monthly-eval-stop', {
+    entity: 'FormLaunchRule', entityId: id('FormLaunchRule', 'monthly-eval'), action: 'UPDATE', by: 'E035', at: vn('2027-04-01 10:00'),
+    before: { isActive: true }, after: { isActive: false }, reason: 'Từ quý 1/2027 đánh giá KPI chính thức theo quý và năm; tháng đánh giá công việc.',
+  });
   audit('delegation-revoke', { entity: 'Delegation', entityId: f.delegations.revoked.id, action: 'UPDATE', by: 'E011', at: vn('2027-03-20 10:00'), before: { revokedAt: null }, after: { revokedAt: vn('2027-03-20 10:00') } });
 }

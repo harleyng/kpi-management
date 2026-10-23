@@ -1,5 +1,6 @@
 import type { CyclePeriod, Goal, Id, RoleCode, Tenant } from '@/data/types';
 import { targetForPeriod } from '@/lib/calcRules';
+import { periodTarget } from '@/lib/resultRules';
 import { idsFor, seedId } from './ids';
 import { ResultScript } from './results';
 import { addLibrary, addNotificationTemplates, addRating, addRoles, addWorkflows, addWorkScoring, goalFromKpi, SeedRows } from './shared';
@@ -60,6 +61,8 @@ export function buildDemoCo(): TenantSeed {
   s.add('PerformanceCycle', { id: cycleId, name: 'KPI 2027', startDate: '2027-01-01', endDate: '2027-12-31', ratingScaleId: rating.scaleId, status: 'Active' });
   const t01 = s.add('CyclePeriod', { id: id('CyclePeriod', 'T01'), cycleId, periodType: 'Month', label: 'T01', startDate: '2027-01-01', endDate: '2027-01-31', inputDeadline: '2027-02-05', evalDeadline: '2027-02-13', isLocked: true });
   s.add('CyclePeriod', { id: id('CyclePeriod', 'T02'), cycleId, periodType: 'Month', label: 'T02', startDate: '2027-02-01', endDate: '2027-02-28', inputDeadline: '2027-03-05', evalDeadline: '2027-03-13', isLocked: false });
+  // The formal evaluation is quarterly (PEND-09): Q1 is what Demo Co pays on.
+  const q1 = s.add('CyclePeriod', { id: id('CyclePeriod', 'Q1'), cycleId, periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31', inputDeadline: null, evalDeadline: null, isLocked: false });
 
   const company = s.add('GoalPlan', { id: id('GoalPlan', 'DEMO'), cycleId, planType: 'KPI', ownerType: 'Company', ownerOrgUnitId: unit('DEMO'), ownerEmployeeId: null, status: 'Locked', lockedAt: vn('2026-12-20 10:00') });
   const staffPlan = s.add('GoalPlan', { id: id('GoalPlan', 'D003'), cycleId, planType: 'KPI', ownerType: 'Employee', ownerOrgUnitId: null, ownerEmployeeId: id('Employee', 'D003'), status: 'Locked', lockedAt: vn('2027-01-11 15:00') });
@@ -105,7 +108,9 @@ export function buildDemoCo(): TenantSeed {
   s.add('Evidence', { id: id('Evidence', 1), goalId: goals[0].id, periodId: t01.id, actualId: revenue.id, fileId: null, url: 'https://drive.demo.example/bao-cao-T01', note: null, uploadedBy: user('D003'), uploadedAt: vn('2027-02-02 09:00') });
 
   // ─── Forms ──────────────────────────────────────────────────────────────────────────────────
-  const rule = s.add('FormLaunchRule', { id: id('FormLaunchRule', 1), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng tháng', triggerEvent: 'PERIOD_END', periodType: 'Month', offsetDays: 1, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, isActive: true });
+  // PEND-09: the monthly rule launched T01 and is switched off; the quarterly one launched Q1.
+  const rule = s.add('FormLaunchRule', { id: id('FormLaunchRule', 1), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng tháng', triggerEvent: 'PERIOD_END', periodType: 'Month', offsetDays: 1, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, isActive: false });
+  const quarterly = s.add('FormLaunchRule', { id: id('FormLaunchRule', 2), workflowId: wf.id('KPI_EVAL'), name: 'Đánh giá KPI hằng quý', triggerEvent: 'PERIOD_END', periodType: 'Quarter', offsetDays: 1, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, isActive: true });
   const launch = s.add('FormLaunch', { id: id('FormLaunch', 'T01'), workflowId: wf.id('KPI_EVAL'), formType: 'KPI_EVAL', name: 'Đánh giá KPI tháng 01/2027', timing: 'RECURRING', scheduledAt: vn('2027-02-01 09:00'), launchRuleId: rule.id, cycleId, periodId: t01.id, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, status: 'Launched', launchedAt: vn('2027-02-01 09:00'), createdBy: null, createdAt: vn('2027-02-01 09:00'), startStepNo: null });
   const form = (key: string, f: { type: 'GOAL_SETTING' | 'GOAL_CHANGE' | 'KPI_EVAL'; periodId: Id | null; launchId: Id | null; at: string; due: string }) =>
     s.add('FormInstance', { id: id('FormInstance', key), workflowId: wf.id(f.type), formType: f.type, subjectEmployeeId: id('Employee', 'D003'), goalPlanId: staffPlan.id, workPlanId: null, periodId: f.periodId, currentStepId: null, currentStepEnteredAt: null, overdueHandledAt: null, status: 'Completed', dueDate: f.due, launchedAt: f.at, launchId: f.launchId });
@@ -127,6 +132,17 @@ export function buildDemoCo(): TenantSeed {
     const targetSnapshot = targetForPeriod(goal, s.rows.GoalPeriodTarget, t01.id);
     s.add('EvaluationItem', { id: id('EvaluationItem', goal.id), formId: ev.id, goalId: goal.id, actualSnapshot: null, actualTextSnapshot: null, actualValue: null, actualText: null, actualEnteredBy: null, submittedActualValue: null, submittedActualText: null, targetSnapshot, selfAchievementPct: null, selfComment: 'Hoàn thành.', managerAchievementPct: 95, managerComment: 'Đồng ý.', finalAchievementPct: 95, finalComment: null });
   }
+  // Q1 — D003's quarterly form, recorded by HR on 04-05. No month after T01 has an actual, so the quarter
+  // has none (a SUM / AVG quarter needs every month): the manager scores each goal with a comment.
+  const q1Launch = s.add('FormLaunch', { id: id('FormLaunch', 'Q1'), workflowId: wf.id('KPI_EVAL'), formType: 'KPI_EVAL', name: 'Đánh giá KPI quý 1/2027', timing: 'RECURRING', scheduledAt: vn('2027-04-01 09:00'), launchRuleId: quarterly.id, cycleId, periodId: q1.id, dueDays: 12, recipientMode: 'ALL', recipientFilter: null, status: 'Launched', launchedAt: vn('2027-04-01 09:00'), createdBy: null, createdAt: vn('2027-04-01 09:00'), startStepNo: null });
+  const evQ1 = form('EVAL-Q1', { type: 'KPI_EVAL', periodId: q1.id, launchId: q1Launch.id, at: vn('2027-04-01 09:00'), due: '2027-04-13' });
+  step(evQ1.id, 'KPI_EVAL', 1, 'D003', 'SUBMIT', vn('2027-04-02 10:00'));
+  step(evQ1.id, 'KPI_EVAL', 2, 'D002', 'SUBMIT', vn('2027-04-03 10:00'));
+  step(evQ1.id, 'KPI_EVAL', 3, 'D004', 'APPROVE', vn('2027-04-05 10:00'));
+  for (const goal of goals) {
+    const targetSnapshot = periodTarget(goal, q1, { periods: s.rows.CyclePeriod, periodTargets: s.rows.GoalPeriodTarget, kpiDefinitions: s.rows.KpiDefinition });
+    s.add('EvaluationItem', { id: id('EvaluationItem', 'Q1', goal.id), formId: evQ1.id, goalId: goal.id, actualSnapshot: null, actualTextSnapshot: null, actualValue: null, actualText: null, actualEnteredBy: null, submittedActualValue: null, submittedActualText: null, targetSnapshot, selfAchievementPct: null, selfComment: 'Hoàn thành quý 1.', managerAchievementPct: 100, managerComment: 'Đạt kế hoạch quý.', finalAchievementPct: 100, finalComment: null });
+  }
   const gc = form('GC', { type: 'GOAL_CHANGE', periodId: null, launchId: null, at: vn('2027-02-15 09:00'), due: '2027-02-25' });
   step(gc.id, 'GOAL_CHANGE', 1, 'D003', 'SUBMIT', vn('2027-02-15 10:00'));
   step(gc.id, 'GOAL_CHANGE', 2, 'D002', 'APPROVE', vn('2027-02-16 10:00'));
@@ -135,6 +151,8 @@ export function buildDemoCo(): TenantSeed {
 
   // ─── System ─────────────────────────────────────────────────────────────────────────────────
   s.add('Notification', { id: id('Notification', 1), templateId: templateOf('FORM_LAUNCHED'), eventCode: 'FORM_LAUNCHED', recipientUserId: user('D003'), refType: 'Launch', refId: launch.id, subject: 'Đợt Đánh giá KPI tháng 01/2027 đã bắt đầu', body: 'Hạn hoàn thành: 13/02/2027.', status: 'Read', createdAt: vn('2027-02-01 09:00'), sentAt: vn('2027-02-01 09:00'), readAt: vn('2027-02-01 10:00') });
+  s.add('AuditLog', { id: id('AuditLog', 2), userId: user('D004'), onBehalfOfUserId: null, entityName: 'FormLaunchRule', entityId: rule.id, action: 'UPDATE', beforeData: { isActive: true }, afterData: { isActive: false }, reason: 'Đánh giá KPI chính thức theo quý (PEND-09).', createdAt: vn('2027-03-25 10:00') });
+  s.add('AuditLog', { id: id('AuditLog', 3), userId: user('D004'), onBehalfOfUserId: null, entityName: 'FormLaunchRule', entityId: quarterly.id, action: 'CREATE', beforeData: null, afterData: { name: 'Đánh giá KPI hằng quý', periodType: 'Quarter', isActive: true }, reason: null, createdAt: vn('2027-03-25 10:00') });
   s.add('AuditLog', { id: id('AuditLog', 1), userId: user('D004'), onBehalfOfUserId: null, entityName: 'GoalPlan', entityId: staffPlan.id, action: 'LOCK', beforeData: { status: 'Approved' }, afterData: { status: 'Locked' }, reason: null, createdAt: vn('2027-01-11 15:00') });
 
   // ─── Monthly work (PEND-14): D003's January, planned, reviewed and recorded ───────────────────
@@ -166,10 +184,13 @@ export function buildDemoCo(): TenantSeed {
   w.act(wp2, 2, 'D003', 'SUBMIT', vn('2027-02-02 10:00'));
   w.act(wp2, 3, 'D002', 'APPROVE', vn('2027-02-03 15:00'));
 
-  // ─── Results (through resultRules, like Syntra's): T01 calculated and finalised on its deadline ─
+  // ─── Results (through resultRules, like Syntra's): T01 finalised on its deadline (tracked: no payout); Q1 ─
   const results = new ResultScript(s, id);
   results.calculate(t01.id);
   results.finalizeAll(t01.id, vn('2027-02-13 09:00'));
+  // Q1 — D003 finalised (paid: a quarter); the company plan has no quarter actual, so it stays Draft.
+  results.calculate(q1.id);
+  results.finalizeAll(q1.id, vn('2027-04-05 16:00'), [company.id]);
 
   return { tenant, rows: s.rows };
 }

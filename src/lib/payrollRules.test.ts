@@ -15,13 +15,14 @@ import { subjectAssignment } from './resultRules';
 const levels = sampleScale(); // rl-D rl-C rl-B rl-A rl-A+
 const cycle: PerformanceCycle = { id: 'c2027', tenantId: TENANT, name: 'KPI 2027', startDate: '2027-01-01', endDate: '2027-12-31', ratingScaleId: 'rs1', status: 'Active' };
 const scale: RatingScale = { id: 'rs1', tenantId: TENANT, name: 'Thang mẫu A+/A/B/C/D', status: 'Active' };
-const T01 = period();
-const T02 = period({ id: 'T02', label: 'T02', startDate: '2027-02-01', endDate: '2027-02-28' });
+// The paid periods (PEND-09): a quarter or the year. A month is tracked only — refused below.
+const Q1 = period({ id: 'Q1', periodType: 'Quarter', label: 'Q1', startDate: '2027-01-01', endDate: '2027-03-31' });
+const Q2 = period({ id: 'Q2', periodType: 'Quarter', label: 'Q2', startDate: '2027-04-01', endDate: '2027-06-30' });
 
 const result = (o: Partial<PeriodResult> = {}): PeriodResult => ({
-  id: `r-${o.goalPlanId ?? 'plan1'}-${o.periodId ?? 'T01'}`,
+  id: `r-${o.goalPlanId ?? 'plan1'}-${o.periodId ?? 'Q1'}`,
   tenantId: TENANT,
-  periodId: 'T01',
+  periodId: 'Q1',
   goalPlanId: 'plan1',
   ownerType: 'Employee',
   totalScore: 90.5,
@@ -36,7 +37,7 @@ const result = (o: Partial<PeriodResult> = {}): PeriodResult => ({
 function data(o: Partial<PayrollData> = {}): PayrollData {
   return {
     PerformanceCycle: [cycle],
-    CyclePeriod: [T01, T02],
+    CyclePeriod: [Q1, Q2],
     GoalPlan: [plan({ status: 'Locked' })],
     Employee: [employee()],
     EmployeeAssignment: [assignment({ orgUnitId: 'ou-kd' })],
@@ -51,7 +52,7 @@ function data(o: Partial<PayrollData> = {}): PayrollData {
 
 const meta: PayrollMeta = { tenantName: 'Syntra', timeZone: TZ, exportedAt: '2027-04-06T02:00:00.000Z', exportedByName: 'Người C&B' };
 
-function sheetOf(d: PayrollData, periodId = 'T01') {
+function sheetOf(d: PayrollData, periodId = 'Q1') {
   const outcome = buildPayrollSheet(d, periodId, meta);
   if (!outcome.ok) throw new Error(`refused: ${outcome.issues.map((i) => i.detail).join()}`);
   return outcome.sheet;
@@ -92,7 +93,7 @@ describe('buildPayrollSheet — which results', () => {
         result({ goalPlanId: 'plan2', status: 'Locked' }),
         result({ goalPlanId: 'plan3', status: 'Draft' }),
         result({ goalPlanId: 'unit', ownerType: 'OrgUnit', payoutPct: null }),
-        result({ goalPlanId: 'plan1', periodId: 'T02' }),
+        result({ goalPlanId: 'plan1', periodId: 'Q2' }),
         result({ goalPlanId: 'plan2', tenantId: 'other' , id: 'foreign' }),
       ],
     });
@@ -104,8 +105,22 @@ describe('buildPayrollSheet — which results', () => {
   });
 
   it('refuses a period with no Final / Locked Employee result (ERR-KPI-04 NO_FINAL_RESULT)', () => {
-    const outcome = buildPayrollSheet(data({ PeriodResult: [result({ status: 'Draft' }), result({ ownerType: 'Company', goalPlanId: 'x' })] }), 'T01', meta);
-    expect(outcome).toEqual({ ok: false, issues: [expect.objectContaining({ code: 'ERR-KPI-04', detail: 'NO_FINAL_RESULT', ref: 'T01' })] });
+    const outcome = buildPayrollSheet(data({ PeriodResult: [result({ status: 'Draft' }), result({ ownerType: 'Company', goalPlanId: 'x' })] }), 'Q1', meta);
+    expect(outcome).toEqual({ ok: false, issues: [expect.objectContaining({ code: 'ERR-KPI-04', detail: 'NO_FINAL_RESULT', ref: 'Q1' })] });
+  });
+
+  it.each([
+    ['a month (continuous evaluation, tracked)', period({ id: 'T01' })],
+    ['a half year', period({ id: 'H1', periodType: 'Half', label: 'H1', endDate: '2027-06-30' })],
+  ])('refuses %s even with Final results — only quarters and the year are paid (ERR-KPI-06 PERIOD_NOT_PAID, PEND-09)', (_, p) => {
+    const d = data({ CyclePeriod: [Q1, p], PeriodResult: [result({ periodId: p.id, payoutPct: null })] });
+    expect(buildPayrollSheet(d, p.id, meta)).toEqual({ ok: false, issues: [expect.objectContaining({ code: 'ERR-KPI-06', detail: 'PERIOD_NOT_PAID', ref: p.id })] });
+  });
+
+  it('exports the year like a quarter', () => {
+    const year = period({ id: 'Y', periodType: 'Year', label: 'Năm 2027', endDate: '2027-12-31' });
+    const d = data({ CyclePeriod: [Q1, year], PeriodResult: [result({ periodId: 'Y' })] });
+    expect(sheetOf(d, 'Y').rows).toHaveLength(1);
   });
 
   it('refuses an unknown period (ERR-KPI-02)', () => {
@@ -154,11 +169,11 @@ describe('buildPayrollSheet — who, where (subjectAssignment, BR-KPI-24/40/42)'
   });
 
   it('a transfer effective on the last day counts; one effective after does not', () => {
-    const onLast = assignment({ id: 'as-last', orgUnitId: 'ou-root', effectiveFrom: '2027-01-31' });
-    const after = assignment({ id: 'as-after', orgUnitId: 'ou-root', effectiveFrom: '2027-02-01' });
+    const onLast = assignment({ id: 'as-last', orgUnitId: 'ou-root', effectiveFrom: '2027-03-31' });
+    const after = assignment({ id: 'as-after', orgUnitId: 'ou-root', effectiveFrom: '2027-04-01' });
     const kdOpen = assignment({ id: 'as-kd', orgUnitId: 'ou-kd' });
-    expect(unitOf({ EmployeeAssignment: [{ ...kdOpen, effectiveTo: '2027-01-30' }, onLast] }).unitName).toBe('Syntra');
-    expect(unitOf({ EmployeeAssignment: [{ ...kdOpen, effectiveTo: '2027-01-31' }, after] }).unitName).toBe('Kinh doanh');
+    expect(unitOf({ EmployeeAssignment: [{ ...kdOpen, effectiveTo: '2027-03-30' }, onLast] }).unitName).toBe('Syntra');
+    expect(unitOf({ EmployeeAssignment: [{ ...kdOpen, effectiveTo: '2027-03-31' }, after] }).unitName).toBe('Kinh doanh');
   });
 
   it('someone who left mid-period is placed where they were on their last day', () => {
@@ -190,7 +205,7 @@ describe('buildPayrollSheet — who, where (subjectAssignment, BR-KPI-24/40/42)'
 
   it('agrees with the payout subject for the same inputs', () => {
     const d = data({ EmployeeAssignment: [kd, root] });
-    expect(subjectAssignment(d.GoalPlan[0], T01, d)?.id).toBe('as-root');
+    expect(subjectAssignment(d.GoalPlan[0], Q1, d)?.id).toBe('as-root');
   });
 });
 
@@ -206,7 +221,7 @@ describe('buildPayrollSheet — order and header', () => {
 
   it('carries the cycle, period, scale and export metadata', () => {
     expect(sheetOf(data())).toMatchObject({
-      tenantName: 'Syntra', timeZone: TZ, cycleName: 'KPI 2027', periodLabel: 'T01', periodStart: '2027-01-01', periodEnd: '2027-01-31',
+      tenantName: 'Syntra', timeZone: TZ, cycleName: 'KPI 2027', periodLabel: 'Q1', periodStart: '2027-01-01', periodEnd: '2027-03-31',
       ratingScaleName: 'Thang mẫu A+/A/B/C/D', exportedAt: meta.exportedAt, exportedByName: 'Người C&B',
     });
     expect(sheetOf(data({ PerformanceCycle: [{ ...cycle, ratingScaleId: null }] })).ratingScaleName).toBeNull();
@@ -222,12 +237,19 @@ describe('payrollPreview', () => {
         result({ goalPlanId: 'p2', payoutPct: null }),
         result({ goalPlanId: 'p3', status: 'Draft' }),
         result({ goalPlanId: 'u', ownerType: 'OrgUnit' }),
-        result({ goalPlanId: 'p1', periodId: 'T02' }),
+        result({ goalPlanId: 'p1', periodId: 'Q2' }),
       ],
     });
-    const preview = payrollPreview(d, 'T01');
-    expect(preview).toEqual({ exportable: 2, noPayout: 1, missingEmployee: 1, drafts: 1, unitResults: 1 });
+    const preview = payrollPreview(d, Q1);
+    expect(preview).toEqual({ exportable: 2, noPayout: 1, missingEmployee: 1, drafts: 1, unitResults: 1, notPaid: false });
     expect(preview.exportable).toBe(sheetOf(d).rows.length);
+  });
+
+  it('a month agrees with the sheet: nothing exportable, flagged not paid (PEND-09)', () => {
+    const t01 = period({ id: 'T01' });
+    const d = data({ CyclePeriod: [Q1, t01], PeriodResult: [result({ periodId: 'T01', payoutPct: null })] });
+    expect(payrollPreview(d, t01)).toEqual({ exportable: 0, noPayout: 0, missingEmployee: 0, drafts: 0, unitResults: 0, notPaid: true });
+    expect(buildPayrollSheet(d, 'T01', meta).ok).toBe(false);
   });
 });
 

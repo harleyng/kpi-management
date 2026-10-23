@@ -340,10 +340,12 @@ is **2027-04-06 09:00 +07**; the scheduler last ran 2027-04-01 09:00. Ids come f
 
 **Frozen at Gate 1 (2026-10-19)** as the contract between tracks: `src/data/fixtures/freeze.test.ts` pins
 the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (55);
-`SEED_VERSION` is `2027-04-06.A1.B1.A2.B2` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
+`SEED_VERSION` is `2027-04-06.A1.B1.A2.B2.A3` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
 results; then by Plan B 8.1: the `work` group, six monthly-work entities, the Kinh doanh monthly-work pilot; then
 by Plan A's A2: `startStepNo`, `autoApprove`, HR's RETURN at registration step 4; then by Plan B 8.2: the 3-step
-WORK_PLAN workflow, the seed's plans launched at the employee's step). A
+WORK_PLAN workflow, the seed's plans launched at the employee's step; then by Plan A's A3 (PEND-09): the monthly
+evaluation rule stopped, quarterly and annual rules, the Q1 launch with three recorded forms and their paid Final
+results, Demo Co's Q1; month results carry no payout). A
 failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4

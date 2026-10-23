@@ -243,7 +243,7 @@ export const WORKFLOWS: readonly { key: FormType; name: string; steps: readonly 
   },
   {
     key: 'KPI_EVAL',
-    name: 'Đánh giá KPI hằng tháng (3 bước)',
+    name: 'Đánh giá KPI quý / năm (3 bước)',
     steps: [
       { name: 'Tự đánh giá', actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 6, onOverdue: 'AUTO_FORWARD', remindDaysBefore: 1, evaluationColumn: 'SELF', requiresComment: true },
       { name: 'Quản lý đánh giá', actorRule: 'DIRECT_MANAGER', allowedActions: ['SUBMIT', 'RETURN', 'EDIT'], slaDays: 4, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: 'MANAGER', requiresComment: false },

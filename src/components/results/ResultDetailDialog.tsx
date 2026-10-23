@@ -18,7 +18,7 @@ import { AdjustmentValue, PayoutValue, RatingValue } from './ResultCells';
 
 interface ResultDetailDialogProps {
   row: ResultRow | null;
-  period: Pick<CyclePeriod, 'label'> | null;
+  period: Pick<CyclePeriod, 'label' | 'periodType'> | null;
   levels: readonly RatingLevel[];
   onOpenChange: (open: boolean) => void;
   /** HR / C&B on `/admin/results`: a Draft's adjustment can be edited. */
@@ -117,7 +117,7 @@ export function ResultDetailDialog({ row, period, levels, onOpenChange, canAdjus
                     <RatingValue result={result} level={row.level} />
                   </Figure>
                   <Figure term="% hưởng lương KPI">
-                    <PayoutValue state={payoutState(result, levels)} />
+                    <PayoutValue state={payoutState(result, levels, period)} />
                   </Figure>
                 </dl>
                 {!isWeightComplete(view.breakdown.totalWeight) && view.lines.length > 0 && (

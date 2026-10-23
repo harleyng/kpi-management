@@ -9,7 +9,7 @@ export type LaunchesSection = 'runs' | 'rules' | 'forms' | 'workflows';
 
 const SECTIONS: Record<LaunchesSection, { title: string; description: string }> = {
   runs: { title: 'Đợt khởi chạy', description: 'Mọi đợt gửi phiếu đăng ký và đánh giá KPI, kể cả đợt do lịch tự động tạo.' },
-  rules: { title: 'Lịch tự động', description: 'Lịch tự khởi chạy phiếu đánh giá tháng sau mỗi kỳ.' },
+  rules: { title: 'Lịch tự động', description: 'Lịch tự khởi chạy phiếu đánh giá KPI sau mỗi quý và cuối năm.' },
   forms: { title: 'Phiếu đã tạo', description: 'Theo dõi mọi phiếu các đợt đã tạo: xử lý thay, hủy phiếu khi cần.' },
   workflows: { title: 'Quy trình duyệt', description: 'Các bước duyệt của từng loại phiếu: SLA, xử lý quá hạn, nhắc hạn, bắt buộc nhận xét.' },
 };
