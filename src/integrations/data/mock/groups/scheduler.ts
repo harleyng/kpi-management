@@ -7,6 +7,7 @@ import {
   reminderKey,
   remindersDue,
   stepDeadline,
+  isFrozen,
   transition,
 } from '@/lib/workflowRules';
 import type { SchedulerGateway, SchedulerReport } from '../../types';
@@ -68,6 +69,8 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
           launchedAt: null,
           createdBy: null,
           createdAt: tx.now,
+          // A rule's recurring launches start at step 1 (a rule has no start step).
+          startStepNo: null,
         });
         fire(launch);
       }
@@ -75,6 +78,9 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
       // 3. Overdue steps, once per entry into the step.
       for (const due of overdueActions(formsAtStart, steps, clock)) {
         const form = tx.get('FormInstance', due.formId);
+        // A frozen form (HR locked its registration plan by hand) is not moved: moving it would unlock the plan.
+        const dueStep = stepOf(form, stepsOf(tx, form.workflowId));
+        if (due.action !== null && dueStep && isFrozen(form, dueStep, planOfForm(tx, form))) continue;
         const missedBy: Id[] = assigneesFor(tx, form);
         if (due.action === null) {
           const handled = markHandled(form, clock);

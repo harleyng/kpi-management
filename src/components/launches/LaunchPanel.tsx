@@ -9,14 +9,14 @@ import { toastError } from '@/components/shared/toastError';
 import { useSession } from '@/contexts/useSession';
 import { FORM_TYPE_LABEL, LAUNCH_TIMING_LABEL, type FormLaunch, type FormType, type Id, type RecipientFilter, type RecipientMode } from '@/data/types';
 import type { NewLaunchInput } from '@/integrations/data/types';
-import { useCreateLaunch, useWorkflows } from '@/hooks/queries/forms';
+import { useCreateLaunch, useWorkflowSteps, useWorkflows } from '@/hooks/queries/forms';
 import { useCycles, usePeriods } from '@/hooks/queries/goals';
 import { useGatewayClock } from '@/hooks/queries/session';
 import { ERROR_CATALOG } from '@/lib/errorCatalog';
 import { cycleAllowsLaunch } from '@/lib/cycleRules';
 import { addDaysToInstant, fromZonedLocalInput, toZonedLocalInput } from '@/lib/isoDate';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { launchDueDate, launchTimingIssues, validateLaunch } from '@/lib/workflowRules';
+import { launchDueDate, launchTimingIssues, startStepChoices, validateLaunch } from '@/lib/workflowRules';
 import { RecipientFilterFields } from './RecipientFilterFields';
 import { EMPTY_RECIPIENT_FILTER } from './recipients';
 
@@ -64,9 +64,14 @@ export function LaunchPanel({
   const [mode, setMode] = useState<RecipientMode>('ALL');
   const [filter, setFilter] = useState<RecipientFilter>(EMPTY_RECIPIENT_FILTER);
   const [tried, setTried] = useState(false);
+  /** PEND-01 — the step the forms start at; `null` = step 1 (top-down). */
+  const [startStepNo, setStartStepNo] = useState<number | null>(null);
   const periods = usePeriods(cycleId);
 
   const workflow = workflows.data?.find((w) => w.id === workflowId) ?? workflows.data?.find((w) => w.isDefault) ?? workflows.data?.[0];
+  const workflowSteps = useWorkflowSteps(workflow?.id);
+  /** Only a workflow whose owner acts after step 1 offers a choice (registration: manager first, or the employee). */
+  const startChoices = workflow ? startStepChoices((workflowSteps.data ?? []).filter((s) => s.workflowId === workflow.id)) : [];
   const openCycles = (cycles.data ?? []).filter((c) => cycleAllowsLaunch(c, formType).ok);
   const due = /^\d+$/.test(dueDays.trim()) ? Number(dueDays) : Number.NaN;
   const scheduledAt = timing === 'SCHEDULED' ? fromZonedLocalInput(scheduledLocal, tenant.timezone) : clock.now;
@@ -90,6 +95,7 @@ export function LaunchPanel({
     workflowId !== null ||
     name.trim() !== '' ||
     timing !== 'NOW' ||
+    startStepNo !== null ||
     cycleId !== null ||
     periodId !== null ||
     dueDays !== String(DEFAULT_DUE_DAYS) ||
@@ -100,7 +106,7 @@ export function LaunchPanel({
   const submit = () => {
     setTried(true);
     if (blocked || !workflow) return;
-    const base = { workflowId: workflow.id, name: name.trim(), cycleId, periodId: evaluation ? periodId : null, dueDays: due, recipientMode: mode, recipientFilter };
+    const base = { workflowId: workflow.id, name: name.trim(), cycleId, periodId: evaluation ? periodId : null, dueDays: due, recipientMode: mode, recipientFilter, startStepNo };
     const input: NewLaunchInput = timing === 'NOW' ? { ...base, timing: 'NOW' } : { ...base, timing: 'SCHEDULED', scheduledAt: scheduledAt! };
     create.mutate(input, {
       onSuccess: (launch) => {
@@ -116,6 +122,7 @@ export function LaunchPanel({
   const changeType = (next: FormType) => {
     setFormType(next);
     setWorkflowId(null);
+    setStartStepNo(null);
     setCycleId(null);
     setPeriodId(null);
   };
@@ -151,7 +158,13 @@ export function LaunchPanel({
           </FormField>
           <FormField label="Quy trình" required error={hint('workflow')}>
             {(control) => (
-              <Select value={workflow?.id} onValueChange={setWorkflowId}>
+              <Select
+                value={workflow?.id}
+                onValueChange={(v) => {
+                  setWorkflowId(v);
+                  setStartStepNo(null);
+                }}
+              >
                 <SelectTrigger {...control}>
                   <SelectValue placeholder="Chọn quy trình" />
                 </SelectTrigger>
@@ -241,6 +254,31 @@ export function LaunchPanel({
             {(control) => <Input {...control} inputMode="numeric" className="tabular" value={dueDays} onChange={(e) => setDueDays(e.target.value)} />}
           </FormField>
         </div>
+
+        {startChoices.length > 1 && (
+          <div className="grid gap-3 md:grid-cols-4">
+            <FormField
+              label="Bắt đầu từ"
+              className="md:col-span-2"
+              hint={startStepNo === null ? 'Quản lý giao chỉ tiêu trước, nhân viên bổ sung sau.' : 'Nhân viên tự lập chỉ tiêu, các bước trước được bỏ qua; quản lý vẫn duyệt và sửa được.'}
+            >
+              {(control) => (
+                <Select value={String(startStepNo ?? 1)} onValueChange={(v) => setStartStepNo(v === '1' ? null : Number(v))}>
+                  <SelectTrigger {...control}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {startChoices.map((s) => (
+                      <SelectItem key={s.id} value={String(s.stepNo)}>
+                        {s.stepNo === 1 ? 'Quản lý giao trước' : s.actorRule === 'SELF' ? 'Nhân viên tự lập' : s.name} (bước {s.stepNo}: {s.name})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+          </div>
+        )}
 
         <RecipientFilterFields mode={mode} filter={filter} onModeChange={setMode} onFilterChange={setFilter} />
         {hint('recipients') && <p className="text-xs text-support-negative">{hint('recipients')}</p>}

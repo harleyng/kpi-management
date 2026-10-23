@@ -364,10 +364,18 @@ export const SCHEMA: Readonly<Record<CollectionName, CollectionSpec>> = {
     unique: [{ fields: ['formType'], where: (row) => row.isDefault === true }],
   },
   WorkflowStep: {
-    writable: ['name', 'actorRule', 'actorRoleId', 'allowedActions', 'returnToStepNo', 'slaDays', 'onOverdue', 'remindDaysBefore', 'evaluationColumn', 'requiresComment'],
+    writable: ['name', 'actorRule', 'actorRoleId', 'allowedActions', 'returnToStepNo', 'slaDays', 'onOverdue', 'remindDaysBefore', 'evaluationColumn', 'requiresComment', 'autoApprove'],
     refs: [owner('workflowId', 'WorkflowTemplate', 'cascade'), ref('actorRoleId', 'Role')],
     unique: [{ fields: ['workflowId', 'stepNo'] }],
-    checks: [setIff('actorRoleId', (r) => r.actorRule === 'ROLE', 'actorRule is ROLE'), nonNegative('slaDays', 'remindDaysBefore')],
+    checks: [
+      setIff('actorRoleId', (r) => r.actorRule === 'ROLE', 'actorRule is ROLE'),
+      nonNegative('slaDays', 'remindDaysBefore'),
+      // PEND-02: the row-local half of `validateWorkflow`'s autoApprove rules (last step is cross-row).
+      (row) =>
+        row.autoApprove === true && (!(Array.isArray(row.allowedActions) && row.allowedActions.includes('APPROVE')) || row.stepNo === 1)
+          ? 'autoApprove needs APPROVE and a step after the first'
+          : null,
+    ],
   },
   FormInstance: {
     writable: [],
@@ -434,6 +442,7 @@ export const SCHEMA: Readonly<Record<CollectionName, CollectionSpec>> = {
     ],
     checks: [
       nonNegative('dueDays'),
+      (row) => (row.startStepNo === null || row.startStepNo === undefined || (Number.isInteger(row.startStepNo) && (row.startStepNo as number) >= 1) ? null : 'startStepNo must be null or an integer ≥ 1'),
       setIff('recipientFilter', (r) => r.recipientMode === 'FILTER', 'recipientMode is FILTER'),
       sameParent('periodId', 'CyclePeriod', 'cycleId', (row) => row.cycleId),
     ],

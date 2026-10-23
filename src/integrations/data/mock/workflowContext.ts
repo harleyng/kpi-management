@@ -25,6 +25,7 @@ import {
   editRefusal,
   editStanding,
   entitlementContextOf,
+  initialStep,
   isTerminal,
   launchDueDate,
   resolveRecipients,
@@ -220,7 +221,8 @@ export function setPlanStatus(tx: Tx, plan: GoalPlan, to: GoalPlan['status'], re
 export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; formIds: Id[]; skipped: Recipients['skipped'] } {
   const clock = clockOf(tx);
   const steps = stepsOf(tx, launch.workflowId);
-  const first = steps[0];
+  // PEND-01 — the launch's start step; one no longer valid (the workflow was edited since) is step 1.
+  const first = initialStep(steps, launch.startStepNo);
   if (!first) throw new KpiError('ERR-KPI-06', `workflow ${launch.workflowId} has no steps`);
   const period = launch.periodId ? tx.get('CyclePeriod', launch.periodId) : null;
   const cycleId = launch.cycleId ?? period?.cycleId ?? null;

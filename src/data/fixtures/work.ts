@@ -76,6 +76,7 @@ export function workSeed(d: WorkDeps) {
       launchedAt: l.at,
       createdBy: d.user(l.by),
       createdAt: l.at,
+      startStepNo: null,
     });
 
   const plan = (code: string, month: string, status: WorkPlanStatus, approved: { at: string; by: string } | null, specs: readonly TaskSpec[]): WorkPlan => {

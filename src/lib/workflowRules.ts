@@ -44,7 +44,7 @@ import { isWorkFormType } from '@/data/types';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
 import { canSubmit, type CanSubmitInput } from './formRules';
 import { cycleAllowsLaunch } from './cycleRules';
-import { PLAN_STATUS_ON_CANCEL, PLAN_STATUS_ON_COMPLETE, planStatusOnEnterStep, type Decision } from './goalPlanRules';
+import { PLAN_STATUS_ON_CANCEL, PLAN_STATUS_ON_COMPLETE, ownerStepNo, planStatusOnEnterStep, type Decision } from './goalPlanRules';
 import { addDays, isIsoDate, isWithin, minDate, todayOf, toZonedDate, type Clock } from './isoDate';
 import { descendantUnitIds, isEmployedDuring, isEmployedOn, managerOf, primaryAssignmentOn, scopeCoversEmployee, scopeSubjectOn } from './orgRules';
 
@@ -66,6 +66,8 @@ const lastStepNo = (steps: readonly WorkflowStep[]) => Math.max(...steps.map((s)
  * LOCK only on registration (a GOAL_CHANGE plan is already locked and an evaluation has no plan to
  * lock, so the form could never be released); registration and monthly work need ≥ 2 steps including
  * the owner's, and monthly work never ends on the employee's step; a ROLE step names its role.
+ * `autoApprove` (PEND-02) only on the last step, never step 1, on a step that allows APPROVE; and no
+ * AUTO_FORWARD into it — the form would complete with no person deciding.
  */
 export function validateWorkflow(formType: FormType, steps: readonly WorkflowStep[]): RuleIssue[] {
   if (steps.length === 0) return [ruleIssue('ERR-KPI-06', null, 'STEPS_REQUIRED')];
@@ -83,6 +85,12 @@ export function validateWorkflow(formType: FormType, steps: readonly WorkflowSte
     if (step.slaDays !== null && !(Number.isInteger(step.slaDays) && step.slaDays >= 0)) bad(step, 'SLA_INVALID');
     if (step.remindDaysBefore !== null && !(Number.isInteger(step.remindDaysBefore) && step.remindDaysBefore >= 0)) bad(step, 'REMIND_INVALID');
     if (step.actorRule === 'ROLE' && step.actorRoleId === null) bad(step, 'ROLE_REQUIRED');
+    if (step.autoApprove) {
+      if (step.stepNo !== n) bad(step, 'AUTO_APPROVE_NOT_LAST');
+      if (step.stepNo === 1) bad(step, 'AUTO_APPROVE_ON_FIRST_STEP');
+      if (!step.allowedActions.includes('APPROVE')) bad(step, 'AUTO_APPROVE_NEEDS_APPROVE');
+    }
+    if (step.onOverdue === 'AUTO_FORWARD' && sorted[i + 1]?.autoApprove) bad(step, 'AUTO_FORWARD_INTO_AUTO_APPROVE');
   });
   if (formType === 'GOAL_SETTING' || isWorkFormType(formType)) {
     if (n < 2) bad(null, 'TOO_FEW_STEPS');
@@ -298,7 +306,7 @@ export function entitlement(
 
 // ─── The transition table ──────────────────────────────────────────────────────────────────────
 
-export type TransitionAction = PersonFormAction | 'AUTO_FORWARD' | 'AUTO_LOCK';
+export type TransitionAction = PersonFormAction | 'AUTO_FORWARD' | 'AUTO_LOCK' | 'AUTO_APPROVE';
 
 type Target = { kind: 'enter'; stepNo: number; viaReturn: boolean } | { kind: 'complete' } | { kind: 'cancel' } | { kind: 'stay' };
 
@@ -334,6 +342,11 @@ export const TRANSITIONS: Readonly<Record<TransitionAction, TransitionRule>> = {
     refusal: (step, form) =>
       step.onOverdue !== 'LOCK' || form.formType !== 'GOAL_SETTING' ? refuse('ERR-KPI-04', 'NOT_CONFIGURED') : null,
     target: () => ({ kind: 'stay' }),
+  },
+  // PEND-02 — the system approves a step configured to (`settleAutoSteps`), the moment the form enters it.
+  AUTO_APPROVE: {
+    refusal: (step) => (step.autoApprove && step.allowedActions.includes('APPROVE') ? null : refuse('ERR-KPI-04', 'NOT_CONFIGURED')),
+    target: forward,
   },
 };
 
@@ -411,6 +424,40 @@ export function transition(
         planStatus: action === 'AUTO_LOCK' ? 'Locked' : null,
       };
   }
+}
+
+/** A move and the system's own approvals that follow it, merged into what is written once. */
+export interface SettledMove extends TransitionResult {
+  /** Every history row, in order: the move itself, then each AUTO_APPROVE (no actor). */
+  records: TransitionResult['record'][];
+  /** The steps the form passed through and left at once (their entry effects still apply). */
+  passedSteps: WorkflowStep[];
+}
+
+/**
+ * PEND-02 — a move that enters a step with `autoApprove` is followed, in the same write, by the
+ * system's AUTO_APPROVE of that step (no content check: the person before already passed it). The
+ * result is written ONCE: the form's final position, the LAST plan status (a registration goes straight
+ * to Locked, never through Approved), `applyGoalChanges` if any part asks for it, and every history row.
+ * A move entering no such step is returned as it is.
+ */
+export function settleAutoSteps(form: FormInstance, steps: readonly WorkflowStep[], moved: TransitionResult, clock: Clock): SettledMove | Refusal {
+  const settled: SettledMove = { ...moved, records: [moved.record], passedSteps: [] };
+  let current = { ...form, ...moved.form };
+  let entered = moved.nextStep;
+  while (entered?.autoApprove) {
+    const auto = transition(current, steps, 'AUTO_APPROVE', { clock, comment: null });
+    if (!auto.ok) return auto;
+    settled.passedSteps.push(entered);
+    settled.records.push(auto.record);
+    settled.form = auto.form;
+    settled.nextStep = auto.nextStep;
+    settled.planStatus = auto.planStatus ?? settled.planStatus;
+    settled.applyGoalChanges = settled.applyGoalChanges || auto.applyGoalChanges;
+    current = { ...current, ...auto.form };
+    entered = auto.nextStep;
+  }
+  return settled;
 }
 
 /**
@@ -588,10 +635,12 @@ export interface OverdueAction {
 export function effectiveOverdueBehaviour(
   form: Pick<FormInstance, 'formType'>,
   step: Pick<WorkflowStep, 'onOverdue' | 'stepNo'>,
-  workflowSteps: readonly Pick<WorkflowStep, 'stepNo'>[],
+  workflowSteps: readonly Pick<WorkflowStep, 'stepNo' | 'autoApprove'>[],
 ): OverdueBehaviour | null {
   const behaviour = step.onOverdue;
   if (behaviour === 'AUTO_FORWARD' && step.stepNo >= Math.max(...workflowSteps.map((s) => s.stepNo))) return 'REMIND';
+  // Never forward into a step that approves itself: the form would complete with nobody deciding.
+  if (behaviour === 'AUTO_FORWARD' && workflowSteps.find((s) => s.stepNo === step.stepNo + 1)?.autoApprove) return 'REMIND';
   if (behaviour === 'LOCK' && form.formType !== 'GOAL_SETTING') return 'REMIND';
   return behaviour;
 }
@@ -688,6 +737,38 @@ export function validateLaunch(
 export function launchPeriodIssues(formType: FormType, period: Pick<CyclePeriod, 'periodType'> | null): RuleIssue[] {
   if (!isWorkFormType(formType) || period === null || period.periodType === 'Month') return [];
   return [ruleIssue('ERR-KPI-06', 'periodId', 'MONTH_REQUIRED')];
+}
+
+/**
+ * PEND-01 — where a form may start (`FormLaunch.startStepNo`, `StartFormInput.startStepNo`): `null`
+ * (step 1) or a whole step of the workflow up to the owner's own (SELF) step — starting later would skip
+ * the owner (06 `START_STEP_INVALID`). Not registration-only: any form with a SELF step may start there
+ * (Plan B's WORK_PLAN); a workflow with no SELF step starts at 1.
+ */
+export function startStepIssues(startStepNo: number | null | undefined, steps: readonly Pick<WorkflowStep, 'stepNo' | 'actorRule'>[]): RuleIssue[] {
+  if (startStepNo === null || startStepNo === undefined) return [];
+  const ok = Number.isInteger(startStepNo) && startStepNo >= 1 && startStepNo <= ownerStepNo(steps) && steps.some((s) => s.stepNo === startStepNo);
+  return ok ? [] : [ruleIssue('ERR-KPI-06', 'startStepNo', 'START_STEP_INVALID')];
+}
+
+/** The steps a form may start at (PEND-01): step 1 up to the owner's (SELF) step, in order. */
+export function startStepChoices<S extends Pick<WorkflowStep, 'stepNo' | 'actorRule'>>(steps: readonly S[]): S[] {
+  const owner = ownerStepNo(steps);
+  return [...steps].sort((a, b) => a.stepNo - b.stepNo).filter((s) => s.stepNo <= owner);
+}
+
+/** One way to store "step 1": `null` (PEND-01). */
+export const normaliseStartStepNo = (startStepNo: number | null | undefined): number | null =>
+  startStepNo === undefined || startStepNo === null || startStepNo === 1 ? null : startStepNo;
+
+/**
+ * The step a form is created at: `startStepNo` when it is (still) valid, else step 1 — a scheduled
+ * launch can outlive an edit of its workflow, and a scheduler tick must not die on it.
+ */
+export function initialStep<S extends Pick<WorkflowStep, 'stepNo' | 'actorRule'>>(steps: readonly S[], startStepNo: number | null | undefined): S | undefined {
+  const sorted = [...steps].sort((a, b) => a.stepNo - b.stepNo);
+  if (startStepIssues(startStepNo, sorted).length === 0 && startStepNo != null) return sorted.find((s) => s.stepNo === startStepNo);
+  return sorted[0];
 }
 
 /** One-off SCHEDULED launches whose time has come. */

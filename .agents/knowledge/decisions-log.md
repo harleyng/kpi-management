@@ -6,6 +6,28 @@
 
 ---
 
+## 2026-10-23 — Plan A, A2: a form may start at the owner's step; the last step may approve itself; HR returns registration to the manager
+
+**Decision.** PEND-01/02 on `ASSUMPTION Q44–Q46` (BR-KPI-12, 19, 20). `FormLaunch.startStepNo` (and an optional
+`StartFormInput.startStepNo`) starts forms at any step up to the SELF step (`startStepIssues`, 06
+`START_STEP_INVALID`), step 1 stored as `null`, a stale one falls back to step 1 (`initialStep`). `WorkflowStep.autoApprove`
+(last step only, not step 1, needs APPROVE, no AUTO_FORWARD into it) makes the system record `AUTO_APPROVE` (no actor)
+in the same write as the move entering the step — `workflowRules.settleAutoSteps` merges the moves so the form and
+the plan are written once. GOAL_SETTING step 4 gains RETURN (→ step 3). The scheduler no longer moves a form whose
+registration plan HR locked by hand. `listFormActions` keeps insertion order on equal `actedAt`.
+
+**Why.** Chaining the auto-approval as a second write would have passed the plan through Approved (a spurious
+`goalPlan.statusChanged` and audit row) before Locked. An AUTO_FORWARD into an auto-approving step would complete a
+form nobody decided. A scheduled launch can outlive an edit of its workflow; throwing on its stale start step would
+abort the whole scheduler tick. Moving a frozen form by AUTO_FORWARD would set its plan to Submitted — silently
+undoing HR's lock (a pre-existing gap the review found).
+
+**Consequence.** Plan B reuses `startStepNo` for WORK_PLAN and `autoApprove` for its HR "ghi nhận" step. Nobody is
+notified of an automatic lock (Q29 kept; a candidate notice for P2). `SEED_VERSION` 2027-04-06.A1.B1.A2.
+
+**Updated alongside.** `business-rules.md` BR-KPI-12, 19, 20, §5 step actions, §8 Q44–Q46, §12 (PEND-01/02 removed);
+`architecture.md` D10 and `SEED_VERSION`; `new-flow.md` §4G, §5; plan tables.
+
 ## 2026-10-23 — Plan B, B1 pre-merge review: closing the dead ends before the contract freezes
 
 **Decision.** system-architect's pre-merge review (approve with changes) and workflow-expert's B2 review found

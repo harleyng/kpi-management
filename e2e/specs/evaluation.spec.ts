@@ -55,3 +55,20 @@ test.describe('@smoke evaluation form (PEND-06/07/08)', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('@smoke registration returned by HR (PEND-02)', () => {
+  test('HR sends a plan at "ghi nhận và khóa" back to the manager, with a reason', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    await become(page, 'Kha Thị Duyên'); // E035, HR
+    await page.goto('/my/tasks/inbox');
+    await page.getByRole('button', { name: 'Mở phiếu Đăng ký KPI của Hà Văn Phong' }).click(); // E040, at HR's step
+    await page.getByRole('button', { name: 'Trả lại', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('textbox').fill('Chỉ tiêu tồn kho chưa liên kết KPI phòng, đề nghị quản lý xem lại.');
+    await dialog.getByRole('button', { name: 'Trả lại', exact: true }).click();
+    await expect(page.getByText('Đã trả lại').first()).toBeVisible();
+    await expect(page.getByText(/Bước 3\/4/)).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});

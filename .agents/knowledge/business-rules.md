@@ -165,7 +165,24 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   **Approved** when a reviewer already approved, and **Locked** on the final APPROVE; cancelling the
   form puts it back to Draft. 100% / 5–8 goals is required only from the owner's step on — the
   manager's step-1 SUBMIT hands an unfinished plan to the employee (`formRules.canSubmit`).
-  > **Pending (22/10/2026 meeting, §12):** PEND-01, 02 — step 1 becomes optional so an employee can register bottom-up without a cascade (`Q44`, `Q45`), and step 4 can be configured to record and lock automatically (`Q46`).
+  **Top-down and bottom-up run in parallel** (22/10, PEND-01, built 2026-10-23, `ASSUMPTION Q44, Q45`): a launch
+  (`FormLaunch.startStepNo`) or a by-hand start (`StartFormInput.startStepNo`) may start the forms at the owner's
+  own step — the steps before it are skipped and record nothing; the plan is Draft there; at most the owner's step
+  (06 `START_STEP_INVALID`, `workflowRules.startStepIssues`); step 1 is stored as `null`; a scheduled launch whose
+  start step no longer fits its edited workflow starts at step 1 (`initialStep`). A return still goes to
+  `returnToStepNo` (a bottom-up form returned past the owner lands on the skipped step 1 — allowed). A manager's
+  own plan works the same way (Q44). Any workflow with a SELF step may use it (monthly work, Plan B); a rule's
+  recurring launches start at step 1. **Step 4 records and locks by itself when configured** (PEND-02,
+  `ASSUMPTION Q46`: on the workflow template, manual by default): a last step with `autoApprove` is approved by
+  the system (`AUTO_APPROVE`, no actor) in the same write as the move that enters it — the manager's APPROVE
+  completes the form and the plan goes straight to Locked (`settleAutoSteps`; audited LOCK reason
+  `AUTO_APPROVE`), with no content check (the person before already passed it); forms already waiting at the
+  step when it is switched on stay with HR. `validateWorkflow`: `autoApprove` only on the last step, never step
+  1, on a step that allows APPROVE, and no AUTO_FORWARD into it (`AUTO_FORWARD_INTO_AUTO_APPROVE`; one that
+  slipped in acts as REMIND). The step's SLA, overdue and reminders never fire (the form never rests there).
+  Nobody is notified of the automatic lock (`ASSUMPTION Q29`). **HR may send the plan back to the manager**
+  at step 4 (RETURN → step 3, comment required, plan Submitted); the form's due date does not move, so a late
+  return can make step 3 overdue at once (HR unlocks with a new date, BR-KPI-14).
 - **BR-KPI-13** — When a step's deadline passes, the step's **overdue behaviour** applies, and it is
   configured per step: **lock** the Goal Plan (registration: "the goal plan will be locked and can not be
   editable after running out of time"), **auto-forward** to the next actor (evaluation: an employee who
@@ -239,7 +256,8 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
 - **BR-KPI-18** — A form can be **submitted** only when the weights sum to 100% (BR-KPI-04) and every
   item that requires a score or comment at that step has one (`formRules.canSubmit`, D6). *Source:
   Manager guide p. 26.*
-- **BR-KPI-19** — Forms are created by a **launch**: form type and workflow template; timing — now, on a
+- **BR-KPI-19** — Forms are created by a **launch**: form type and workflow template; the step they start at
+  (step 1, or the owner's own step — bottom-up, BR-KPI-12); timing — now, on a
   date, or recurring (e.g. day 1 of each month); the evaluation period; a due date rule (e.g. 7 days
   after launch); recipients — everyone, or a filter (units ± children, positions, job levels, employment
   status, named people). One launch creates many forms; recipients are resolved when it fires, and a
@@ -261,7 +279,8 @@ The three P1 form types: **GOAL_SETTING** (registration), **GOAL_CHANGE** (adjus
   to Evaluating). An evaluation form's items snapshot the **current** actual of (goal, period) at the
   moment the launch fires (BR-KPI-17). *Source: HR guide pp. 89–93.*
 - **BR-KPI-20** — Every step defines its **actor rule** (SELF / DIRECT_MANAGER / MANAGER_L2 / HR / CNB /
-  ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN) and its SLA in days. The direct manager
+  ROLE), its allowed actions (SUBMIT / APPROVE / EDIT / RETURN), its SLA in days and whether it approves
+  itself (`autoApprove`, the last step only — BR-KPI-12). The direct manager
   is resolved from the reporting line at the time of the action. *Source: ERD `WORKFLOW_STEP`; HR guide
   pp. 150–155.* Being a step's actor is never a permission (BR-KPI-61). The line read is the **primary**
   assignment's manager (`orgRules.managerOf`); a concurrent (kiêm nhiệm) manager is NOT a step actor,
@@ -626,7 +645,7 @@ and `src/data/types.test.ts` keeps the two in step. Codes are English (D8).
 | Work plan | Draft · Submitted · Returned · Locked — the Goal Plan set without `Approved` (`WORK_PLAN_STATUSES`, Goal Plan labels): the manager's approval IS the lock. Mirrors its WORK_PLAN form; the sync is `forms.act` from 8.2 — until then only the launch (Draft) and the seed write it, a known gap | D10 |
 | Work task progress | NotStarted · InProgress · Done · Cancelled (Chưa bắt đầu · Đang thực hiện · Hoàn thành · Đã hủy) — `Cancelled` only through `work.cancelWorkTask` (manager, reason, Q64) | D10, HR guide p. 26 |
 | Actor rule | SELF · DIRECT_MANAGER · MANAGER_L2 · HR · CNB · ROLE | ERD |
-| Step action | SUBMIT · APPROVE · EDIT · RETURN · CANCEL · AUTO_FORWARD · AUTO_LOCK — EDIT is never recorded (BR-KPI-23) | ERD + CANCEL, AUTO_LOCK (D7) |
+| Step action | SUBMIT · APPROVE · EDIT · RETURN · CANCEL · AUTO_FORWARD · AUTO_LOCK · AUTO_APPROVE — EDIT is never recorded (BR-KPI-23); the AUTO_* are the system's, no actor | ERD + CANCEL, AUTO_LOCK (D7), AUTO_APPROVE (PEND-02) |
 | Overdue behaviour | AUTO_FORWARD · REMIND · LOCK | ERD + LOCK (BR-KPI-13) |
 | Evaluation column | SELF · MANAGER · FINAL | D6 |
 | Form | Open · InProgress · Completed · Cancelled — "overdue" is derived, not a status | ERD |
@@ -806,9 +825,9 @@ to mark, `data` = the numbers shown beside the copy); an adapter throws them wit
 | Q41 | When does a goal / a result "need attention"? | A goal below 90% achievement (exactly 90 is not; a fixed number, independent of the rating scale); a goal with no achievement is "Thiếu số liệu", never a warning. A result whose rating is one of the scale's two lowest bands (one on a scale of < 3) | BR-KPI-86 |
 | Q42 | What does the dashboard compare a period with? | The previous period of the same type in the same cycle — never an earlier one that happens to have data. Points, rounded once; "(tạm tính)" when a Draft is on either side; none for the first period | BR-KPI-87 |
 | Q43 | Under which unit does someone who moved (E021) or left (E024) count? | The unit they sat in on the period's last day (their last working day when earlier) — per period: earlier months under the old unit. Someone with no primary assignment then is "chưa xếp đơn vị", shown to a tenant-wide viewer only | BR-KPI-84 |
-| Q44 | Does a manager get their own KPIs top-down or bottom-up? | Both, like an employee | PEND-01, BR-KPI-12 |
-| Q45 | Bottom-up: where does a registration form start when the manager cascades nothing? | Step 1 becomes optional — the manager sends it on with nothing cascaded, or HR launches straight into the employee's step | PEND-01, BR-KPI-12, 19 |
-| Q46 | Where is automatic record-and-lock configured, and what is the default? | On the registration workflow template; manual by default | PEND-02, BR-KPI-12, 14 |
+| Q44 | Does a manager get their own KPIs top-down or bottom-up? | Both, like an employee — **built 2026-10-23** | PEND-01, BR-KPI-12 |
+| Q45 | Bottom-up: where does a registration form start when the manager cascades nothing? | Step 1 becomes optional — the manager sends it on with nothing cascaded, or HR launches straight into the employee's step ("Bắt đầu từ", `startStepNo`) — **built 2026-10-23** | PEND-01, BR-KPI-12, 19 |
+| Q46 | Where is automatic record-and-lock configured, and what is the default? | On the registration workflow template (the last step's "Tự động ghi nhận"); manual by default; no notice of the automatic lock (Q29) — **built 2026-10-23** | PEND-02, BR-KPI-12, 14 |
 | Q47 | How does HR edit a result "in special cases"? | HR edits the FINAL column with a required reason, audited; the FINAL column defaults to the manager's — **built 2026-10-23** | PEND-08, BR-KPI-16, 23 |
 | Q48 | The employee enters the actual on the form: does manual entry by manager / HR (BR-KPI-52) stay, and which number wins? | Manual entry stays; the form's actual is entered by the employee at step 1 and may be corrected by the manager at step 2 (with a comment); a changed actual of a Month form becomes the current FORM actual on completion, the latest snapshot wins — **built 2026-10-23** | PEND-06, BR-KPI-17, 52 |
 | Q49 | May the system-computed % be overridden? | Not by the employee; the manager may, with a comment — **built 2026-10-23** | PEND-07, BR-KPI-16, 32 |
@@ -1024,8 +1043,6 @@ the merge order of the two streams: `docs/plans/KPI_plan_A_kpi.md` §2.
 
 | Code | Change | Replaces / affects | Open points | Lane |
 |---|---|---|---|---|
-| PEND-01 | **Top-down and bottom-up registration run in parallel.** An employee may create their own KPIs and link them to a superior's goal when one exists; the manager's cascade step is no longer required first. The manager approves and may add or edit goals | BR-KPI-12, 19, 28 | Q44, Q45 | Workflow |
-| PEND-02 | **Step 4 "record and lock" is configurable**: automatic on the manager's approval, or manual by HR. HR (e.g. the HR head) may review and send the plan back to the manager | BR-KPI-12, 14 | Q46 | Workflow |
 | PEND-03 | **Cascade chain Company → Khối → Phòng → employee**; a superior's KPI can be cascaded to a unit or to a named employee. *Partly built 2026-10-21:* a Company / OrgUnit goal cascades to the nearest planned units below (BR-KPI-07 unit targets). Left: a plan for every Khối whose director receives KPIs, the dashboard's Khối score (Q40), the direct vs Khối manager | BR-KPI-01, 07, 85 | Q40, Q56 | Large (fixtures) |
 | PEND-04 | **Annual target split into quarters** (or months) in the same cycle — even split or typed in. *Checked 2026-10-23 (Đợt 0):* the split, `SPLIT_MISMATCH` / `SPLIT_INCOMPLETE` and Company / OrgUnit quarter results already work. *A1 (2026-10-23):* an evaluation form now snapshots the period's target and the months' sum (BR-KPI-17). Left (A3): a month under a quarter-only split takes the annual target (Q67), and `resultRules.actualLines` still falls back to the annual target for a quarter with no split; clearer split labels. List: `KPI_update_plan_2210.md` §6 | BR-KPI-11, 44 | Q50, Q67 | KPI Rules |
 | PEND-05 | **Cumulative (lũy kế) tracking** of quarter / month figures against the annual plan, on results and dashboards. *Rules built 2026-10-23 (Plan B, B0):* `src/lib/cumulativeRules.ts` — running actual and target by aggregation, on-track and year-progress achievements (`ASSUMPTION Q51`); not wired to any screen yet. Left: a read hook, the "Lũy kế" column on the Goal Plan and Results, the dashboard toggle (Đợt 4); the month target of a quarter-only split once Q67 is built | BR-KPI-44, 83…88 | Q51, Q67 | KPI Rules |

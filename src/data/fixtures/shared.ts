@@ -198,6 +198,8 @@ export function addWorkflows(s: SeedRows, id: IdFn): Workflows {
           remindDaysBefore: step.remindDaysBefore,
           evaluationColumn: step.evaluationColumn,
           requiresComment: step.requiresComment,
+          // PEND-02: manual by default (ASSUMPTION Q46); HR switches it on in the workflow editor.
+          autoApprove: false,
         }),
       ),
     );

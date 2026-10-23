@@ -918,10 +918,12 @@ export const ACTOR_RULE_LABEL: Readonly<Record<ActorRule, string>> = {
  *   `entity.changed`, and the form does not move.
  * - `AUTO_FORWARD` and `AUTO_LOCK` are recorded by the scheduler when a step runs over (BR-KPI-13),
  *   with `actorUserId = null`.
+ * - `AUTO_APPROVE` is recorded by the system the moment a form enters a step with `autoApprove`
+ *   (PEND-02, BR-KPI-12): the last step approves itself, with `actorUserId = null`.
  * - `CANCEL` records HR/ADMIN cancelling a form at any non-terminal step — how a form reaches
  *   `Cancelled` with a trace of who did it.
  */
-export const STEP_ACTIONS = ['SUBMIT', 'APPROVE', 'EDIT', 'RETURN', 'CANCEL', 'AUTO_FORWARD', 'AUTO_LOCK'] as const;
+export const STEP_ACTIONS = ['SUBMIT', 'APPROVE', 'EDIT', 'RETURN', 'CANCEL', 'AUTO_FORWARD', 'AUTO_LOCK', 'AUTO_APPROVE'] as const;
 export type StepAction = (typeof STEP_ACTIONS)[number];
 export const STEP_ACTION_LABEL: Readonly<Record<StepAction, string>> = {
   SUBMIT: 'Gửi',
@@ -931,6 +933,7 @@ export const STEP_ACTION_LABEL: Readonly<Record<StepAction, string>> = {
   CANCEL: 'Hủy phiếu',
   AUTO_FORWARD: 'Tự chuyển do quá hạn',
   AUTO_LOCK: 'Tự khóa do quá hạn',
+  AUTO_APPROVE: 'Tự động ghi nhận',
 };
 
 /** The subset a step can offer a person. */
@@ -992,6 +995,12 @@ export interface WorkflowStep extends TenantScoped {
   evaluationColumn: EvaluationColumn | null;
   /** D6 — a comment is mandatory on every item at this step. */
   requiresComment: boolean;
+  /**
+   * PEND-02 — the step approves itself (AUTO_APPROVE, no actor) the moment a form enters it: automatic
+   * record-and-lock of a registration, automatic "HR ghi nhận" of an evaluation. Only on the last step,
+   * never step 1, and the step must allow APPROVE (`workflowRules.validateWorkflow`). Default `false`.
+   */
+  autoApprove: boolean;
 }
 
 /**
@@ -1045,7 +1054,7 @@ export interface FormInstance extends TenantScoped {
 export interface FormStepAction extends TenantScoped {
   formId: Id;
   stepId: Id;
-  /** `null` only for the system's `AUTO_FORWARD`. */
+  /** `null` only for the system's moves: `AUTO_FORWARD`, `AUTO_LOCK`, `AUTO_APPROVE`. */
   actorUserId: Id | null;
   onBehalfOfUserId: Id | null;
   delegationId: Id | null;
@@ -1211,6 +1220,12 @@ export interface FormLaunch extends TenantScoped {
   cycleId: Id | null;
   /** The evaluation period (KPI_EVAL); `null` for a registration. */
   periodId: Id | null;
+  /**
+   * PEND-01 — the step its forms start at: `null` = step 1 (the manager cascades first, top-down);
+   * the owner's (SELF) step = bottom-up, the steps before it are skipped and record nothing. At most the
+   * owner's step (`workflowRules.startStepIssues`). A rule's recurring launches start at step 1.
+   */
+  startStepNo: number | null;
   /** Due date = launch date + `dueDays` (HR guide p. 92: "7 ngày sau ngày khởi chạy"). */
   dueDays: number;
   recipientMode: RecipientMode;

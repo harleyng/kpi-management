@@ -142,7 +142,7 @@ export const step = (o: Partial<WorkflowStep> = {}): WorkflowStep => ({
   id: `s${o.stepNo ?? 1}`, tenantId: TENANT, workflowId: 'wf1', stepNo: 1, name: 'Step',
   actorRule: 'SELF', actorRoleId: null, allowedActions: ['SUBMIT'], returnToStepNo: null,
   slaDays: null, onOverdue: null, remindDaysBefore: null, evaluationColumn: null,
-  requiresComment: false, ...o,
+  requiresComment: false, autoApprove: false, ...o,
 });
 
 /** The default registration workflow (BR-KPI-12): manager cascades → employee → manager → HR. */
@@ -192,7 +192,7 @@ export const launch = (o: Partial<FormLaunch> = {}): FormLaunch => ({
   id: 'l1', tenantId: TENANT, workflowId: 'wf1', formType: 'KPI_EVAL', name: 'Đánh giá T01',
   timing: 'NOW', scheduledAt: '2027-02-01T01:00:00.000Z', launchRuleId: null, cycleId: 'c2027',
   periodId: 'T01', dueDays: 7, recipientMode: 'ALL', recipientFilter: null, status: 'Launched',
-  launchedAt: '2027-02-01T01:00:00.000Z', createdBy: 'u-hr', createdAt: '2027-02-01T01:00:00.000Z', ...o,
+  launchedAt: '2027-02-01T01:00:00.000Z', createdBy: 'u-hr', createdAt: '2027-02-01T01:00:00.000Z', startStepNo: null, ...o,
 });
 
 export const launchRule = (o: Partial<FormLaunchRule> = {}): FormLaunchRule => ({

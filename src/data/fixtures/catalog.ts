@@ -228,7 +228,8 @@ export const WORKFLOWS: readonly { key: FormType; name: string; steps: readonly 
       { name: 'Quản lý giao chỉ tiêu', actorRule: 'DIRECT_MANAGER', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 3, onOverdue: 'LOCK', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
       { name: 'Nhân viên bổ sung và liên kết', actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 3, onOverdue: 'LOCK', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
       { name: 'Quản lý duyệt', actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 3, onOverdue: 'LOCK', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
-      { name: 'HR ghi nhận và khóa', actorRule: 'HR', allowedActions: ['APPROVE', 'EDIT'], slaDays: 2, onOverdue: 'LOCK', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
+      // PEND-02: HR may send the plan back to the manager (RETURN → the previous step, 3).
+      { name: 'HR ghi nhận và khóa', actorRule: 'HR', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 2, onOverdue: 'LOCK', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
     ],
   },
   {

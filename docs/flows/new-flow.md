@@ -324,7 +324,7 @@ flowchart LR
 > chạy như các mục trên. Mã `PEND-xx` khớp với `business-rules.md` §12. Điểm chưa rõ nằm ở mục 6 (Q44–Q58).
 > Kế hoạch triển khai theo đợt: `docs/plans/KPI_update_plan_2210.md`.
 
-### Đăng ký KPI: cả hai luồng chạy song song (PEND-01, 02, 03)
+### Đăng ký KPI: cả hai luồng chạy song song (PEND-01, 02 — đã làm 23/10; PEND-03)
 
 ```mermaid
 sequenceDiagram
@@ -355,10 +355,14 @@ sequenceDiagram
 - **Chuỗi phân bổ Công ty → Khối → Phòng → Nhân viên.** KPI cấp trên giao xuống được cho **một đơn vị**
   (phòng ban) hoặc **một nhân viên cụ thể**. Giám đốc khối nhận KPI từ công ty (xem Q56 về Goal Plan của Khối).
   Phần giao xuống Goal Plan đơn vị gần nhất đã làm ngày 21/10 (mục 2).
-- **Nhân viên tự tạo KPI** và liên kết lên chỉ tiêu cấp trên nếu có; không bắt buộc quản lý giao trước.
-  Cách quản lý nhận KPI của chính mình (top-down hay bottom-up) chưa chốt (Q44).
-- **B4 của HR là "ghi nhận và khóa"**, cấu hình được tự động hoặc thủ công (Q46). HR (ví dụ Trưởng phòng Nhân
-  sự) được xem và phản hồi quản lý khi chỉ tiêu không hợp lý.
+- **Nhân viên tự tạo KPI** và liên kết lên chỉ tiêu cấp trên nếu có; không bắt buộc quản lý giao trước. Đợt
+  khởi chạy (hoặc "Bắt đầu đăng ký" của Goal Plan đơn vị) chọn **"Bắt đầu từ"**: *quản lý giao trước* (bước 1) hoặc
+  *nhân viên tự lập* (bước của nhân viên — các bước trước được bỏ qua). Quản lý nhận KPI của chính mình cũng theo
+  hai cách này (Q44).
+- **B4 của HR là "ghi nhận và khóa"**, cấu hình trên mẫu quy trình ("Tự động ghi nhận" ở bước cuối; mặc định thủ
+  công — Q46). Khi bật, quản lý duyệt xong là Goal Plan khóa ngay, nhật ký ghi "Tự động ghi nhận". HR (ví dụ Trưởng
+  phòng Nhân sự) được **trả lại quản lý** (B3) kèm lý do khi chỉ tiêu không hợp lý.
+- *Đã làm 23/10/2026 (Plan A, A2):* PEND-01, 02 — BR-KPI-12, 19, 20.
 
 ### Phân bổ mục tiêu năm theo quý và theo dõi lũy kế (PEND-04, 05)
 
@@ -476,8 +480,6 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 
 | Mã | Prototype hiện tại | Sau buổi họp | Lý do | Ảnh hưởng |
 |---|---|---|---|---|
-| PEND-01 | Đăng ký luôn bắt đầu bằng B1 quản lý giao (BR-KPI-12) | Top-down và bottom-up song song; nhân viên tự lập không cần B1 | Doanh nghiệp dùng cả hai cách | Mẫu quy trình đăng ký, `workflowRules`, `formRules.canSubmit` |
-| PEND-02 | B4 HR ghi nhận và khóa, luôn thủ công | Cấu hình tự động hoặc thủ công | Giảm việc tay cho HR | Mẫu quy trình, `workflowRules` |
 | PEND-03 | Đã giao được từ Goal Plan công ty / đơn vị xuống đơn vị gần nhất có kế hoạch (21/10); Khối có thể không có Goal Plan (Q40) | Công ty → Khối → Phòng → NV; giao cho đơn vị hoặc NV | Đúng cơ cấu tập đoàn | Còn lại: Goal Plan của mọi Khối, điểm Khối trên dashboard (Q40, Q56) |
 | PEND-04 | Phân bổ theo kỳ dựng quý / năm từ tháng (BR-KPI-11) | Phân bổ năm → quý, chia đều hoặc nhập tay | Kế hoạch kinh doanh theo quý | `goalPlanRules`, `resultRules`. Đã có: chia quý, cảnh báo; phiếu quý dùng mục tiêu quý (23/10). Còn: tháng khi chỉ chia quý (Q67), nhãn |
 | PEND-05 | Không có số lũy kế | Theo dõi lũy kế so với kế hoạch năm | Quản lý thấy tiến độ năm | Quy tắc mới, kết quả, dashboard |

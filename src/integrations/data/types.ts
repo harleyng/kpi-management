@@ -381,14 +381,21 @@ export interface StartFormInput {
   goalPlanId: Id | null;
   periodId: Id | null;
   dueDate: IsoDate;
+  /**
+   * PEND-01 — start at this step (`null` / omitted = step 1; at most the owner's step,
+   * `workflowRules.startStepIssues`). Not stored: the form's history shows where it began.
+   */
+  startStepNo?: number | null;
 }
 
 /** A one-off launch as HR creates it; `RECURRING` launches come only from a `FormLaunchRule`. */
 export type NewLaunchInput = Omit<
   FormLaunch,
-  'id' | 'tenantId' | 'formType' | 'timing' | 'scheduledAt' | 'status' | 'launchedAt' | 'createdBy' | 'createdAt' | 'launchRuleId'
-> &
-  ({ timing: 'NOW' } | { timing: 'SCHEDULED'; scheduledAt: IsoDateTime });
+  'id' | 'tenantId' | 'formType' | 'timing' | 'scheduledAt' | 'status' | 'launchedAt' | 'createdBy' | 'createdAt' | 'launchRuleId' | 'startStepNo'
+> & {
+  /** PEND-01 — `null` / omitted = step 1 (stored as `null`). */
+  startStepNo?: number | null;
+} & ({ timing: 'NOW' } | { timing: 'SCHEDULED'; scheduledAt: IsoDateTime });
 
 export interface UploadFileInput {
   fileName: string;

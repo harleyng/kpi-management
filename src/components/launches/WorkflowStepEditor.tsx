@@ -39,6 +39,10 @@ const ISSUE_HINT: Record<string, string> = {
   ROLE_REQUIRED: 'Bước theo vai trò cần chọn vai trò.',
   TOO_FEW_STEPS: 'Quy trình đăng ký cần ít nhất 2 bước.',
   OWNER_STEP_REQUIRED: 'Quy trình đăng ký cần một bước của nhân viên.',
+  AUTO_APPROVE_NOT_LAST: 'Chỉ bước cuối mới tự động ghi nhận.',
+  AUTO_APPROVE_ON_FIRST_STEP: 'Bước đầu tiên không thể tự động ghi nhận.',
+  AUTO_APPROVE_NEEDS_APPROVE: 'Bước tự động ghi nhận cần có thao tác Duyệt.',
+  AUTO_FORWARD_INTO_AUTO_APPROVE: 'Không thể tự chuyển khi quá hạn sang bước tự động ghi nhận — phiếu sẽ hoàn thành mà không ai quyết định.',
 };
 
 const WARNING_TEXT: Record<WorkflowEditWarning, string> = {
@@ -46,6 +50,7 @@ const WARNING_TEXT: Record<WorkflowEditWarning, string> = {
   LOCK_RELEASED: 'Phiếu đang bị khóa do quá hạn ở bước này sẽ được mở lại.',
   LOCK_ADDED: 'Phiếu đăng ký đã quá hạn ở bước này sẽ khóa Goal Plan ở lần chạy lịch tiếp theo.',
   COMMENT_REQUIRED: 'Lần gửi tiếp theo cần nhận xét cho mọi chỉ tiêu ở bước này.',
+  AUTO_APPROVE_ADDED: 'Phiếu tới bước này từ nay được ghi nhận ngay; phiếu đang chờ ở bước này vẫn do HR ghi nhận.',
 };
 
 
@@ -127,6 +132,7 @@ export function WorkflowStepEditor({ workflow, steps, editable }: { workflow: Wo
                 <TableHead className="w-44 text-xs">Khi quá hạn</TableHead>
                 <TableHead className="w-20 text-right text-xs">Nhắc trước (ngày)</TableHead>
                 <TableHead className="text-xs">Bắt buộc nhận xét</TableHead>
+                <TableHead className="text-xs">Tự động ghi nhận</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -230,6 +236,24 @@ export function WorkflowStepEditor({ workflow, steps, editable }: { workflow: Wo
                           />
                           <span className="text-xs text-muted-foreground">{EVALUATION_COLUMN_LABEL[s.evaluationColumn]}</span>
                         </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 py-2">
+                      {/* PEND-02 — only the last step may approve itself (validateWorkflow); a stored value always shows. */}
+                      {i + 1 === last && s.stepNo > 1 ? (
+                        <span className="flex items-center gap-2">
+                          <Switch
+                            checked={s.autoApprove}
+                            disabled={!editable}
+                            onCheckedChange={(v) => update(s.id, { autoApprove: v })}
+                            aria-label={`Tự động ghi nhận ở bước ${s.stepNo}`}
+                          />
+                          <span className="text-xs text-muted-foreground">{s.autoApprove ? 'Ghi nhận ngay khi phiếu tới bước này' : 'HR ghi nhận thủ công'}</span>
+                        </span>
+                      ) : s.autoApprove ? (
+                        <Switch checked disabled={!editable} onCheckedChange={(v) => update(s.id, { autoApprove: v })} aria-label={`Tự động ghi nhận ở bước ${s.stepNo}`} />
+                      ) : (
+                        <span className="text-muted-foreground">Không áp dụng</span>
                       )}
                     </TableCell>
                   </TableRow>

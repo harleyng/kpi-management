@@ -397,6 +397,7 @@ describe('workflowEditWarnings — what an edit means for forms already in the s
       'KPI_EVAL',
       ['COMMENT_REQUIRED'],
     ],
+    ['the last step starts approving itself (PEND-02)', { ...base, autoApprove: false }, { ...base, autoApprove: true }, 'GOAL_SETTING', ['AUTO_APPROVE_ADDED']],
   ] as const)('%s', (_label, before, after, formType, expected) => {
     expect(workflowEditWarnings(before, after, formType)).toEqual(expected);
   });

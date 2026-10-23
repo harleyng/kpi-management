@@ -18,7 +18,11 @@ import {
   isTerminal,
   launchPeriodIssues,
   launchTimingIssues,
+  initialStep,
+  normaliseStartStepNo,
   resolveStepActors,
+  settleAutoSteps,
+  startStepIssues,
   stepDeadline,
   validateLaunch,
   validateLaunchRule,
@@ -119,8 +123,9 @@ export function formsGroup(rt: Runtime): FormsGateway {
         launchedAt: null,
         createdBy: tx.ctx.actorUserId,
         createdAt: tx.now,
+        startStepNo: normaliseStartStepNo(input.startStepNo),
       };
-      throwIssues([...validateLaunch(launch), ...launchPeriodIssues(launch.formType, period), ...launchTimingIssues(launch, clock)]);
+      throwIssues([...validateLaunch(launch), ...launchPeriodIssues(launch.formType, period), ...startStepIssues(launch.startStepNo, stepsOf(tx, workflow.id)), ...launchTimingIssues(launch, clock)]);
       if (period && cycle && period.cycleId !== cycle.id) throw new KpiError('ERR-KPI-06', 'FormLaunch.periodId belongs to another cycle');
       const target = cycle ?? (period ? tx.get('PerformanceCycle', period.cycleId) : null);
       if (target) throwDecision(cycleAllowsLaunch(target, launch.formType), `cycle ${target.id} does not accept ${launch.formType} now`);
@@ -157,7 +162,9 @@ export function formsGroup(rt: Runtime): FormsGateway {
         const plan = input.goalPlanId === null ? null : refOrInvalid(tx, 'GoalPlan', input.goalPlanId, 'FormInstance.goalPlanId');
         if (input.periodId !== null) refOrInvalid(tx, 'CyclePeriod', input.periodId, 'FormInstance.periodId');
         const steps = stepsOf(tx, workflow.id);
-        const first = steps[0];
+        // PEND-01 — the start step is checked before the rest (06 before 04).
+        throwIssues(startStepIssues(input.startStepNo, steps));
+        const first = initialStep(steps, input.startStepNo);
         if (!first) throw new KpiError('ERR-KPI-06', `workflow ${workflow.id} has no steps`);
         throwIssues(
           canStartForm(input, {
@@ -230,7 +237,8 @@ export function formsGroup(rt: Runtime): FormsGateway {
       return tx
         .all('FormStepAction')
         .filter((a) => a.formId === formId)
-        .sort((a, b) => (a.actedAt < b.actedAt ? -1 : 1));
+        // Stable on equal times: a move and the AUTO_APPROVE it triggered share `actedAt` (insertion order).
+        .sort((a, b) => (a.actedAt === b.actedAt ? 0 : a.actedAt < b.actedAt ? -1 : 1));
     }),
     listEvaluationItems: rt.read('forms.listEvaluationItems', (tx, formId: Id) => {
       tx.get('FormInstance', formId);
@@ -337,18 +345,26 @@ export function formsGroup(rt: Runtime): FormsGateway {
       if (!checked.ok) throwRefusal(checked);
       // Both people are named on every event and audit row of this write (BR-KPI-21).
       tx.onBehalfOfUserId = checked.record.onBehalfOfUserId;
+      // PEND-02 — a step that approves itself is approved in this same write; everything is written once.
+      const { mode: _mode, record: personRecord, ...move } = checked;
+      const settled = settleAutoSteps(form, steps, { ...move, record: { formId: personRecord.formId, stepId: personRecord.stepId, action: personRecord.action, comment: personRecord.comment, actedAt: personRecord.actedAt } }, clock);
+      if (!settled.ok) throwRefusal(settled);
+      const auto = settled.passedSteps.length > 0;
 
       // A completed evaluation records the actuals entered on it (PEND-06); a skipped one is named on the audit row.
-      const recorded = checked.form.status === 'Completed' ? recordFormActuals(tx, form) : null;
+      if (settled.form.status === 'Completed') for (const passed of settled.passedSteps) applyColumnEntry(tx, form, passed, step, 'AUTO_APPROVE');
+      const recorded = settled.form.status === 'Completed' ? recordFormActuals(tx, form) : null;
       const skipped = recorded && recorded.skipped.length > 0 ? `FORM_ACTUAL_SKIPPED: ${recorded.skipped.join(', ')}` : null;
-      const reason = input.action === 'CANCEL' || input.action === 'RETURN' ? input.comment : skipped;
-      const saved = tx.update('FormInstance', { ...form, ...checked.form }, { reason });
-      const history: FormStepAction = { id: newId(), tenantId: tx.tenantId, ...checked.record };
+      const reason = input.action === 'CANCEL' || input.action === 'RETURN' ? input.comment : (skipped ?? (auto ? 'AUTO_APPROVE' : null));
+      const saved = tx.update('FormInstance', { ...form, ...settled.form }, { reason });
+      const history: FormStepAction = { id: newId(), tenantId: tx.tenantId, ...personRecord };
       tx.insert('FormStepAction', history);
+      // The system's approvals: nobody, on behalf of nobody.
+      const autoRows = settled.records.slice(1).map((r) => tx.insert('FormStepAction', { id: newId(), tenantId: tx.tenantId, ...r, actorUserId: null, onBehalfOfUserId: null, delegationId: null }));
 
-      if (checked.nextStep) applyColumnEntry(tx, saved, checked.nextStep, step, 'STEP_ENTRY');
-      if (checked.planStatus && plan) setPlanStatus(tx, plan, checked.planStatus, reason);
-      if (checked.applyGoalChanges && plan) {
+      if (settled.nextStep) applyColumnEntry(tx, saved, settled.nextStep, settled.passedSteps.at(-1) ?? step, 'STEP_ENTRY');
+      if (settled.planStatus && plan) setPlanStatus(tx, plan, settled.planStatus, auto && settled.planStatus === 'Locked' ? 'AUTO_APPROVE' : reason);
+      if (settled.applyGoalChanges && plan) {
         const goals = tx.all('Goal').filter((g) => g.goalPlanId === plan.id);
         const applied = applyGoalChanges(plan, goals, tx.all('GoalChangeItem').filter((i) => i.formId === form.id), newId);
         if (!applied.ok) throwIssues(applied.issues);
@@ -360,15 +376,19 @@ export function formsGroup(rt: Runtime): FormsGateway {
           for (const change of applied.effects.statusChanges) tx.update('Goal', { ...tx.get('Goal', change.goalId), status: change.status });
         }
       }
+      // The person's move, as the form now stands (completed by an auto step → no next step, nobody to tell).
       tx.emit({
         type: 'form.stepActed',
         formId: form.id,
         stepId: history.stepId,
         action: history.action,
-        nextStepId: checked.nextStep?.id ?? null,
+        nextStepId: settled.nextStep?.id ?? null,
         assigneeUserIds: assigneesFor(tx, saved),
         formStatus: saved.status,
       });
+      for (const row of autoRows) {
+        tx.emit({ type: 'form.stepActed', formId: form.id, stepId: row.stepId, action: row.action, nextStepId: settled.nextStep?.id ?? null, assigneeUserIds: assigneesFor(tx, saved), formStatus: saved.status });
+      }
       return saved;
     }),
 

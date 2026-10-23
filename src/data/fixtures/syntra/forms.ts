@@ -121,7 +121,9 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
     });
   };
 
-  const launch = (key: string, l: Omit<FormLaunch, 'id' | 'tenantId'>) => s.add('FormLaunch', { id: id('FormLaunch', key), ...l });
+  /** A launch row; `startStepNo` defaults to step 1 (top-down). */
+  const launch = (key: string, l: Omit<FormLaunch, 'id' | 'tenantId' | 'startStepNo'> & { startStepNo?: number | null }) =>
+    s.add('FormLaunch', { id: id('FormLaunch', key), ...l, startStepNo: l.startStepNo ?? null });
 
   // ─── Registration of the unit plans (December 2026, started by hand; no Company form) ────────
   for (const dept of DEPARTMENTS) {
@@ -193,9 +195,10 @@ export function buildForms(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals
     type: 'GOAL_SETTING', subject: 'E018', planOwner: 'E018', periodLabel: null, launchId: newHire.id,
     launchedAt: T.newHireLaunch, dueDate: T.newHireDue, status: 'Open', step: 1, enteredAt: T.newHireLaunch,
   });
-  // A second round scheduled for probation staff, and one HR cancelled before it fired.
+  // A second round scheduled for probation staff — bottom-up: the forms start at the employee's own step
+  // (PEND-01, ASSUMPTION Q45) — and one HR cancelled before it fired.
   launch('GS-2027-round-2', {
-    workflowId: wf.id('GOAL_SETTING'), formType: 'GOAL_SETTING', name: 'Đăng ký KPI bổ sung – đợt 2', timing: 'SCHEDULED',
+    workflowId: wf.id('GOAL_SETTING'), formType: 'GOAL_SETTING', name: 'Đăng ký KPI bổ sung – đợt 2', timing: 'SCHEDULED', startStepNo: 2,
     scheduledAt: vn('2027-04-15 09:00'), launchRuleId: null, cycleId: g.cycleId, periodId: null, dueDays: 14,
     recipientMode: 'FILTER', recipientFilter: { ...STAFF_LEVELS, jobLevels: [], employmentStatuses: ['Probation'] },
     status: 'Scheduled', launchedAt: null, createdBy: user('E035'), createdAt: vn('2027-04-02 11:00'),

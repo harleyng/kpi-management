@@ -208,6 +208,11 @@ số trên phiếu.
   phiếu ở bước 3, Goal Plan *Đã gửi*; HR mở khóa sau tự động vẫn theo BR-KPI-14.
 - **Xong khi.** BR-KPI-12, 14, 20 viết lại; Q44–Q46 có câu trả lời.
 
+**Đợt 2 ✅ 23/10/2026 (Plan A, A2).** Theo `ASSUMPTION Q44–Q46`. Sau Phase 2: `startStepNo` dùng được cho mọi mẫu có
+bước của nhân viên (Plan B dùng cho WORK_PLAN), bước 1 lưu `null`; tự ghi nhận chạy trong cùng lần ghi với thao tác
+dẫn vào bước (`settleAutoSteps` — Goal Plan khóa thẳng, không qua *Đã duyệt*); cấm tự chuyển khi quá hạn vào bước tự
+ghi nhận; lịch chạy không chuyển phiếu đang bị HR khóa Goal Plan.
+
 ---
 
 ## 6. Đợt 3 — Mục tiêu theo quý, lũy kế, nhịp đánh giá (PEND-04, 05, 09)

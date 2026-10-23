@@ -16,6 +16,8 @@ import { useStartFormContext, type StartFormContext } from '@/hooks/queries/star
 import { cycleAllowsLaunch } from '@/lib/cycleRules';
 import { issueText, KpiError, type RuleIssue } from '@/lib/errorCatalog';
 import { resourceOfOwner } from '@/lib/permissionRules';
+import { startStepChoices } from '@/lib/workflowRules';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDate } from '@/lib/utils';
 
 interface StartRegistrationButtonProps {
@@ -73,11 +75,16 @@ function StartRegistrationDialog({ plan, planName, ctx, onClose }: { plan: GoalP
   const start = useStartForm();
   const [dueDate, setDueDate] = useState(ctx.defaultDueDate);
   const [error, setError] = useState<string | null>(null);
+  /** PEND-01 — `null` = step 1 (the director cascades first); the head's own step = the head drafts it. */
+  const [startStepNo, setStartStepNo] = useState<number | null>(null);
   const issues = ctx.issuesFor(dueDate);
   const dueIssue = issues.find((i) => i.ref === 'dueDate');
   const otherIssue = issues.find((i) => i.ref !== 'dueDate');
   const subject = ctx.dir?.employees.find((e) => e.id === ctx.ownerId);
-  const route = ctx.route ?? [];
+  const fullRoute = ctx.route ?? [];
+  const startChoices = startStepChoices(fullRoute.map((r) => r.step));
+  // The steps before the start are skipped: they record nothing and are not shown.
+  const route = fullRoute.filter((r) => r.step.stepNo >= (startStepNo ?? 1));
   const firstActors = route[0]?.actorUserIds ?? [];
   const firstName = firstActors.length > 0 ? firstActors.map((id) => userName(ctx, id)).join(', ') : null;
   // A step nobody holds and that locks the plan when overdue: HR must act on it in time.
@@ -88,11 +95,11 @@ function StartRegistrationDialog({ plan, planName, ctx, onClose }: { plan: GoalP
     setError(null);
     if (!ctx.workflow || ctx.ownerId === null || issues.length > 0) return;
     start.mutate(
-      { workflowId: ctx.workflow.id, subjectEmployeeId: ctx.ownerId, goalPlanId: plan.id, periodId: null, dueDate },
+      { workflowId: ctx.workflow.id, subjectEmployeeId: ctx.ownerId, goalPlanId: plan.id, periodId: null, dueDate, startStepNo },
       {
         onSuccess: (form) => {
           toast.success('Đã bắt đầu đăng ký', {
-            description: firstName ? `Phiếu đang chờ ${firstName} ở bước 1.` : 'Bước 1 chưa có người nhận — HR thao tác thay.',
+            description: firstName ? `Phiếu đang chờ ${firstName} ở bước ${route[0]?.step.stepNo ?? 1}.` : `Bước ${route[0]?.step.stepNo ?? 1} chưa có người nhận — HR thao tác thay.`,
             action: { label: 'Xem phiếu', onClick: () => navigate(`/forms/${form.id}`) },
           });
           onClose();
@@ -123,6 +130,25 @@ function StartRegistrationDialog({ plan, planName, ctx, onClose }: { plan: GoalP
             <dt className="text-muted-foreground">Goal Plan</dt>
             <dd>{GOAL_PLAN_STATUS_LABEL[plan.status]}</dd>
           </dl>
+
+          {startChoices.length > 1 && (
+            <FormField label="Bắt đầu từ" className="max-w-sm">
+              {(control) => (
+                <Select value={String(startStepNo ?? 1)} onValueChange={(v) => setStartStepNo(v === '1' ? null : Number(v))}>
+                  <SelectTrigger {...control}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {startChoices.map((s) => (
+                      <SelectItem key={s.id} value={String(s.stepNo)}>
+                        {s.stepNo === 1 ? 'Cấp trên giao trước' : s.actorRule === 'SELF' ? 'Trưởng đơn vị tự lập' : s.name} (bước {s.stepNo})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+          )}
 
           <section aria-labelledby="route-title" className="space-y-1.5">
             <h3 id="route-title" className="text-sm font-medium">

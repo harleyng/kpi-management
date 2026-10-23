@@ -357,13 +357,15 @@ export function goalDraftFromKpi(kpi: KpiDefinition, fields: NewGoalFields): Goa
  * - `APPLIES_NOW` — the SLA or overdue behaviour changed: deadlines and the next tick follow it;
  * - `LOCK_RELEASED` — no longer LOCK: forms frozen by an earlier overdue are released;
  * - `LOCK_ADDED` — now LOCK: an overdue registration freezes its plan at the next tick;
- * - `COMMENT_REQUIRED` — a comment becomes mandatory on every item before the next submit.
+ * - `COMMENT_REQUIRED` — a comment becomes mandatory on every item before the next submit;
+ * - `AUTO_APPROVE_ADDED` — forms that ENTER the step from now on approve themselves; forms already
+ *   waiting there stay with HR (the auto-approval happens on entry only, PEND-02).
  */
-export type WorkflowEditWarning = 'APPLIES_NOW' | 'LOCK_RELEASED' | 'LOCK_ADDED' | 'COMMENT_REQUIRED';
+export type WorkflowEditWarning = 'APPLIES_NOW' | 'LOCK_RELEASED' | 'LOCK_ADDED' | 'COMMENT_REQUIRED' | 'AUTO_APPROVE_ADDED';
 
 export function workflowEditWarnings(
-  before: Pick<WorkflowStep, 'slaDays' | 'onOverdue' | 'requiresComment' | 'evaluationColumn'>,
-  after: Pick<WorkflowStep, 'slaDays' | 'onOverdue' | 'requiresComment'>,
+  before: Pick<WorkflowStep, 'slaDays' | 'onOverdue' | 'requiresComment' | 'evaluationColumn'> & Partial<Pick<WorkflowStep, 'autoApprove'>>,
+  after: Pick<WorkflowStep, 'slaDays' | 'onOverdue' | 'requiresComment'> & Partial<Pick<WorkflowStep, 'autoApprove'>>,
   formType: FormType,
 ): WorkflowEditWarning[] {
   const warnings: WorkflowEditWarning[] = [];
@@ -373,5 +375,6 @@ export function workflowEditWarnings(
   if (!before.requiresComment && after.requiresComment && formType === 'KPI_EVAL' && before.evaluationColumn !== null) {
     warnings.push('COMMENT_REQUIRED');
   }
+  if (!before.autoApprove && after.autoApprove) warnings.push('AUTO_APPROVE_ADDED');
   return warnings;
 }

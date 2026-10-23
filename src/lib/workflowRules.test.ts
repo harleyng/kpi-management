@@ -61,6 +61,10 @@ import {
   transition,
   validateLaunch,
   validateWorkflow,
+  initialStep,
+  normaliseStartStepNo,
+  settleAutoSteps,
+  startStepIssues,
   type ActorDirectory,
   type CheckActionInput,
   type EntitlementContext,
@@ -287,7 +291,7 @@ describe('entitlement — actor, delegate, proxy (BR-KPI-21)', () => {
 
 describe('TRANSITIONS — the one table', () => {
   it('covers every action a form can record', () => {
-    expect(Object.keys(TRANSITIONS).sort()).toEqual(['APPROVE', 'AUTO_FORWARD', 'AUTO_LOCK', 'CANCEL', 'RETURN', 'SUBMIT']);
+    expect(Object.keys(TRANSITIONS).sort()).toEqual(['APPROVE', 'AUTO_APPROVE', 'AUTO_FORWARD', 'AUTO_LOCK', 'CANCEL', 'RETURN', 'SUBMIT']);
   });
 });
 
@@ -940,5 +944,88 @@ describe('delegations — what saveDelegation and revokeDelegation refuse (BR-KP
     expect(canRevokeDelegation(live, { actorUserId: 'u-hr1', actorMayManage: true }, CLOCK)).toEqual({ ok: true });
     expect(canRevokeDelegation(live, { actorUserId: 'u-m2', actorMayManage: false }, CLOCK)).toEqual({ ok: false, code: 'ERR-KPI-05' });
     expect(canRevokeDelegation({ ...live, revokedAt: '2027-02-02T00:00:00.000Z' }, { actorUserId: 'u-m1', actorMayManage: false }, CLOCK)).toEqual({ ok: false, code: 'ERR-KPI-04' });
+  });
+});
+
+// ─── PEND-01 / 02 — where a form starts, steps that approve themselves ─────────────────────────────
+
+describe('startStepIssues / initialStep — bottom-up registration (PEND-01, ASSUMPTION Q45)', () => {
+  const steps = registrationSteps(); // owner (SELF) at step 2
+
+  it('null or a step up to the owner\'s; later, 0, a fraction or an unknown step is 06', () => {
+    expect(startStepIssues(null, steps)).toEqual([]);
+    expect(startStepIssues(undefined, steps)).toEqual([]);
+    expect(startStepIssues(1, steps)).toEqual([]);
+    expect(startStepIssues(2, steps)).toEqual([]);
+    for (const bad of [3, 4, 0, -1, 1.5, 9]) expect(startStepIssues(bad, steps).map((i) => [i.code, i.detail])).toEqual([['ERR-KPI-06', 'START_STEP_INVALID']]);
+  });
+
+  it('a workflow with no SELF step starts at 1 only; any form type with one may start there', () => {
+    const noSelf = evaluationSteps().map((s) => ({ ...s, actorRule: 'HR' as const }));
+    expect(startStepIssues(2, noSelf)).toHaveLength(1);
+    expect(startStepIssues(1, evaluationSteps())).toEqual([]);
+  });
+
+  it('initialStep: the start step when valid, else step 1 (a stale launch never breaks a tick)', () => {
+    expect(initialStep(steps, null)?.stepNo).toBe(1);
+    expect(initialStep(steps, 2)?.stepNo).toBe(2);
+    expect(initialStep(steps, 4)?.stepNo).toBe(1);
+    expect(initialStep([], 2)).toBeUndefined();
+  });
+
+  it('step 1 is stored one way: null', () => {
+    expect([normaliseStartStepNo(1), normaliseStartStepNo(undefined), normaliseStartStepNo(null), normaliseStartStepNo(2)]).toEqual([null, null, null, 2]);
+  });
+});
+
+describe('autoApprove — record and lock by itself (PEND-02, ASSUMPTION Q46)', () => {
+  const steps = registrationSteps();
+  const auto = steps.map((s) => (s.stepNo === 4 ? { ...s, autoApprove: true } : s));
+  const details = (list: WorkflowStep[]) => validateWorkflow('GOAL_SETTING', list).map((i) => i.detail);
+
+  it('validateWorkflow: only the last step, never step 1, and it must allow APPROVE', () => {
+    expect(details(auto)).toEqual([]);
+    expect(details(steps.map((s) => (s.stepNo === 3 ? { ...s, autoApprove: true } : s)))).toContain('AUTO_APPROVE_NOT_LAST');
+    expect(details(steps.map((s) => (s.stepNo === 4 ? { ...s, autoApprove: true, allowedActions: ['EDIT'] as WorkflowStep['allowedActions'] } : s)))).toContain('AUTO_APPROVE_NEEDS_APPROVE');
+    const one = [step({ stepNo: 1, actorRule: 'HR', allowedActions: ['APPROVE'], autoApprove: true })];
+    expect(validateWorkflow('KPI_EVAL', one).map((i) => i.detail)).toContain('AUTO_APPROVE_ON_FIRST_STEP');
+  });
+
+  it('no AUTO_FORWARD into a step that approves itself — refused on save, a REMIND if it slipped in', () => {
+    const forwardInto = auto.map((s) => (s.stepNo === 3 ? { ...s, onOverdue: 'AUTO_FORWARD' as const } : s));
+    expect(details(forwardInto)).toContain('AUTO_FORWARD_INTO_AUTO_APPROVE');
+    expect(effectiveOverdueBehaviour(form({ formType: 'GOAL_SETTING' }), forwardInto[2], forwardInto)).toBe('REMIND');
+  });
+
+  it('settleAutoSteps: the manager\'s APPROVE into an auto step completes the form and locks the plan in ONE result', () => {
+    const f = form({ formType: 'GOAL_SETTING', workflowId: 'wf1', currentStepId: 's3', status: 'InProgress' });
+    const moved = transition(f, auto, 'APPROVE', { clock: CLOCK, comment: null });
+    if (!moved.ok) throw new Error('move refused');
+    expect(moved.planStatus).toBe('Approved');
+    const settled = settleAutoSteps(f, auto, moved, CLOCK);
+    if (!settled.ok) throw new Error('settle refused');
+    expect(settled.form).toMatchObject({ status: 'Completed', currentStepId: null });
+    expect(settled.planStatus).toBe('Locked'); // straight to Locked, never written as Approved
+    expect(settled.records.map((r) => [r.stepId, r.action])).toEqual([['s3', 'APPROVE'], ['s4', 'AUTO_APPROVE']]);
+    expect(settled.passedSteps.map((s) => s.stepNo)).toEqual([4]);
+    expect(settled.nextStep).toBeNull();
+  });
+
+  it('a move into a manual step is returned unchanged; GOAL_CHANGE merges applyGoalChanges', () => {
+    const f = form({ formType: 'GOAL_SETTING', workflowId: 'wf1', currentStepId: 's3', status: 'InProgress' });
+    const moved = transition(f, steps, 'APPROVE', { clock: CLOCK, comment: null });
+    if (!moved.ok) throw new Error('move refused');
+    const settled = settleAutoSteps(f, steps, moved, CLOCK);
+    expect(settled).toMatchObject({ ok: true, passedSteps: [], planStatus: 'Approved' });
+    const change = form({ formType: 'GOAL_CHANGE', workflowId: 'wf1', currentStepId: 's3', status: 'InProgress' });
+    const movedChange = transition(change, auto, 'APPROVE', { clock: CLOCK, comment: null });
+    if (!movedChange.ok) throw new Error('move refused');
+    const settledChange = settleAutoSteps(change, auto, movedChange, CLOCK);
+    expect(settledChange).toMatchObject({ ok: true, applyGoalChanges: true, planStatus: null });
+  });
+
+  it('TRANSITIONS.AUTO_APPROVE is refused on a step not configured for it (04)', () => {
+    const f = form({ formType: 'GOAL_SETTING', workflowId: 'wf1', currentStepId: 's4', status: 'InProgress' });
+    expect(transition(f, steps, 'AUTO_APPROVE', { clock: CLOCK, comment: null })).toMatchObject({ ok: false, code: 'ERR-KPI-04', detail: 'NOT_CONFIGURED' });
   });
 });

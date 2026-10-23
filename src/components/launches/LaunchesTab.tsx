@@ -52,7 +52,17 @@ export function LaunchesTab({ onOpenForms }: { onOpenForms: (launchId: Id) => vo
       sortValue: (l) => l.scheduledAt,
     },
     { id: 'due', header: 'Hạn (ngày)', numeric: true, cell: (l) => l.dueDays },
-    { id: 'recipients', header: 'Người nhận', cell: (l) => recipientSummary(l.recipientMode, l.recipientFilter) },
+    {
+      id: 'recipients',
+      header: 'Người nhận',
+      cell: (l) => (
+        <span>
+          {recipientSummary(l.recipientMode, l.recipientFilter)}
+          {/* PEND-01 — a launch that starts after step 1 (bottom-up) says so. */}
+          {l.startStepNo !== null && <span className="block text-xs text-muted-foreground">Bắt đầu từ bước {l.startStepNo}</span>}
+        </span>
+      ),
+    },
     { id: 'status', header: 'Trạng thái', cell: (l) => <LaunchStatusBadge status={l.status} /> },
     {
       id: 'actions',
