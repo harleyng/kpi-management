@@ -39,6 +39,7 @@ import type {
   UserAccount,
   UserRole,
   WorkflowStep,
+  WorkPlanStatus,
 } from '@/data/types';
 import { isWorkFormType } from '@/data/types';
 import { ruleIssue, type ErrorCode, type RuleIssue } from './errorCatalog';
@@ -46,6 +47,7 @@ import { canSubmit, type CanSubmitInput } from './formRules';
 import { cycleAllowsLaunch } from './cycleRules';
 import { PLAN_STATUS_ON_CANCEL, PLAN_STATUS_ON_COMPLETE, ownerStepNo, planStatusOnEnterStep, type Decision } from './goalPlanRules';
 import { addDays, isIsoDate, isWithin, minDate, todayOf, toZonedDate, type Clock } from './isoDate';
+import { WORK_PLAN_STATUS_ON_CANCEL, WORK_PLAN_STATUS_ON_COMPLETE, workPlanStatusOnEnterStep } from './workRules';
 import { descendantUnitIds, isEmployedDuring, isEmployedOn, managerOf, primaryAssignmentOn, scopeCoversEmployee, scopeSubjectOn } from './orgRules';
 
 export type Refusal = { ok: false; code: ErrorCode; detail: string; issues: RuleIssue[] };
@@ -360,6 +362,8 @@ export interface TransitionResult {
   nextStep: WorkflowStep | null;
   /** The Goal Plan's new status (GOAL_SETTING; AUTO_LOCK), or `null` for no change. Locked → the caller sets `lockedAt`. */
   planStatus: GoalPlanStatus | null;
+  /** The month's `WorkPlan` new status (WORK_PLAN), or `null`. Locked → the caller stamps `approvedAt` / `approvedBy`. */
+  workPlanStatus: WorkPlanStatus | null;
   /** GOAL_CHANGE's final approval: apply the proposal (`goalPlanRules.applyGoalChanges`). */
   applyGoalChanges: boolean;
   /** The history row, without the people (see `checkAction`). */
@@ -390,8 +394,16 @@ export function transition(
   const now = ctx.clock.now;
   const target = rule.target(step, n);
   const record = { formId: form.id, stepId: step.id, action, comment: ctx.comment, actedAt: now };
-  const base = { ok: true as const, record, applyGoalChanges: false, planStatus: null as GoalPlanStatus | null, nextStep: null as WorkflowStep | null };
+  const base = {
+    ok: true as const,
+    record,
+    applyGoalChanges: false,
+    planStatus: null as GoalPlanStatus | null,
+    workPlanStatus: null as WorkPlanStatus | null,
+    nextStep: null as WorkflowStep | null,
+  };
   const registration = form.formType === 'GOAL_SETTING';
+  const workPlan = form.formType === 'WORK_PLAN';
 
   switch (target.kind) {
     case 'enter': {
@@ -402,6 +414,7 @@ export function transition(
         nextStep: next,
         form: { status: 'InProgress', currentStepId: next.id, currentStepEnteredAt: now, overdueHandledAt: null },
         planStatus: registration ? planStatusOnEnterStep(next.stepNo, own, target.viaReturn) : null,
+        workPlanStatus: workPlan ? workPlanStatusOnEnterStep(next.stepNo, own, target.viaReturn) : null,
       };
     }
     case 'complete':
@@ -409,6 +422,7 @@ export function transition(
         ...base,
         form: { status: 'Completed', currentStepId: null, currentStepEnteredAt: null, overdueHandledAt: null },
         planStatus: registration ? PLAN_STATUS_ON_COMPLETE : null,
+        workPlanStatus: workPlan ? WORK_PLAN_STATUS_ON_COMPLETE : null,
         applyGoalChanges: form.formType === 'GOAL_CHANGE',
       };
     case 'cancel':
@@ -416,6 +430,7 @@ export function transition(
         ...base,
         form: { status: 'Cancelled', currentStepId: null, currentStepEnteredAt: null, overdueHandledAt: null },
         planStatus: registration ? PLAN_STATUS_ON_CANCEL : null,
+        workPlanStatus: workPlan ? WORK_PLAN_STATUS_ON_CANCEL : null,
       };
     case 'stay':
       return {
@@ -453,6 +468,7 @@ export function settleAutoSteps(form: FormInstance, steps: readonly WorkflowStep
     settled.form = auto.form;
     settled.nextStep = auto.nextStep;
     settled.planStatus = auto.planStatus ?? settled.planStatus;
+    settled.workPlanStatus = auto.workPlanStatus ?? settled.workPlanStatus;
     settled.applyGoalChanges = settled.applyGoalChanges || auto.applyGoalChanges;
     current = { ...current, ...auto.form };
     entered = auto.nextStep;
@@ -505,9 +521,9 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
   if (form.currentStepId !== input.expectedStepId) return refuse('ERR-KPI-04', 'STALE_STEP');
   const step = steps.find((s) => s.id === form.currentStepId && s.workflowId === form.workflowId);
   if (!step) return refuse('ERR-KPI-04', 'STEP_UNKNOWN');
-  // Monthly work (PEND-14): moving a WORK_PLAN / WORK_REVIEW form must also move its WorkPlan and
-  // record its WorkResult — wired in steps 8.2 / 8.3. Until then only HR's CANCEL goes through.
-  if (isWorkFormType(form.formType) && action !== 'CANCEL') return refuse('ERR-KPI-04', 'WORK_FORM_NOT_BUILT');
+  // Monthly work review (PEND-14): completing it must record the month's WorkResult — wired in step
+  // 8.3. Until then only HR's CANCEL goes through.
+  if (form.formType === 'WORK_REVIEW' && action !== 'CANCEL') return refuse('ERR-KPI-04', 'WORK_FORM_NOT_BUILT');
   if (action !== 'CANCEL' && isFrozen(form, step, input.plan)) return refuse('ERR-KPI-04', 'FROZEN');
 
   const who = entitlement(form, step, action, input.actor, { ...input.entitlement, clock });
@@ -523,7 +539,8 @@ export function checkAction(input: CheckActionInput): CheckedAction | Refusal {
     const matches =
       check.formType === form.formType &&
       (check.formType !== 'KPI_EVAL' || check.step.id === step.id) &&
-      (check.formType !== 'GOAL_SETTING' || check.stepNo === step.stepNo);
+      (check.formType !== 'GOAL_SETTING' || check.stepNo === step.stepNo) &&
+      (check.formType !== 'WORK_PLAN' || check.stepNo === step.stepNo);
     if (!matches) return refuse('ERR-KPI-04', 'SUBMIT_CHECK_MISMATCH');
     const content = canSubmit(check);
     if (!content.ok) return refuse(content.issues[0].code, 'CONTENT_INCOMPLETE', content.issues);

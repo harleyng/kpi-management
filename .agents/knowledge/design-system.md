@@ -90,6 +90,20 @@ The tones follow one principle — **five colours, one meaning each**:
 | Approved | Đã duyệt | `positive` | settled |
 | Locked | Đã khóa | `positive` + lock icon | in effect for the cycle |
 
+A monthly **work plan** (`WorkPlan`, PEND-14) uses the same badge and labels — Draft, Submitted, Returned,
+Locked (it has no Approved: the manager's approval is the lock).
+
+### Monthly task (`WorkTask.progressStatus`, PEND-14)
+
+| Status | Label (vi) | Tone | Why |
+|---|---|---|---|
+| NotStarted | Chưa bắt đầu | `muted` | nothing yet |
+| InProgress | Đang thực hiện | `info` | under way |
+| Done | Hoàn thành | `positive` | finished |
+| Cancelled | Đã hủy | `muted` | the manager cancelled it; the row is struck through with its reason |
+
+A private task carries the text tag "Riêng tư" with an `EyeOff` icon — never a lock (the lock means "Đã khóa").
+
 ### Form (phiếu)
 
 | Status | Label (vi) | Tone | Note |

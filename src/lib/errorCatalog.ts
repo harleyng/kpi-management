@@ -211,6 +211,10 @@ export const ISSUE_DETAILS = [
   // workflowRules.canStartForm — a form started by hand (BR-KPI-15, 19)
   'PLAN_REQUIRED', 'EMPLOYEE_PLAN_BY_LAUNCH', 'SUBJECT_NOT_OWNER', 'PLAN_LOCKED', 'REGISTRATION_ALREADY_OPEN',
   'CYCLE_NOT_OPEN', 'DUE_DATE_INVALID', 'PLAN_NOT_LOCKED', 'CHANGE_ALREADY_OPEN', 'NOT_STARTABLE', 'PERIOD_NOT_ALLOWED',
+  // workRules — the monthly work plan and its tasks (PEND-14)
+  'PLAN_EMPTY', 'NAME_REQUIRED', 'WEIGHT_INVALID', 'DATES_ORDER', 'DATES_OUTSIDE_PERIOD', 'WORK_PLAN_LOCKED', 'REVIEW_LAUNCHED',
+  'RESULT_RECORDED', 'NOT_APPROVED', 'MANAGER_ONLY', 'NOT_SUBJECT_OR_MANAGER', 'CANCEL_REASON_REQUIRED', 'PROGRESS_OUT_OF_RANGE',
+  'STATUS_MISMATCH', 'CANCEL_BY_PROGRESS', 'TASK_CANCELLED', 'LINKED_GOAL_INVALID', 'NO_OPEN_FORM', 'PERIOD_REQUIRED', 'LAST_LIVE_TASK',
 ] as const;
 export type IssueDetail = (typeof ISSUE_DETAILS)[number];
 
@@ -261,6 +265,26 @@ export const ISSUE_DETAIL_COPY: Readonly<Record<IssueDetail, string>> = {
   CHANGE_ALREADY_OPEN: 'Goal Plan này đang có phiếu điều chỉnh chưa hoàn thành.',
   NOT_STARTABLE: 'Phiếu đánh giá được tạo khi khởi chạy, không bắt đầu thủ công.',
   PERIOD_NOT_ALLOWED: 'Phiếu đăng ký và phiếu điều chỉnh không gắn với một kỳ.',
+  PLAN_EMPTY: 'Kế hoạch chưa có việc nào. Thêm ít nhất một việc.',
+  NAME_REQUIRED: 'Việc chưa có tên.',
+  WEIGHT_INVALID: 'Trọng số phải lớn hơn 0.',
+  DATES_ORDER: 'Ngày kết thúc đứng trước ngày bắt đầu.',
+  DATES_OUTSIDE_PERIOD: 'Việc nằm hoàn toàn ngoài tháng của kế hoạch.',
+  WORK_PLAN_LOCKED: 'Kế hoạch đã duyệt và khóa: không thêm, sửa hay xóa việc. Quản lý hủy việc kèm lý do; tiến độ vẫn cập nhật được.',
+  REVIEW_LAUNCHED: 'Tháng này đã có phiếu đánh giá: danh sách việc không đổi được nữa, chỉ còn cập nhật tiến độ.',
+  RESULT_RECORDED: 'Kết quả công việc tháng đã được ghi nhận: không thay đổi được nữa.',
+  NOT_APPROVED: 'Kế hoạch chưa được duyệt: chưa hủy việc hay cập nhật tiến độ được.',
+  MANAGER_ONLY: 'Chỉ quản lý trực tiếp (hoặc người được ủy quyền, HR thao tác thay) được hủy việc.',
+  NOT_SUBJECT_OR_MANAGER: 'Chỉ nhân viên và quản lý trực tiếp cập nhật được tiến độ.',
+  CANCEL_REASON_REQUIRED: 'Nhập lý do hủy việc.',
+  PROGRESS_OUT_OF_RANGE: '% hoàn thành phải từ 0 đến 100.',
+  STATUS_MISMATCH: 'Trạng thái không khớp % hoàn thành: Hoàn thành là 100%, Chưa bắt đầu là 0%.',
+  CANCEL_BY_PROGRESS: 'Hủy việc là việc của quản lý, kèm lý do — không chọn được ở tiến độ.',
+  TASK_CANCELLED: 'Việc đã bị hủy.',
+  LINKED_GOAL_INVALID: 'Chỉ liên kết được với một KPI đang hiệu lực trong Goal Plan đã khóa của chính nhân viên, cùng chu kỳ.',
+  NO_OPEN_FORM: 'Không có phiếu kế hoạch đang mở cho tháng này.',
+  PERIOD_REQUIRED: 'Phiếu chưa gắn với tháng nào.',
+  LAST_LIVE_TASK: 'Không hủy được việc cuối cùng còn hiệu lực: tháng sẽ không còn gì để đánh giá.',
 };
 
 const isIssueDetail = (value: string): value is IssueDetail => Object.prototype.hasOwnProperty.call(ISSUE_DETAIL_COPY, value);

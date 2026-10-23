@@ -15,6 +15,7 @@ import type {
   WorkTaskStatus,
 } from '@/data/types';
 import { DEFAULT_WORK_SCORING, workResultOf } from '@/lib/workRules';
+import { WORK_PLAN_BOTTOM_UP_STEP } from './catalog';
 import type { IdFn, SeedRows, Workflows } from './shared';
 
 /**
@@ -76,7 +77,8 @@ export function workSeed(d: WorkDeps) {
       launchedAt: l.at,
       createdBy: d.user(l.by),
       createdAt: l.at,
-      startStepNo: null,
+      // The seed's monthly plans are written by the employee first (bottom-up).
+      startStepNo: l.type === 'WORK_PLAN' ? WORK_PLAN_BOTTOM_UP_STEP : null,
     });
 
   const plan = (code: string, month: string, status: WorkPlanStatus, approved: { at: string; by: string } | null, specs: readonly TaskSpec[]): WorkPlan => {

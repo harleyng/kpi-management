@@ -452,6 +452,38 @@ describe('registration moves the Goal Plan with it (BR-KPI-12)', () => {
   });
 });
 
+describe('the monthly work plan moves its WorkPlan with it (PEND-14, 8.2)', () => {
+  const wp = [
+    step({ stepNo: 1, actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], onOverdue: 'AUTO_FORWARD', slaDays: 3 }),
+    step({ stepNo: 2, actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN', 'EDIT'] }),
+  ];
+  const f0 = form({ formType: 'WORK_PLAN', goalPlanId: null, workPlanId: 'wp1', currentStepId: 's1' });
+  const move = (f: FormInstance, action: 'SUBMIT' | 'APPROVE' | 'RETURN' | 'CANCEL' | 'AUTO_FORWARD', comment: string | null = 'x') => {
+    const r = transition(f, wp, action, { clock: CLOCK, comment });
+    if (!r.ok) throw new Error(r.detail);
+    return { form: { ...f, ...r.form }, result: r };
+  };
+
+  it('Draft → Submitted → Returned → Submitted → Locked; the Goal Plan status stays untouched', () => {
+    const sent = move(f0, 'SUBMIT');
+    expect([sent.result.workPlanStatus, sent.result.planStatus]).toEqual(['Submitted', null]);
+    const back = move(sent.form, 'RETURN');
+    expect([back.form.currentStepId, back.result.workPlanStatus]).toEqual(['s1', 'Returned']);
+    const done = move(move(back.form, 'SUBMIT').form, 'APPROVE');
+    expect([done.form.status, done.result.workPlanStatus]).toEqual(['Completed', 'Locked']);
+  });
+
+  it('an overdue employee step hands the plan to the manager as Submitted; a cancel puts it back to Draft', () => {
+    expect(move(f0, 'AUTO_FORWARD').result.workPlanStatus).toBe('Submitted');
+    expect(move(f0, 'CANCEL').result.workPlanStatus).toBe('Draft');
+  });
+
+  it('no other form type touches a work plan', () => {
+    const kpi = transition(form({ currentStepId: 's1' }), evaluationSteps(), 'SUBMIT', { clock: CLOCK, comment: null });
+    expect(kpi).toMatchObject({ ok: true, workPlanStatus: null });
+  });
+});
+
 describe('frozen forms (overdue LOCK, or HR locked the plan)', () => {
   const lockStep = reg[1]; // the employee's step: LOCK when overdue
   const frozen = form({ formType: 'GOAL_SETTING', periodId: null, currentStepId: 's2', overdueHandledAt: '2027-02-01T00:00:00.000Z' });

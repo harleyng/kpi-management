@@ -14,6 +14,7 @@
  */
 
 import type {
+  CyclePeriod,
   Delegation,
   DelegationState,
   EvaluationColumn,
@@ -31,8 +32,8 @@ import type {
   KpiDefinition,
   PersonFormAction,
   WorkflowStep,
+  WorkTask,
 } from '@/data/types';
-import { isWorkFormType } from '@/data/types';
 import type { CanSubmitInput } from './formRules';
 import { todayOf, type Clock } from './isoDate';
 import type { SessionDirectory } from './sessionRules';
@@ -87,16 +88,20 @@ export interface SubmitRows {
   kgis: readonly Kgi[];
   items: readonly EvaluationItem[];
   changeItems: readonly GoalChangeItem[];
+  /** Monthly work (PEND-14): the tasks and the months a WORK_PLAN form's check reads. Default none. */
+  workTasks?: readonly WorkTask[];
+  periods?: readonly Pick<CyclePeriod, 'id' | 'startDate' | 'endDate'>[];
 }
 
 /**
  * `canSubmit`'s input for this form at this step — THE builder, used by the mock's `forms.act` and
  * by the screens' blockers, so both check exactly the same rows:
  * - GOAL_SETTING / GOAL_CHANGE — every goal of the plan (no status filter: the rules filter), every KGI;
- * - KPI_EVAL — the goals of the form's items (a goal superseded mid-period still counts on its form).
+ * - KPI_EVAL — the goals of the form's items (a goal superseded mid-period still counts on its form);
+ * - WORK_PLAN — every task of the form's `WorkPlan` (cancelled ones too: the rule drops them) and its month.
  */
 export function submitCheckInput(
-  form: Pick<FormInstance, 'id' | 'formType' | 'goalPlanId'>,
+  form: Pick<FormInstance, 'id' | 'formType' | 'goalPlanId' | 'workPlanId' | 'periodId'>,
   step: WorkflowStep,
   steps: readonly WorkflowStep[],
   rows: SubmitRows,
@@ -113,9 +118,13 @@ export function submitCheckInput(
       return { formType: 'GOAL_SETTING', stepNo: step.stepNo, steps, goals: planGoals, kgis };
     case 'GOAL_CHANGE':
       return { formType: 'GOAL_CHANGE', goals: planGoals, changeItems: rows.changeItems.filter((i) => i.formId === form.id), kgis };
-    case 'WORK_PLAN':
+    case 'WORK_PLAN': {
+      const period = (rows.periods ?? []).find((p) => p.id === form.periodId) ?? null;
+      const tasks = (rows.workTasks ?? []).filter((t) => t.workPlanId === form.workPlanId);
+      return { formType: 'WORK_PLAN', stepNo: step.stepNo, steps, tasks, period };
+    }
     case 'WORK_REVIEW':
-      return { formType: form.formType };
+      return { formType: 'WORK_REVIEW' };
   }
 }
 
@@ -232,8 +241,8 @@ export function formStanding(input: FormStandingInput): FormStanding {
   if (frozen) return { ...entitled, readOnlyReason: 'FROZEN' };
 
   const n = Math.max(...steps.map((s) => s.stepNo));
-  // Monthly work forms do not move yet (`checkAction` refuses WORK_FORM_NOT_BUILT until 8.2 / 8.3): offer no move.
-  const moves = isWorkFormType(form.formType)
+  // The monthly work review does not move yet (`checkAction` refuses WORK_FORM_NOT_BUILT until 8.3): offer no move.
+  const moves = form.formType === 'WORK_REVIEW'
     ? []
     : STEP_ACTIONS_SHOWN.filter(
         // A non-blank comment stands in for the one the dialog will ask for: only the step decides here.

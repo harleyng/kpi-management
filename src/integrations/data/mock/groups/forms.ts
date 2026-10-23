@@ -48,6 +48,7 @@ import {
   setPlanStatus,
   stepOf,
   stepsOf,
+  syncWorkPlan,
   throwDecision,
   throwIssues,
   throwRefusal,
@@ -71,6 +72,8 @@ function submitCheckOf(tx: Tx, form: FormInstance, step: WorkflowStep, steps: re
     kgis: tx.all('Kgi'),
     items: tx.all('EvaluationItem'),
     changeItems: tx.all('GoalChangeItem'),
+    workTasks: form.workPlanId ? tx.all('WorkTask').filter((t) => t.workPlanId === form.workPlanId) : [],
+    periods: form.periodId ? [tx.get('CyclePeriod', form.periodId)] : [],
   });
 }
 
@@ -364,6 +367,8 @@ export function formsGroup(rt: Runtime): FormsGateway {
 
       if (settled.nextStep) applyColumnEntry(tx, saved, settled.nextStep, settled.passedSteps.at(-1) ?? step, 'STEP_ENTRY');
       if (settled.planStatus && plan) setPlanStatus(tx, plan, settled.planStatus, auto && settled.planStatus === 'Locked' ? 'AUTO_APPROVE' : reason);
+      // A monthly plan follows the SETTLED move; an automatic approval locks it with no approver.
+      syncWorkPlan(tx, form, settled.workPlanStatus, auto && settled.workPlanStatus === 'Locked' ? null : (tx.ctx.actorUserId as Id), auto && settled.workPlanStatus === 'Locked' ? 'AUTO_APPROVE' : reason);
       if (settled.applyGoalChanges && plan) {
         const goals = tx.all('Goal').filter((g) => g.goalPlanId === plan.id);
         const applied = applyGoalChanges(plan, goals, tx.all('GoalChangeItem').filter((i) => i.formId === form.id), newId);

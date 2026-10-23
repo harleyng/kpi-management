@@ -174,6 +174,18 @@ separator · sheet (T1/T2: right-hand side panel, `SheetHeader` / `SheetBody` / 
 | `WorkflowsTab` · `WorkflowDetailPage` + `WorkflowStepEditor` | Quy trình duyệt: the workflows table; one workflow's step settings on its own page with `validateWorkflow` inline, `workflowEditWarnings` and `UnsavedChangesGuard` · `NewLaunchPage` hosts `LaunchPanel` |
 | `RecipientFilterFields` · `recipients.ts` | "Người nhận" ALL / FILTER fields · `EMPTY_RECIPIENT_FILTER`, `recipientSummary` |
 
+## `src/components/work/` (Plan B — monthly work, PEND-14)
+
+| Component | Purpose |
+|---|---|
+| `WorkPlanPanel` | One employee's month on any screen: the turn notice (`planNotice`), `WorkTaskTable` in the mode the rules give (`taskEditBlockers` — the gateway's own check), the weight total in `FormActionBar`'s summary, blockers from `canSubmit(submitCheckInput(…))`, "Sao chép tháng trước" (`copyFromPreviousMonth`, disabled with its reason), remove / cancel / note dialogs |
+| `WorkTaskTable` | The month's tasks: name + product + KPI + "Riêng tư" tag (`EyeOff`), unit, weight, dates; from Locked on "Hoàn thành (%)" and "Trạng thái" edited in place (`followProgress`); cancelled rows struck with their reason on a second line; row menu |
+| `WorkTaskSheet` | Add / edit one task in an `EditSheet`; "Lưu" commits the whole list (`saveWorkTasks`), "Lưu và thêm việc khác"; live "Sau khi lưu, tổng trọng số là …" |
+| `WorkPlanFormBody` / `WorkPlanWithForm` | The WORK_PLAN body on `/forms/:formId`; a plan with its month's form loaded (`useFormDetail`) for the work pages |
+| `WorkMonthSelect` + `useWorkMonth` | `?month=` over every Month period, newest first, default `defaultWorkMonth` |
+| `workCopy.ts` | `monthText`, `planBlockerSentences` (tasks, "để gửi" / "để duyệt"), `planNotice` (whose turn), `RENORMALISED_NOTE` |
+| `WorkTaskStatusBadge` (`StatusBadge.tsx`) | `WORK_TASK_STATUS_TONE` in `statusTones.ts` |
+
 ## `src/components/results/` (T6)
 
 | Component | Purpose |
@@ -255,7 +267,7 @@ Every rule that needs the time takes `Clock { now, tz }` (`isoDate.ts`). Checks 
 | `excel/workbook.ts` / `excel/orgDataTemplate.ts` (T1) | `buildTemplateWorkbook` (exceljs imported on call only), `orgDataTemplateSpec` — tested |
 | `orgIssueCopy.ts` (T1) | `ORG_ISSUE_COPY` (sentence per rule sub-code), `orgIssueText`, `fieldIssues`, `otherIssues` — completeness tested against the rule sources |
 | `cumulativeRules.ts` (Plan B, B0 — PEND-05) | `cumulativeMonths`, `runningFigure` (partial + `complete`, unlike `aggregatePeriodActuals`), `cumulativeActual`, `cumulativeTarget` (no proration), `cumulativeAchievement` → on track / year progress / `provisional` (`ASSUMPTION Q51`) — not wired yet |
-| `workRules.ts` (Plan B, B0 + B1 — PEND-14) | `DEFAULT_WORK_SCORING`, `workScoringIssues`, `workScoreIssue`, `totalTaskWeight`, `taskWeightIssues`, `effectiveWeights` (Q64), `kqcv`, `hsht`, `hsnvRequired`, `hsnvIssues`, `finalWorkScore` (Q61); B1: `planSubmitIssues` (Q68), `taskEditBlockers` (ADD / UPDATE / REMOVE / CANCEL / PROGRESS), `progressIssues`, `linkedGoalIssues` (Q63), `WORK_REVIEW_COLUMN_FIELDS`, `columnScores`, `columnTotals`, `reviewSubmitIssues`, `workResultOf` |
+| `workRules.ts` (Plan B, B0 + B1 — PEND-14) | `DEFAULT_WORK_SCORING`, `workScoringIssues`, `workScoreIssue`, `totalTaskWeight`, `taskWeightIssues`, `effectiveWeights` (Q64), `kqcv`, `hsht`, `hsnvRequired`, `hsnvIssues`, `finalWorkScore` (Q61); B1: `planSubmitIssues` (Q68), `taskEditBlockers` (ADD / UPDATE / REMOVE / CANCEL / PROGRESS; `mayActForManager`), `progressIssues`, `linkedGoalIssues` (Q63), `WORK_REVIEW_COLUMN_FIELDS`, `columnScores`, `columnTotals`, `reviewSubmitIssues`, `workResultOf`; B2: `workPlanStatusOnEnterStep`, `WORK_PLAN_STATUS_ON_COMPLETE` / `_ON_CANCEL`, `copyFromPreviousMonth`, `previousMonth`, `defaultWorkMonth`, `weightedProgress`, `followProgress`, `currentMonthForm` |
 | `actualRules.ts` (Gate 1, T4) | `actualIssues` = `entryBlockers` (plan / period / result / goal — what the entry screen shows before typing) + `valueIssues`; `isResultFinalised`, `currentActual`, `syncKeepsHumanActual`, `syncRunStatus`, `isEvidenceUrl`, `monthlySchedule` (BR-KPI-52, 56, 57) |
 | `importRules.ts` (T4) | THE shared import framework: `ImportColumn` / `ImportTemplateSpec`, `parseSheet(spec, matrix)`, `normaliseCell`, `parseNumberCell` / `parseDateCell` / `parseTextCell`, `importError`, `batchCounts`, `canCommitImport`, `canRejectImport`, `errorsByRow`, `previewOrder` (BR-KPI-53, 54) — shared by T1/T2/T3, changing it is Large |
 | `actualImportRules.ts` (T4) | `ACTUAL_IMPORT_SPEC` / `ACTUAL_COLUMNS`, `resolveActualRow`, `validateActualRows`, `actualImportWarnings`, `actualTemplateRows` (BR-KPI-53) |
@@ -309,7 +321,7 @@ Conventions in its `README.md`. Keys are `[tenantId, root, ...params]`.
 | `insight.ts` (Phase 3) | `useInsightSummary(snapshot)`, `useExplainInsight(snapshot, nodeId)` (`insightKey` = tenant, `insight`, kind, snapshot digest), `useAskInsight()` (mutation, nothing stored) |
 | `results.ts` additions (Phase 3) | `useResultsOfPeriods(periodIds)` (one query per period, `periodResultsKey`; data only once all loaded); `useResultBreakdown(result, { plan })` — with `plan`, goal names follow visibility (`hidden` lines) |
 | `dev.ts` | The ONLY toolbar access to `gateway.dev`: `useSimulatedNow` (`simulatedNowKey`, staleTime ∞, re-read on open), `useSetSimulatedNow` (`{ to }` or `{ shiftDays }` via `addDaysToInstant` in the tenant zone), `useSetLatency`, `useSetFailureMode` (all three mirror into `devStore` and invalidate every query), `useRunScheduler` (session tenant, invalidates `[tenantId]`) — tested |
-| `work.ts` (Plan B 8.1 — PEND-14) | Reads with `*Key` (roots `workPlans`, `workReviews`, `workResults`, `workScoring`): `useWorkPlans(filter)`, `useWorkPlan`, `useWorkTasks`, `useWorkTasksOfPlans(ids)` (one read for a team), `useWorkReview(formId)`, `useWorkReviewItems(formId)`, `useWorkResults(filter)`, `useWorkScoring` (falls back to `DEFAULT_WORK_SCORING` when the tenant saved none). Writes invalidate their root, refusals left to the caller: `useSaveWorkTasks`, `useCancelWorkTask`, `useUpdateTaskProgress`, `useSaveWorkReview`, `useSaveWorkScoring`. No screen uses them yet (8.2) |
+| `work.ts` (Plan B 8.1 — PEND-14) | Reads with `*Key` (roots `workPlans`, `workReviews`, `workResults`, `workScoring`): `useWorkPlans(filter)`, `useWorkPlan`, `useWorkTasks`, `useWorkTasksOfPlans(ids)` (one read for a team), `useWorkReview(formId)`, `useWorkReviewItems(formId)`, `useWorkResults(filter)`, `useWorkScoring` (falls back to `DEFAULT_WORK_SCORING` when the tenant saved none). Writes invalidate their root, refusals left to the caller: `useSaveWorkTasks`, `useCancelWorkTask`, `useUpdateTaskProgress`, `useSaveWorkReview`, `useSaveWorkScoring`. Used by `src/components/work/` and the work pages (8.2) |
 | `useGatewayEventInvalidation` | Subscribes the cache to the gateway's `entity.changed` for one tenant; invalidates the affected roots once per microtask — tested; mounted by `GatewayEventBridge` |
 
 ## Mock adapter and seed (Phase 1.2) — for tests only outside `src/integrations/data/`

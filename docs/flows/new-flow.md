@@ -451,7 +451,24 @@ sequenceDiagram
 - **Việc bị hủy giữa tháng** (quản lý hủy kèm lý do) không tính vào KQcv; trọng số các việc còn lại chia lại
   cho đủ 100% (Q64). Liên kết việc với KPI là tùy chọn, không ảnh hưởng điểm (Q63).
 - Kết quả tháng **chỉ theo dõi, không vào lương** (Q52).
-- *Đã làm 23/10 (B0):* phần tính điểm (`workRules.ts`). Chưa có màn hình, phiếu hay dữ liệu.
+- **Kế hoạch tháng (phiếu WORK_PLAN, đã làm 23/10 — B2):** nhân viên lập ở *Của tôi › Công việc tháng*
+  (`/my/work`): thêm / sửa / xóa việc trong khung bên phải, mỗi lần **Lưu là lưu ngay** (không có nháp), tổng
+  trọng số luôn hiện; **Sao chép tháng trước** thêm các việc chưa xong của tháng trước (bỏ việc đã xong, đã hủy,
+  việc đã có cùng tên). **Gửi** chỉ được khi có ít nhất một việc và đủ 100%. Quản lý ở *Đội nhóm › Công việc
+  tháng của đội* (`/team/work`) thấy từng nhân viên trực tiếp, mở kế hoạch, sửa được, **Trả lại** (bắt buộc lý
+  do — kế hoạch *Bị trả lại*) hoặc **Duyệt** (cùng kiểm tra 100%) → kế hoạch **Đã khóa**. Quá hạn bước nhân
+  viên → hệ thống chuyển cho quản lý (kế hoạch *Đã gửi*, lịch sử ghi "Hệ thống"); quản lý bổ sung rồi duyệt hoặc
+  trả lại. HR hủy phiếu → kế hoạch về *Nháp*, giữ các việc; khởi chạy lại dùng tiếp kế hoạch đó.
+- **Quản lý giao trước (top-down):** khi khởi chạy, HR chọn *Bắt đầu từ: Quản lý giao việc* (bước 1) — quản lý nhập
+  các việc đã định rồi chuyển cho nhân viên (chưa cần đủ 100%), nhân viên bổ sung và gửi duyệt; hoặc *Nhân viên lập
+  kế hoạch* (bước 2, cách CMC thường làm). Trả lại từ bước duyệt luôn về bước của nhân viên.
+- **Trong tháng:** sau khi khóa, nhân viên và quản lý sửa **% hoàn thành** và **trạng thái** ngay trên bảng
+  (Hoàn thành = 100%, Chưa bắt đầu = 0%), thêm ghi chú; chỉ quản lý (hoặc người được ủy quyền, HR thao tác
+  thay) **hủy việc kèm lý do**. Kế hoạch đã khóa không mở lại ở P1.
+- **Phiếu đánh giá** chỉ khởi chạy cho kế hoạch **đã khóa có ít nhất một việc** (Q69) — người chưa có kế hoạch
+  được duyệt thì HR xử lý kế hoạch trước.
+- *Đã làm 23/10:* phần tính điểm (B0); dữ liệu, seed (B1); phiếu kế hoạch và hai màn hình (B2). Chưa làm: phiếu
+  đánh giá (B3), khởi chạy đầu kỳ và import điểm (B4), kết quả và dashboard (B5).
 
 ### Dashboard theo vai trò (PEND-13)
 

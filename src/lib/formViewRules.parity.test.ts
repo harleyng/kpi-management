@@ -61,7 +61,7 @@ async function loadWorld(tenantIndex: number, existing?: DataGateway): Promise<W
   const tenant = (await gateway.platform.listTenants())[tenantIndex];
   const t = tenant.id;
   const preparedId = existing ? null : await prepare(gateway, tenant);
-  const { org, forms, goals } = gateway;
+  const { org, forms, goals, work } = gateway;
   const [accounts, employees, roles, permissions, rolePermissions, userRoles, orgUnits, assignments] = await Promise.all([
     org.listUserAccounts(t),
     org.listEmployees(t, { includeResigned: true }),
@@ -124,13 +124,15 @@ async function loadWorld(tenantIndex: number, existing?: DataGateway): Promise<W
   };
 
   const contentOk = async (form: FormInstance, s: FormStanding) => {
-    const [goalRows, kgis, items, changeItems] = await Promise.all([
+    const [goalRows, kgis, items, changeItems, workTasks, periods] = await Promise.all([
       form.goalPlanId ? goals.listGoals(t, { goalPlanIds: [form.goalPlanId] }) : Promise.resolve([]),
       form.goalPlanId ? goals.listKgis(t, form.goalPlanId) : Promise.resolve([]),
       form.formType === 'KPI_EVAL' ? forms.listEvaluationItems(t, form.id) : Promise.resolve([]),
       form.formType === 'GOAL_CHANGE' ? forms.listGoalChangeItems(t, form.id) : Promise.resolve([]),
+      form.workPlanId ? work.listWorkTasks(t, form.workPlanId) : Promise.resolve([]),
+      form.formType === 'WORK_PLAN' ? goals.listCycles(t).then((cs) => Promise.all(cs.map((c) => goals.listPeriods(t, c.id)))).then((ps) => ps.flat()) : Promise.resolve([]),
     ]);
-    return canSubmit(submitCheckInput(form, s.step!, s.steps, { goals: goalRows, kgis, items, changeItems })).ok;
+    return canSubmit(submitCheckInput(form, s.step!, s.steps, { goals: goalRows, kgis, items, changeItems, workTasks, periods })).ok;
   };
 
   return { gateway, preparedId, tenant, directory, allForms: all, openForms: all.filter((f) => f.status === 'Open' || f.status === 'InProgress'), plans, standingOf, candidatesFor, contentOk };

@@ -12,6 +12,7 @@ import type {
   PeriodResultStatus,
   RecordStatus,
   SyncRunStatus,
+  WorkTaskStatus,
 } from '@/data/types';
 
 /**
@@ -163,4 +164,12 @@ export const ATTENTION_TONE: Readonly<Record<keyof typeof ATTENTION_LABEL, Tone>
   BELOW_THRESHOLD: 'warning',
   MISSING: 'muted',
   LOW_RATING: 'warning',
+};
+
+/** A monthly task's progress (PEND-14): not started and cancelled are grey, in progress blue, done green. */
+export const WORK_TASK_STATUS_TONE: Readonly<Record<WorkTaskStatus, Tone>> = {
+  NotStarted: 'muted',
+  InProgress: 'info',
+  Done: 'positive',
+  Cancelled: 'muted',
 };

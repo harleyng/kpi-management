@@ -254,8 +254,11 @@ export const WORKFLOWS: readonly { key: FormType; name: string; steps: readonly 
   // (`ASSUMPTION Q65` proposes day 5); the review runs like the KPI evaluation (6 / 4 / 2 days).
   {
     key: 'WORK_PLAN',
-    name: 'Kế hoạch công việc tháng (2 bước)',
+    name: 'Kế hoạch công việc tháng (3 bước)',
+    // Top-down or bottom-up by the launch's "Bắt đầu từ" (PEND-01's startStepNo, monthly plan §6): step 1 when
+    // the manager assigns first, step 2 when the employee writes the list herself (CMC's usual way).
     steps: [
+      { name: 'Quản lý giao việc', actorRule: 'DIRECT_MANAGER', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 2, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
       { name: 'Nhân viên lập kế hoạch', actorRule: 'SELF', allowedActions: ['SUBMIT', 'EDIT'], slaDays: 3, onOverdue: 'AUTO_FORWARD', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
       { name: 'Quản lý duyệt kế hoạch', actorRule: 'DIRECT_MANAGER', allowedActions: ['APPROVE', 'RETURN', 'EDIT'], slaDays: 3, onOverdue: 'REMIND', remindDaysBefore: 1, evaluationColumn: null, requiresComment: false },
     ],
@@ -273,6 +276,9 @@ export const WORKFLOWS: readonly { key: FormType; name: string; steps: readonly 
 
 /** The monthly work plan is due 7 days after its launch on day 1 (sample, `ASSUMPTION Q65`). */
 export const WORK_PLAN_DUE_DAYS = 7;
+
+/** Where a bottom-up monthly plan starts: the employee's step of the WORK_PLAN workflow (`FormLaunch.startStepNo`). */
+export const WORK_PLAN_BOTTOM_UP_STEP = 2;
 
 /** The monthly evaluation launches itself: PERIOD_END + 1 day, due 12 days later (SLAs sum to 12). */
 export const EVAL_DUE_DAYS = 12;

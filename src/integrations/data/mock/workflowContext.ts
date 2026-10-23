@@ -17,6 +17,7 @@ import { KpiError, toKpiError, type RuleIssue } from '@/lib/errorCatalog';
 import { computedItemPct, itemsOnEnterColumn, sameActual, type ItemCalcContext } from '@/lib/formRules';
 import { periodActual, periodTarget, type ActualContext } from '@/lib/resultRules';
 import { planStatusOnEnterStep, type Decision } from '@/lib/goalPlanRules';
+import { workPlanStatusOnEnterStep } from '@/lib/workRules';
 import { planEditability, type OpenRegistration } from '@/lib/planAccessRules';
 import { todayOf } from '@/lib/isoDate';
 import { resourceOfSubject } from '@/lib/permissionRules';
@@ -205,6 +206,36 @@ export function setPlanStatus(tx: Tx, plan: GoalPlan, to: GoalPlan['status'], re
   return saved;
 }
 
+/**
+ * Moves a monthly `WorkPlan` to `to` — the one place its status is written: → Locked stamps
+ * `approvedAt` now and `approvedBy` = `approver` (the person who pressed Duyệt — a delegate or proxy
+ * included, the history row names whom they acted for; `null` for a system move), audited LOCK; out of
+ * Locked clears both (UNLOCK — no path reaches it in P1). No-op when the status is already `to`.
+ */
+export function setWorkPlanStatus(tx: Tx, plan: WorkPlan, to: WorkPlan['status'], approver: Id | null, reason: string | null = null): WorkPlan {
+  if (plan.status === to) return plan;
+  const locking = to === 'Locked';
+  const unlocking = plan.status === 'Locked';
+  const action = locking ? 'LOCK' : unlocking ? 'UNLOCK' : undefined;
+  return tx.update(
+    'WorkPlan',
+    { ...plan, status: to, approvedAt: locking ? tx.now : null, approvedBy: locking ? approver : null },
+    { action, reason },
+  );
+}
+
+/**
+ * After a WORK_PLAN form moved (`forms.act`, the scheduler's AUTO_FORWARD): its plan follows
+ * (`TransitionResult.workPlanStatus`). A missing plan fails as an integrity error, never silently.
+ */
+export function syncWorkPlan(tx: Tx, form: FormInstance, workPlanStatus: WorkPlan['status'] | null, approver: Id | null, reason: string | null): void {
+  if (workPlanStatus === null || form.workPlanId === null) return;
+  const plan = tx.get('WorkPlan', form.workPlanId);
+  // A Locked plan has no unlock in P1: no form move takes it out of Locked (a relaunch never reaches one).
+  if (plan.status === 'Locked' && workPlanStatus !== 'Locked') return;
+  setWorkPlanStatus(tx, plan, workPlanStatus, approver, reason);
+}
+
 // ─── Launches ──────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -283,6 +314,11 @@ export function fireLaunch(tx: Tx, launch: FormLaunch): { launch: FormLaunch; fo
     formIds.push(form.id);
 
     if (launch.formType === 'WORK_REVIEW' && workPlan) addWorkReview(tx, form, workPlan);
+    // The plan takes the status of the step the form starts at (Draft at the employee's or a manager's
+    // step before it). A Locked plan stays Locked; a review never moves its plan.
+    if (launch.formType === 'WORK_PLAN' && workPlan && workPlan.status !== 'Locked') {
+      setWorkPlanStatus(tx, tx.get('WorkPlan', workPlan.id), workPlanStatusOnEnterStep(first.stepNo, steps, false), null);
+    }
     if (launch.formType === 'GOAL_SETTING' && plan && plan.status !== 'Locked') {
       setPlanStatus(tx, tx.get('GoalPlan', plan.id), planStatusOnEnterStep(first.stepNo, steps, false));
     }

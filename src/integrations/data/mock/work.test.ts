@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SYNTRA } from '@/data/fixtures';
+import { DEMO, SYNTRA } from '@/data/fixtures';
 import type { Id, RecipientFilter, WorkTask } from '@/data/types';
 import { DEFAULT_WORK_SCORING } from '@/lib/workRules';
 import type { DataGateway, WorkTaskInput } from '../types';
@@ -108,7 +108,7 @@ describe('work — after approval: cancel (manager, reason) and progress', () =>
   it('a Locked plan\'s list is fixed', async () => {
     const { gateway } = newGateway();
     const tasks = inputsOf(await tasksOf(gateway, 'E015', 'T04'));
-    expect(await codeOf(gateway.work.saveWorkTasks(S, MANAGER, workPlan('E015', 'T04'), [{ ...tasks[0], weight: 30 }, ...tasks.slice(1)]))).toBe('ERR-KPI-04:PLAN_LOCKED');
+    expect(await codeOf(gateway.work.saveWorkTasks(S, MANAGER, workPlan('E015', 'T04'), [{ ...tasks[0], weight: 30 }, ...tasks.slice(1)]))).toBe('ERR-KPI-04:WORK_PLAN_LOCKED');
   });
 
   it('the manager cancels with a reason; the task drops out, the reason is audited', async () => {
@@ -218,11 +218,11 @@ describe('work.saveWorkReview — "Lưu nháp" of the current step\'s column', (
 });
 
 describe('work — forms and launches (the monthly-work part wired in 8.1)', () => {
-  it('a monthly-work form does not move yet (8.2 / 8.3); HR may still cancel it', async () => {
+  it('the review does not move yet (8.3); HR may still cancel it', async () => {
     const { gateway } = newGateway();
-    const form = await gateway.forms.getForm(S, formId('WP:T04:E016'));
-    const base = { formId: form.id, expectedStepId: form.currentStepId as Id, comment: 'Duyệt', onBehalfOfUserId: null, delegationId: null };
-    expect(await codeOf(gateway.forms.act(S, MANAGER, { ...base, action: 'APPROVE' }))).toBe('ERR-KPI-04:WORK_FORM_NOT_BUILT');
+    const form = await gateway.forms.getForm(S, formId('WR:T03:E017'));
+    const base = { formId: form.id, expectedStepId: form.currentStepId as Id, comment: 'Gửi', onBehalfOfUserId: null, delegationId: null };
+    expect(await codeOf(gateway.forms.act(S, MANAGER, { ...base, action: 'SUBMIT' }))).toBe('ERR-KPI-04:WORK_FORM_NOT_BUILT');
     expect((await gateway.forms.act(S, hr, { ...base, action: 'CANCEL', comment: 'Kiểm thử' })).status).toBe('Cancelled');
   });
 
@@ -281,5 +281,181 @@ describe('work.saveWorkScoringConfig', () => {
     expect(saved.id).toBe(before?.id);
     expect(await codeOf(gateway.work.saveWorkScoringConfig(S, hr, { resultWeight: 60, disciplineWeight: 30, hsnvThreshold: 80, scoreMin: 0, scoreMax: 100 }))).toBe('ERR-KPI-07:undefined');
     expect((await rejection(gateway.work.saveWorkScoringConfig(S, u('E016'), DEFAULT_WORK_SCORING))).code).toBe('ERR-KPI-05');
+  });
+});
+
+// ─── Step 8.2: the WORK_PLAN form moves its plan ─────────────────────────────────────────────────
+
+const actOn = async (gw: DataGateway, actor: Id, key: string, action: 'SUBMIT' | 'APPROVE' | 'RETURN' | 'CANCEL', comment: string | null = null, as: { onBehalfOfUserId: Id | null; delegationId: Id | null } = { onBehalfOfUserId: null, delegationId: null }) => {
+  const form = await gw.forms.getForm(S, formId(key));
+  return gw.forms.act(S, actor, { formId: form.id, expectedStepId: form.currentStepId as Id, action, comment, ...as });
+};
+const planStatus = async (gw: DataGateway, code: string, month: string) => (await gw.work.getWorkPlan(S, workPlan(code, month))).status;
+
+describe('WORK_PLAN — lập → duyệt → khóa (step 8.2)', () => {
+  it('the manager returns with a reason, the employee sends again, the manager approves: Locked, stamped, frozen list', async () => {
+    const { gateway } = newGateway();
+    expect(await planStatus(gateway, 'E016', 'T04')).toBe('Submitted');
+    expect(await codeOf(actOn(gateway, MANAGER, 'WP:T04:E016', 'RETURN', ' '))).toBe('ERR-KPI-06:COMMENT_REQUIRED');
+    await actOn(gateway, MANAGER, 'WP:T04:E016', 'RETURN', 'Tách việc chốt hợp đồng theo từng khách hàng.');
+    expect(await planStatus(gateway, 'E016', 'T04')).toBe('Returned');
+    // Back at step 1 the employee edits again, then sends.
+    const tasks = inputsOf(await tasksOf(gateway, 'E016', 'T04'));
+    await gateway.work.saveWorkTasks(S, u('E016'), workPlan('E016', 'T04'), [{ ...tasks[0], name: 'Chốt 5 hợp đồng mới (3 khách cũ, 2 khách mới)' }, ...tasks.slice(1)]);
+    await actOn(gateway, u('E016'), 'WP:T04:E016', 'SUBMIT');
+    expect(await planStatus(gateway, 'E016', 'T04')).toBe('Submitted');
+    const done = await actOn(gateway, MANAGER, 'WP:T04:E016', 'APPROVE');
+    expect(done.status).toBe('Completed');
+    const plan = await gateway.work.getWorkPlan(S, workPlan('E016', 'T04'));
+    expect(plan).toMatchObject({ status: 'Locked', approvedBy: MANAGER });
+    expect(plan.approvedAt).not.toBeNull();
+    const audit = await gateway.system.listAuditLog(S, { entityName: 'WorkPlan', entityId: plan.id });
+    expect(audit.items.map((a) => a.action)).toContain('LOCK');
+    // Locked: the list is fixed for everyone; progress moves.
+    expect(await codeOf(gateway.work.saveWorkTasks(S, u('E016'), plan.id, inputsOf(await tasksOf(gateway, 'E016', 'T04')).slice(1)))).toBe('ERR-KPI-04:WORK_PLAN_LOCKED');
+    expect((await gateway.work.updateTaskProgress(S, u('E016'), task('E016', 'T04', 1), { progressPct: 20, progressStatus: 'InProgress', note: null })).progressPct).toBe(20);
+  });
+
+  it('sending a plan off 100% is refused with the total; fixed, it goes', async () => {
+    const { gateway } = newGateway();
+    expect(await planStatus(gateway, 'E018', 'T04')).toBe('Draft');
+    const e = await rejection(actOn(gateway, u('E018'), 'WP:T04:E018', 'SUBMIT'));
+    expect([e.code, e.detail]).toEqual(['ERR-KPI-07', 'CONTENT_INCOMPLETE']);
+    expect(e.issues[0].data).toEqual({ totalWeight: 60 });
+    const tasks = inputsOf(await tasksOf(gateway, 'E018', 'T04'));
+    await gateway.work.saveWorkTasks(S, u('E018'), workPlan('E018', 'T04'), [{ ...tasks[0], weight: 60 }, { ...tasks[1], weight: 40 }]);
+    await actOn(gateway, u('E018'), 'WP:T04:E018', 'SUBMIT');
+    expect(await planStatus(gateway, 'E018', 'T04')).toBe('Submitted');
+    // The employee may no longer edit at the manager's step; the manager may.
+    const sent = inputsOf(await tasksOf(gateway, 'E018', 'T04'));
+    expect((await rejection(gateway.work.saveWorkTasks(S, u('E018'), workPlan('E018', 'T04'), [{ ...sent[0], weight: 50 }, { ...sent[1], weight: 50 }]))).code).toBe('ERR-KPI-05');
+  });
+
+  it('step 1 overdue: the scheduler hands the plan to the manager (no actor); the manager completes and approves', async () => {
+    const { gateway } = newGateway();
+    gateway.dev?.setNow('2027-04-09T02:00:00.000Z'); // E018's step-1 deadline was 04-08
+    const report = await gateway.scheduler.runDue(S);
+    expect(report.overdueHandled.map((o) => o.formId)).toContain(formId('WP:T04:E018'));
+    expect(await planStatus(gateway, 'E018', 'T04')).toBe('Submitted');
+    const history = await gateway.forms.listFormActions(S, formId('WP:T04:E018'));
+    expect(history.at(-1)).toMatchObject({ action: 'AUTO_FORWARD', actorUserId: null });
+    // Never sent complete: APPROVE runs the same check (60%).
+    expect((await rejection(actOn(gateway, MANAGER, 'WP:T04:E018', 'APPROVE'))).code).toBe('ERR-KPI-07');
+    const tasks = inputsOf(await tasksOf(gateway, 'E018', 'T04'));
+    await gateway.work.saveWorkTasks(S, MANAGER, workPlan('E018', 'T04'), [...tasks, { ...tasks[0], id: undefined, name: 'Báo cáo tuần cho trưởng nhóm', weight: 40 }]);
+    await actOn(gateway, MANAGER, 'WP:T04:E018', 'APPROVE');
+    expect(await planStatus(gateway, 'E018', 'T04')).toBe('Locked');
+  });
+
+  it('HR as proxy approves for the manager: approvedBy is HR, the history names both', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, hr, 'WP:T04:E016', 'APPROVE', null, { onBehalfOfUserId: MANAGER, delegationId: null });
+    expect(await gateway.work.getWorkPlan(S, workPlan('E016', 'T04'))).toMatchObject({ status: 'Locked', approvedBy: hr });
+    expect((await gateway.forms.listFormActions(S, formId('WP:T04:E016'))).at(-1)).toMatchObject({ action: 'APPROVE', actorUserId: hr, onBehalfOfUserId: MANAGER });
+  });
+
+  it('a delegate of the manager approves under a WORK_PLAN delegation', async () => {
+    const { gateway } = newGateway();
+    const d = await gateway.forms.saveDelegation(S, MANAGER, { toUserId: u('E015'), formType: 'WORK_PLAN', validFrom: '2027-04-06', validTo: '2027-04-10' });
+    await actOn(gateway, u('E015'), 'WP:T04:E016', 'APPROVE', null, { onBehalfOfUserId: MANAGER, delegationId: d.id });
+    expect(await gateway.work.getWorkPlan(S, workPlan('E016', 'T04'))).toMatchObject({ status: 'Locked', approvedBy: u('E015') });
+  });
+
+  it('HR cancels: the plan goes back to Draft with its tasks; a relaunch reuses it', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, hr, 'WP:T04:E017', 'CANCEL', 'Khởi chạy lại sau khi đổi quản lý');
+    expect(await planStatus(gateway, 'E017', 'T04')).toBe('Draft');
+    expect(await tasksOf(gateway, 'E017', 'T04')).toHaveLength(2);
+    const workflowId = (await gateway.forms.listWorkflows(S, 'WORK_PLAN'))[0].id;
+    const launch = await gateway.forms.createLaunch(S, hr, {
+      workflowId, name: 'Kế hoạch T04 — bổ sung', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T04'), dueDays: 7, recipientMode: 'FILTER', timing: 'NOW',
+      recipientFilter: { ...KDBH, employeeIds: [SYNTRA.employee('E017')] },
+    });
+    const [form] = (await gateway.forms.listForms(S, { launchId: launch.id })).items;
+    expect(form.workPlanId).toBe(workPlan('E017', 'T04'));
+    expect(await gateway.work.listWorkPlans(S, { periodId: period('T04'), employeeIds: [SYNTRA.employee('E017')] })).toHaveLength(1);
+  });
+});
+
+describe('WORK_PLAN — edges (QA, B2)', () => {
+  it('another tenant acting on a Syntra plan form or its tasks gets "not found"; nothing changes', async () => {
+    const { gateway } = newGateway();
+    const D = DEMO.tenantId;
+    const demoHr = DEMO.user(DEMO.personas.hr);
+    const form = await gateway.forms.getForm(S, formId('WP:T04:E016'));
+    const e = await rejection(gateway.forms.act(D, demoHr, { formId: form.id, expectedStepId: form.currentStepId as Id, action: 'CANCEL', comment: 'x', onBehalfOfUserId: null, delegationId: null }));
+    expect(e.code).toBe('ERR-KPI-02');
+    expect((await rejection(gateway.work.saveWorkTasks(D, demoHr, workPlan('E016', 'T04'), []))).code).toBe('ERR-KPI-02');
+    expect(await planStatus(gateway, 'E016', 'T04')).toBe('Submitted');
+    expect(await tasksOf(gateway, 'E016', 'T04')).toHaveLength(3);
+  });
+
+  it('a launch starts the plan at step 1 as Draft; a relaunch after a cancel keeps a Returned plan\'s tasks and makes it Draft', async () => {
+    const { gateway } = newGateway();
+    await actOn(gateway, hr, 'WP:T04:E017', 'CANCEL', 'Đổi người quản lý');
+    expect(await planStatus(gateway, 'E017', 'T04')).toBe('Draft');
+    const workflowId = (await gateway.forms.listWorkflows(S, 'WORK_PLAN'))[0].id;
+    const launch = await gateway.forms.createLaunch(S, hr, {
+      workflowId, name: 'Kế hoạch T05', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T05'), dueDays: 7, recipientMode: 'FILTER', timing: 'NOW', recipientFilter: KDBH,
+    });
+    const plans = await gateway.work.listWorkPlans(S, { periodId: period('T05') });
+    expect(plans.length).toBeGreaterThan(0);
+    expect(new Set(plans.map((p) => p.status))).toEqual(new Set(['Draft']));
+    expect((await gateway.forms.listForms(S, { launchId: launch.id })).items.every((f) => f.currentStepId !== null)).toBe(true);
+  });
+
+  it('the manager cannot cancel the last live task of a month', async () => {
+    const { gateway } = newGateway();
+    await gateway.work.cancelWorkTask(S, MANAGER, task('E015', 'T04', 1), 'Lý do 1');
+    await gateway.work.cancelWorkTask(S, MANAGER, task('E015', 'T04', 2), 'Lý do 2');
+    expect(await codeOf(gateway.work.cancelWorkTask(S, MANAGER, task('E015', 'T04', 3), 'Lý do 3'))).toBe('ERR-KPI-04:LAST_LIVE_TASK');
+  });
+});
+
+describe('WORK_PLAN — top-down: the manager assigns first (PEND-01 startStepNo, plan §6)', () => {
+  it('a launch from step 1 lets the manager hand over an unfinished list; the employee completes it; a RETURN comes back to her', async () => {
+    const { gateway } = newGateway();
+    const workflowId = (await gateway.forms.listWorkflows(S, 'WORK_PLAN'))[0].id;
+    const launch = await gateway.forms.createLaunch(S, hr, {
+      workflowId, name: 'Kế hoạch T05 — quản lý giao trước', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T05'), dueDays: 10, recipientMode: 'FILTER', timing: 'NOW',
+      recipientFilter: { ...KDBH, employeeIds: [SYNTRA.employee('E016')] }, startStepNo: null,
+    });
+    const [form] = (await gateway.forms.listForms(S, { launchId: launch.id })).items;
+    const plan = await gateway.work.getWorkPlan(S, form.workPlanId as Id);
+    expect(plan.status).toBe('Draft');
+    const act = async (actor: Id, action: 'SUBMIT' | 'APPROVE' | 'RETURN', comment: string | null = null) => {
+      const f = await gateway.forms.getForm(S, form.id);
+      return gateway.forms.act(S, actor, { formId: f.id, expectedStepId: f.currentStepId as Id, action, comment, onBehalfOfUserId: null, delegationId: null });
+    };
+    const may = { name: 'Chốt 3 hợp đồng', product: null, description: null, unitText: 'hợp đồng', weight: 60, startDate: '2027-05-01', dueDate: '2027-05-31', visibility: 'PUBLIC' as const, linkedGoalId: null };
+    // Step 1, the manager: 60% is enough to hand over (the list is still being built).
+    await gateway.work.saveWorkTasks(S, MANAGER, plan.id, [may]);
+    expect(await codeOf(gateway.work.saveWorkTasks(S, u('E016'), plan.id, [may, { ...may, name: 'Khác', weight: 40 }]))).toMatch(/^ERR-KPI-05/);
+    await act(MANAGER, 'SUBMIT');
+    expect((await gateway.work.getWorkPlan(S, plan.id)).status).toBe('Draft');
+    // Step 2, the employee: completes to 100% and sends.
+    const tasks = inputsOf(await gateway.work.listWorkTasks(S, plan.id));
+    expect((await rejection(act(u('E016'), 'SUBMIT'))).code).toBe('ERR-KPI-07');
+    await gateway.work.saveWorkTasks(S, u('E016'), plan.id, [...tasks, { ...may, name: 'Cập nhật CRM', weight: 40 }]);
+    await act(u('E016'), 'SUBMIT');
+    expect((await gateway.work.getWorkPlan(S, plan.id)).status).toBe('Submitted');
+    // Step 3: a RETURN goes back to the employee's step (not the manager's assignment).
+    await act(MANAGER, 'RETURN', 'Tách việc CRM theo tuần');
+    const back = await gateway.forms.getForm(S, form.id);
+    const steps = await gateway.forms.listWorkflowSteps(S, back.workflowId);
+    expect(steps.find((s) => s.id === back.currentStepId)?.actorRule).toBe('SELF');
+    expect((await gateway.work.getWorkPlan(S, plan.id)).status).toBe('Returned');
+  });
+
+  it('a bottom-up launch starts at the employee\'s step', async () => {
+    const { gateway } = newGateway();
+    const workflowId = (await gateway.forms.listWorkflows(S, 'WORK_PLAN'))[0].id;
+    const launch = await gateway.forms.createLaunch(S, hr, {
+      workflowId, name: 'Kế hoạch T05', cycleId: SYNTRA.id('PerformanceCycle', '2027'), periodId: period('T05'), dueDays: 7, recipientMode: 'FILTER', timing: 'NOW',
+      recipientFilter: { ...KDBH, employeeIds: [SYNTRA.employee('E016')] }, startStepNo: 2,
+    });
+    const [form] = (await gateway.forms.listForms(S, { launchId: launch.id })).items;
+    const steps = await gateway.forms.listWorkflowSteps(S, form.workflowId);
+    expect(steps.find((s) => s.id === form.currentStepId)?.stepNo).toBe(2);
   });
 });

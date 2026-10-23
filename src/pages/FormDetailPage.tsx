@@ -10,6 +10,7 @@ import { FormHistory } from '@/components/forms/FormHistory';
 import { FormStepStrip } from '@/components/forms/FormStepStrip';
 import { GoalChangeFormBody } from '@/components/forms/GoalChangeFormBody';
 import { GoalPlanFormBody } from '@/components/forms/GoalPlanFormBody';
+import { WorkPlanFormBody } from '@/components/work/WorkPlanFormBody';
 import { actingAsSentence, formPeriodText, formTitle, readOnlySentence, returnedSentence } from '@/components/forms/formCopy';
 import { useFormDetail } from '@/components/forms/useFormDetail';
 import { useSession } from '@/contexts/useSession';
@@ -74,10 +75,12 @@ export default function FormDetailPage() {
       <EvaluationFormBody detail={detail} title={title} />
     ) : form.formType === 'GOAL_SETTING' ? (
       <GoalPlanFormBody detail={detail} title={title} />
+    ) : form.formType === 'WORK_PLAN' ? (
+      <WorkPlanFormBody detail={detail} title={title} />
     ) : isWorkFormType(form.formType) ? (
-      // Monthly work (PEND-14): the form bodies arrive with Plan B steps 8.2 / 8.3.
-      <InlineNotice tone="info" title="Nội dung phiếu công việc tháng đang được xây dựng">
-        Phiếu đã được tạo và lưu đầy đủ. Màn hình lập kế hoạch và chấm điểm công việc tháng sẽ có ở bản cập nhật tới.
+      // The monthly work review's body arrives with Plan B step 8.3.
+      <InlineNotice tone="info" title="Nội dung phiếu đánh giá công việc tháng đang được xây dựng">
+        Phiếu đã được tạo và lưu đầy đủ. Màn hình chấm điểm công việc tháng sẽ có ở bản cập nhật tới.
       </InlineNotice>
     ) : (
       <GoalChangeFormBody detail={detail} title={title} />

@@ -4,12 +4,14 @@ import {
   BookOpen,
   CalendarRange,
   ClipboardCheck,
+  ClipboardList,
   Database,
   FileSpreadsheet,
   History,
   Inbox,
   LayoutDashboard,
   LayoutTemplate,
+  ListChecks,
   Network,
   Rocket,
   ShieldCheck,
@@ -105,6 +107,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Của tôi',
     items: [
       { title: 'KPI của tôi', url: '/my/kpi', icon: Target, permission: null },
+      { title: 'Công việc tháng', url: '/my/work', icon: ListChecks, permission: null },
       {
         title: 'Việc cần xử lý',
         url: '/my/tasks',
@@ -132,6 +135,7 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
       },
       { title: 'Duyệt & đánh giá', url: '/team/reviews', icon: ClipboardCheck, permission: 'team.view' },
+      { title: 'Công việc tháng của đội', url: '/team/work', icon: ClipboardList, permission: 'team.view' },
     ],
   },
   {

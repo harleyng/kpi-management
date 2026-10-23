@@ -111,6 +111,30 @@ describe('canSubmit — GOAL_CHANGE', () => {
   });
 });
 
+describe('canSubmit — WORK_PLAN (PEND-14, 8.2)', () => {
+  const steps = registrationSteps().slice(0, 3); // top-down: manager → employee (2) → manager
+  const march = { startDate: '2027-03-01', endDate: '2027-03-31' };
+  const task = (id: string, weight: number) => ({ id, weight, cancelledAt: null, name: `Việc ${id}`, startDate: '2027-03-01', dueDate: '2027-03-31' });
+
+  it('before the employee\'s step (a manager assigning first) the list may be unfinished', () => {
+    expect(canSubmit({ formType: 'WORK_PLAN', stepNo: 1, steps, tasks: [], period: march }).ok).toBe(true);
+  });
+
+  it.each([2, 3])('from the employee\'s step on: at least one task, weights at 100%% (step %s)', (stepNo) => {
+    expect(issues(canSubmit({ formType: 'WORK_PLAN', stepNo, steps, tasks: [], period: march }))).toEqual([['ERR-KPI-06', null, 'PLAN_EMPTY']]);
+    expect(issues(canSubmit({ formType: 'WORK_PLAN', stepNo, steps, tasks: [task('a', 60)], period: march })).map((i) => i[0])).toEqual(['ERR-KPI-07']);
+    expect(canSubmit({ formType: 'WORK_PLAN', stepNo, steps, tasks: [task('a', 60), task('b', 40)], period: march }).ok).toBe(true);
+  });
+
+  it('a form with no month cannot be checked', () => {
+    expect(issues(canSubmit({ formType: 'WORK_PLAN', stepNo: 2, steps, tasks: [task('a', 100)], period: null }))).toEqual([['ERR-KPI-06', 'periodId', 'PERIOD_REQUIRED']]);
+  });
+
+  it('the review is not wired yet (8.3)', () => {
+    expect(issues(canSubmit({ formType: 'WORK_REVIEW' }))).toEqual([['ERR-KPI-04', null, 'WORK_FORM_NOT_BUILT']]);
+  });
+});
+
 describe('validateScoreInput', () => {
   const capped = calcMethod({ capPct: 120 });
   it.each([

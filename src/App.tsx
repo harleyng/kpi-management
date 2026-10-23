@@ -19,6 +19,9 @@ import { HOME_URL } from '@/components/layout/navConfig';
 const MyKpiPage = lazy(() => import('@/pages/MyKpiPage'));
 const MyTasksPage = lazy(() => import('@/pages/MyTasksPage'));
 const MyResultsPage = lazy(() => import('@/pages/MyResultsPage'));
+const MyWorkPage = lazy(() => import('@/pages/MyWorkPage'));
+const TeamWorkPage = lazy(() => import('@/pages/TeamWorkPages'));
+const TeamWorkPlanPage = lazy(() => import('@/pages/TeamWorkPages').then((m) => ({ default: m.TeamWorkPlanPage })));
 const TeamKpiPage = lazy(() => import('@/pages/TeamKpiPage'));
 const TeamReviewsPage = lazy(() => import('@/pages/TeamReviewsPage'));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
@@ -58,6 +61,7 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/my/tasks/inbox" element={<MyTasksPage section="inbox" />} />
       <Route path="/my/tasks/forms" element={<MyTasksPage section="forms" />} />
       <Route path="/my/tasks/delegations" element={<MyTasksPage section="delegations" />} />
+      <Route path="/my/work" element={<MyWorkPage />} />
       <Route path="/my/results" element={<MyResultsPage />} />
 
       {/* Đội nhóm — managers */}
@@ -68,6 +72,8 @@ export const appRoutes = createRoutesFromElements(
       <Route path="/team/kpi/unit/:planId" element={<PlanPage kind="unit" />} />
       <Route path="/team/kpi/unit/:planId/goals/:goalId" element={<GoalPage kind="unit" />} />
       <Route path="/team/reviews" element={<TeamReviewsPage />} />
+      <Route path="/team/work" element={<TeamWorkPage />} />
+      <Route path="/team/work/:workPlanId" element={<TeamWorkPlanPage />} />
 
       {/* Điều hành — BOD, managers, HR */}
       <Route path="/dashboard/overview" element={<DashboardPage section="overview" />} />

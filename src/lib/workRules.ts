@@ -18,9 +18,9 @@
  * task when, what blocks sending a review column, and the month's result snapshot.
  */
 
-import type { CyclePeriod, EvaluationColumn, Goal, GoalPlan, Id, WorkReview, WorkReviewItem, WorkTaskStatus } from '@/data/types';
+import type { CyclePeriod, EvaluationColumn, Goal, GoalPlan, Id, WorkflowStep, WorkPlanStatus, WorkReview, WorkReviewItem, WorkTask, WorkTaskStatus } from '@/data/types';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
-import { isWeightComplete } from './goalPlanRules';
+import { isWeightComplete, planStatusOnEnterStep } from './goalPlanRules';
 
 // ─── Configuration ─────────────────────────────────────────────────────────────────────────────
 
@@ -238,13 +238,15 @@ export interface TaskEditContext {
   reviewLaunched: boolean;
   /** The month's `WorkResult` is recorded: nothing about its tasks changes. */
   resultRecorded: boolean;
+  /** Live (not cancelled) tasks on the plan — the last one cannot be cancelled. Omitted = not checked. */
+  liveTaskCount?: number;
 }
 
 /**
  * Who may change what (plan §6, CMC QL pp. 126–127):
  * - before approval (not Locked): ADD / UPDATE / REMOVE by whoever may EDIT at the WORK_PLAN form's
  *   current step; there is nothing to cancel or to track yet (`NOT_APPROVED`);
- * - after approval (Locked): the list is fixed (`PLAN_LOCKED`) — only the manager cancels a live task
+ * - after approval (Locked): the list is fixed (`WORK_PLAN_LOCKED`) — only the manager cancels a live task
  *   with a reason (`ASSUMPTION Q64`), and the employee or the manager updates progress;
  * - once the month's review exists, the list is frozen for every edit but PROGRESS
  *   (`REVIEW_LAUNCHED`); once its result is recorded, for every edit (`RESULT_RECORDED`).
@@ -268,9 +270,11 @@ export function taskEditBlockers(
   if (edit === 'PROGRESS') return ctx.isSubject || ctx.isManager || ctx.mayActForManager ? [] : refuse('ERR-KPI-05', 'NOT_SUBJECT_OR_MANAGER');
   if (edit === 'CANCEL') {
     if (!ctx.isManager && !ctx.mayActForManager) return refuse('ERR-KPI-05', 'MANAGER_ONLY');
+    // Cancelling the last live task would leave a month nothing can score (KQcv null for good).
+    if (ctx.liveTaskCount !== undefined && ctx.liveTaskCount <= 1) return refuse('ERR-KPI-04', 'LAST_LIVE_TASK');
     return blank(reason) ? refuse('ERR-KPI-06', 'CANCEL_REASON_REQUIRED') : [];
   }
-  return refuse('ERR-KPI-04', 'PLAN_LOCKED');
+  return refuse('ERR-KPI-04', 'WORK_PLAN_LOCKED');
 }
 
 /**
@@ -409,4 +413,132 @@ export function workResultOf(review: WorkReview, items: readonly WorkReviewItem[
     hsnvReason: required ? review.finalHsnvReason : null,
     finalScore: finalWorkScore(h, review.finalHsnv, config),
   };
+}
+
+// ─── The WORK_PLAN form (step 8.2) ─────────────────────────────────────────────────────────────
+
+/**
+ * The plan's status when its WORK_PLAN form ENTERS step `stepNo` — `goalPlanRules.planStatusOnEnterStep`
+ * with `Approved` folded into `Submitted`: a work plan has no Approved, the approval IS the lock
+ * (`WORK_PLAN_STATUS_ON_COMPLETE`). Up to the employee's step → Draft (Returned via RETURN); after it →
+ * Submitted. Bottom-up (employee → manager): Draft, Submitted. Top-down (manager → employee → manager):
+ * Draft, Draft, Submitted.
+ */
+export function workPlanStatusOnEnterStep(
+  stepNo: number,
+  steps: readonly Pick<WorkflowStep, 'stepNo' | 'actorRule'>[],
+  viaReturn: boolean,
+): WorkPlanStatus {
+  const status = planStatusOnEnterStep(stepNo, steps, viaReturn);
+  return status === 'Approved' ? 'Submitted' : status;
+}
+
+/** The manager's final approval locks the month's plan. */
+export const WORK_PLAN_STATUS_ON_COMPLETE: WorkPlanStatus = 'Locked';
+/** HR cancelling the WORK_PLAN form puts the plan back to Draft; its tasks stay (a relaunch reuses it). */
+export const WORK_PLAN_STATUS_ON_CANCEL: WorkPlanStatus = 'Draft';
+
+/** A task as "Sao chép tháng trước" reads it. */
+export type CopiedTaskSource = Pick<
+  WorkTask,
+  'name' | 'product' | 'description' | 'unitText' | 'weight' | 'visibility' | 'linkedGoalId' | 'progressStatus' | 'cancelledAt'
+>;
+
+const sameTask = (a: Pick<WorkTask, 'name' | 'product'>, b: Pick<WorkTask, 'name' | 'product'>) =>
+  a.name.trim().toLowerCase() === b.name.trim().toLowerCase() && (a.product ?? '').trim().toLowerCase() === (b.product ?? '').trim().toLowerCase();
+
+/**
+ * "Sao chép tháng trước" (plan §6): last month's tasks not cancelled and not `Done`, as new tasks of
+ * `period` — name, product, description, unit, weight and visibility kept; dates = the month; progress
+ * starts over (the gateway inserts 0 / NotStarted). A task already in the list (same name and
+ * product) is skipped, so a second click adds nothing. A KPI link is kept only inside the same cycle
+ * (`linkedGoalIssues` would refuse it in another). Weights are copied as they are: the total shows.
+ */
+export function copyFromPreviousMonth(
+  previous: readonly CopiedTaskSource[],
+  current: readonly Pick<WorkTask, 'name' | 'product'>[],
+  period: Pick<CyclePeriod, 'startDate' | 'endDate'>,
+  sameCycle: boolean,
+): { tasks: Omit<WorkTaskInputShape, 'id'>[]; skipped: number } {
+  const open = previous.filter((t) => t.cancelledAt === null && t.progressStatus !== 'Done');
+  const tasks: Omit<WorkTaskInputShape, 'id'>[] = [];
+  let skipped = 0;
+  for (const t of open) {
+    if (current.some((c) => sameTask(c, t)) || tasks.some((c) => sameTask(c, t))) {
+      skipped += 1;
+      continue;
+    }
+    tasks.push({
+      name: t.name,
+      product: t.product,
+      description: t.description,
+      unitText: t.unitText,
+      weight: t.weight,
+      startDate: period.startDate,
+      dueDate: period.endDate,
+      visibility: t.visibility,
+      linkedGoalId: sameCycle ? t.linkedGoalId : null,
+    });
+  }
+  return { tasks, skipped };
+}
+
+/** The fields a person types for a task — `WorkTaskInput` without the import from the contract. */
+export type WorkTaskInputShape = Pick<
+  WorkTask,
+  'name' | 'product' | 'description' | 'unitText' | 'weight' | 'startDate' | 'dueDate' | 'visibility' | 'linkedGoalId'
+> & { id?: Id };
+
+type MonthPeriod = Pick<CyclePeriod, 'id' | 'periodType' | 'startDate' | 'endDate'>;
+const months = <P extends MonthPeriod>(periods: readonly P[]) =>
+  periods.filter((p) => p.periodType === 'Month').sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+
+/** The month before `period` — the Month period that starts last before it, in any cycle; `null` for the first. */
+export function previousMonth<P extends MonthPeriod>(periods: readonly P[], period: Pick<CyclePeriod, 'startDate'>): P | null {
+  const before = months(periods).filter((p) => p.startDate < period.startDate);
+  return before.at(-1) ?? null;
+}
+
+/** The month a monthly-work screen opens on: the one containing today, else the last started, else the first. */
+export function defaultWorkMonth<P extends MonthPeriod>(periods: readonly P[], today: string): P | null {
+  const list = months(periods);
+  return list.find((p) => p.startDate <= today && today <= p.endDate) ?? list.filter((p) => p.startDate <= today).at(-1) ?? list[0] ?? null;
+}
+
+/**
+ * The month's progress — Σ % complete × effective weight / 100 over the live tasks (cancelled ones drop
+ * out and the rest are normalised, like KQcv). Tracking only, never a score. No live task → `null`.
+ */
+export function weightedProgress(tasks: readonly (WeightedTask & { progressPct: number })[]): number | null {
+  const weights = effectiveWeights(tasks);
+  if (weights.length === 0) return null;
+  const pct = new Map(tasks.map((t) => [t.id, t.progressPct]));
+  return weights.reduce((sum, w) => sum + (pct.get(w.taskId) ?? 0) * w.weight, 0) / 100;
+}
+
+/**
+ * Keeps a progress edit consistent (`progressIssues`): picking `Done` sets 100%, `NotStarted` 0%;
+ * typing a % moves `Done` / `NotStarted` to `InProgress` when it no longer fits, and 100% / 0% on an
+ * `InProgress` task stays as typed (the person decides whether it is done).
+ */
+export function followProgress(
+  current: { progressPct: number; progressStatus: Exclude<WorkTaskStatus, 'Cancelled'> },
+  change: { progressPct: number } | { progressStatus: Exclude<WorkTaskStatus, 'Cancelled'> },
+): { progressPct: number; progressStatus: Exclude<WorkTaskStatus, 'Cancelled'> } {
+  if ('progressStatus' in change) {
+    const s = change.progressStatus;
+    return { progressStatus: s, progressPct: s === 'Done' ? 100 : s === 'NotStarted' ? 0 : current.progressPct };
+  }
+  const pct = change.progressPct;
+  const fits = (current.progressStatus === 'Done' && pct === 100) || (current.progressStatus === 'NotStarted' && pct === 0) || current.progressStatus === 'InProgress';
+  return { progressPct: pct, progressStatus: fits ? current.progressStatus : 'InProgress' };
+}
+
+/**
+ * The form a month's plan is worked on: the latest one not cancelled (HR may cancel and relaunch),
+ * else the latest cancelled one (to show why), else `null`.
+ */
+export function currentMonthForm<F extends { status: string; launchedAt: string }>(forms: readonly F[]): F | null {
+  const newest = [...forms].sort((a, b) => (a.launchedAt < b.launchedAt ? 1 : a.launchedAt > b.launchedAt ? -1 : 0));
+  return newest.find((f) => f.status !== 'Cancelled') ?? newest[0] ?? null;
 }

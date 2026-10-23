@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-10-23 — Plan B, B2: the WORK_PLAN form moves its plan; edits commit at once
+
+**Decision.** `checkAction` lets WORK_PLAN move (WORK_REVIEW still refused until 8.3). The plan follows its form
+through `TransitionResult.workPlanStatus` — `workPlanStatusOnEnterStep` is the Goal Plan mapping with Approved
+folded into Submitted (approval is the lock) — written only by `setWorkPlanStatus` via `syncWorkPlan`, from
+`forms.act`, the scheduler's AUTO_FORWARD and the launch. `approvedBy` = whoever pressed Duyệt (a delegate or HR
+proxy included); the history row carries whom they acted for. AUTO_FORWARD skips the content check (like
+KPI_EVAL) and APPROVE re-runs it, so the manager must complete or return a plan that was never sent. Cancel →
+Draft, tasks kept; a relaunch reuses the plan. No unlock of a Locked plan in P1 (cancel a task + progress
+instead); `syncWorkPlan` never moves a plan out of Locked; the last live task cannot be cancelled (QA). Screens (ui-ux): a side sheet per task that **commits on Lưu** — no draft and no "Lưu nháp" on the form
+— with "Lưu và thêm việc khác"; % and status edited **in place** after approval (`followProgress` keeps them
+consistent, Done = 100, NotStarted = 0); progress columns hidden while planning; the weight total in the action
+bar; "Sao chép tháng trước" appends, skipping done / cancelled / already-listed tasks; no KPI-link picker in
+P1 (the stored link shows). Private tasks: tag only, not enforced on reads (`ASSUMPTION Q70`). Work-task rule
+details have their copy in `errorCatalog.ISSUE_DETAIL_COPY`; the task rule's "list locked" detail became
+`WORK_PLAN_LOCKED` (the Goal Plan `PLAN_LOCKED` copy says something else). `FormActionBar` takes
+`describeBlockers` so a body may word its blockers (tasks, not "chỉ tiêu").
+
+After rebasing on A2: the WORK_PLAN workflow is three steps (manager assigns → employee writes → manager approves)
+and the launch's `startStepNo` picks top-down (step 1) or bottom-up (step 2) — one template, as plan §6 asked; the
+plan follows the SETTLED move (`settleAutoSteps` carries `workPlanStatus`; an automatic approval locks it with no
+approver). The seed's plans start at step 2.
+
+**Why.** One writer of the plan's status and one content check shared by screen and gateway keep the button
+the screen shows and the move the gateway accepts the same (parity test). A list with no draft cannot lose
+work between the sheet and the send.
+
+**Updated alongside.** `business-rules.md` §5, §8 (Q70), §12; `new-flow.md` Quy trình 4; `design-system.md`
+(monthly task tones); `architecture.md` routes; `component-registry.md`; plans §6 and B2 row.
+
+---
 ## 2026-10-23 — Plan A, A2: a form may start at the owner's step; the last step may approve itself; HR returns registration to the manager
 
 **Decision.** PEND-01/02 on `ASSUMPTION Q44–Q46` (BR-KPI-12, 19, 20). `FormLaunch.startStepNo` (and an optional

@@ -149,8 +149,8 @@ export function buildDemoCo(): TenantSeed {
     { name: 'Báo cáo thị trường tháng', weight: 30, progressPct: 100, progressStatus: 'Done' },
   ]);
   const wp = w.form('WP:T01:D003', { type: 'WORK_PLAN', code: 'D003', month: 'T01', launch: wpT01, due: '2027-01-11', status: 'Completed', step: null, enteredAt: null });
-  w.act(wp, 1, 'D003', 'SUBMIT', vn('2027-01-05 10:00'));
-  w.act(wp, 2, 'D002', 'APPROVE', vn('2027-01-06 15:00'));
+  w.act(wp, 2, 'D003', 'SUBMIT', vn('2027-01-05 10:00'));
+  w.act(wp, 3, 'D002', 'APPROVE', vn('2027-01-06 15:00'));
   const wr = w.form('WR:T01:D003', { type: 'WORK_REVIEW', code: 'D003', month: 'T01', launch: wrT01, due: '2027-02-13', status: 'Completed', step: null, enteredAt: null });
   w.act(wr, 1, 'D003', 'SUBMIT', vn('2027-02-03 11:00'));
   w.act(wr, 2, 'D002', 'SUBMIT', vn('2027-02-05 11:00'));
@@ -163,8 +163,8 @@ export function buildDemoCo(): TenantSeed {
     { name: 'Báo cáo thị trường tháng', weight: 40, progressPct: 100, progressStatus: 'Done' },
   ]);
   const wp2 = w.form('WP:T02:D003', { type: 'WORK_PLAN', code: 'D003', month: 'T02', launch: wpT02, due: '2027-02-08', status: 'Completed', step: null, enteredAt: null });
-  w.act(wp2, 1, 'D003', 'SUBMIT', vn('2027-02-02 10:00'));
-  w.act(wp2, 2, 'D002', 'APPROVE', vn('2027-02-03 15:00'));
+  w.act(wp2, 2, 'D003', 'SUBMIT', vn('2027-02-02 10:00'));
+  w.act(wp2, 3, 'D002', 'APPROVE', vn('2027-02-03 15:00'));
 
   // ─── Results (through resultRules, like Syntra's): T01 calculated and finalised on its deadline ─
   const results = new ResultScript(s, id);

@@ -9,12 +9,13 @@
  * column starts at the manager's and HR records it (a different % needs a reason).
  */
 
-import type { CalcMethod, CalcTier, EvaluationColumn, EvaluationItem, Goal, GoalChangeItem, GoalTargetLevel, Id, Kgi, WorkflowStep } from '@/data/types';
+import type { CalcMethod, CalcTier, CyclePeriod, EvaluationColumn, EvaluationItem, Goal, GoalChangeItem, GoalTargetLevel, Id, Kgi, WorkflowStep } from '@/data/types';
 import { entryBlockers, type ActualEntryInput } from './actualRules';
 import { achievement, type Achievement } from './calcRules';
 import { ruleIssue, type RuleIssue } from './errorCatalog';
 import { changeItemIssues, ownerStepNo, planAfterChanges, submitIssues, weightIssue } from './goalPlanRules';
 import { weightedScore, type WeightedScore } from './scoreRules';
+import { planSubmitIssues, type PlannedTask } from './workRules';
 
 /** The two fields of an evaluation item one column owns. */
 export const COLUMN_FIELDS = {
@@ -30,8 +31,10 @@ export type CanSubmitInput =
   | { formType: 'KPI_EVAL'; step: WorkflowStep; items: readonly EvaluationItem[]; goals: readonly Goal[] }
   | { formType: 'GOAL_SETTING'; stepNo: number; steps: readonly WorkflowStep[]; goals: readonly Goal[]; kgis: readonly Kgi[] }
   | { formType: 'GOAL_CHANGE'; goals: readonly Goal[]; changeItems: readonly GoalChangeItem[]; kgis: readonly Kgi[] }
-  /** Monthly work (PEND-14): the content checks are `workRules.planSubmitIssues` / `reviewSubmitIssues`, wired with `forms.act` in 8.2 / 8.3. */
-  | { formType: 'WORK_PLAN' | 'WORK_REVIEW' };
+  /** Monthly work plan (PEND-14, 8.2): the plan's tasks and its month. `period` null = the form names none. */
+  | { formType: 'WORK_PLAN'; stepNo: number; steps: readonly WorkflowStep[]; tasks: readonly PlannedTask[]; period: Pick<CyclePeriod, 'startDate' | 'endDate'> | null }
+  /** Monthly work review: `workRules.reviewSubmitIssues`, wired with `forms.act` in 8.3. */
+  | { formType: 'WORK_REVIEW' };
 
 export type CanSubmitResult = { ok: true } | { ok: false; issues: RuleIssue[] };
 
@@ -214,7 +217,9 @@ export function formActualIssues(
  * - GOAL_SETTING — from the owner's step on, the plan passes `submitIssues` (100%, 5–8 goals, every
  *   goal measurable). Before it (the manager cascading at step 1) the plan is still being built.
  * - GOAL_CHANGE — the proposal is well-formed and the plan AFTER it still passes `submitIssues`.
- * - WORK_PLAN / WORK_REVIEW — not wired yet (ERR-KPI-04 `WORK_FORM_NOT_BUILT`, steps 8.2 / 8.3).
+ * - WORK_PLAN — from the employee's step on, `workRules.planSubmitIssues` (a task, weights at 100%, dates
+ *   that touch the month). Before it (a manager assigning first, top-down) the list is still being built.
+ * - WORK_REVIEW — not wired yet (ERR-KPI-04 `WORK_FORM_NOT_BUILT`, step 8.3).
  */
 export function canSubmit(input: CanSubmitInput): CanSubmitResult {
   switch (input.formType) {
@@ -248,6 +253,9 @@ export function canSubmit(input: CanSubmitInput): CanSubmitResult {
       return result(submitIssues(planAfterChanges([...input.goals], input.changeItems), input.kgis).blocking);
     }
     case 'WORK_PLAN':
+      if (input.stepNo < ownerStepNo(input.steps)) return { ok: true };
+      if (input.period === null) return result([ruleIssue('ERR-KPI-06', 'periodId', 'PERIOD_REQUIRED')]);
+      return result(planSubmitIssues(input.tasks, input.period));
     case 'WORK_REVIEW':
       return result([ruleIssue('ERR-KPI-04', null, 'WORK_FORM_NOT_BUILT')]);
   }

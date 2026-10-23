@@ -17,8 +17,9 @@ import { buildSeed, SEED_VERSION } from './index';
 const FROZEN = {
   // Re-frozen 2026-10-23 by Plan A's A1 (evaluation items), then for Plan B step 8.1 (PEND-14): six
   // monthly-work entities, the Kinh doanh pilot seed, a review only on a Locked plan with a live task (Q69).
-  seedVersion: '2027-04-06.A1.B1.A2',
-  seedHash: '49bcdc28b7f14',
+  // Then A2 (start step, automatic record) and B2 (the 3-step WORK_PLAN workflow, plans launched at the employee's step).
+  seedVersion: '2027-04-06.A1.B1.A2.B2',
+  seedHash: '1eae52ef62f7de',
   entityCount: 55,
 } as const;
 

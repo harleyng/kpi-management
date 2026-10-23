@@ -79,6 +79,7 @@ function taskContext(tx: Tx, plan: WorkPlan): TaskEditContext & { managerUserId:
     managerUserId,
     reviewLaunched: tx.all('WorkReview').some((r) => r.workPlanId === plan.id && liveReviewForm(r.formId)),
     resultRecorded: tx.all('WorkResult').some((r) => r.workPlanId === plan.id),
+    liveTaskCount: tx.all('WorkTask').filter((t) => t.workPlanId === plan.id && t.cancelledAt === null).length,
   };
 }
 

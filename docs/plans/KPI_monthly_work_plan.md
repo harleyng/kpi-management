@@ -232,15 +232,15 @@ thực thể và hook mới.
 
 **Màn hình (Vietnamese inline, `useNavigate()` — không `asChild`).**
 
-- [ ] **Nhân viên** `/my/work` "Công việc tháng" (nhóm *Của tôi* trong `navConfig.ts`): chọn tháng; bảng việc
+- [x] **Nhân viên** `/my/work` "Công việc tháng" (nhóm *Của tôi* trong `navConfig.ts`): chọn tháng; bảng việc
   (tên, sản phẩm, trọng số, hạn, % hoàn thành, trạng thái); tổng trọng số luôn hiện, đỏ khi ≠ 100%; nút "Thêm
   việc", "Sao chép tháng trước", "Gửi kế hoạch". Sau khi khóa: ô % và trạng thái sửa tại chỗ.
-- [ ] **Phiếu** `/my/tasks/...` → `FormDetailPage` với thân mới `WorkPlanFormBody.tsx` (cạnh `GoalPlanFormBody`).
-- [ ] **Quản lý** `/team/work` "Công việc tháng của đội" (nhóm *Đội nhóm*): mỗi nhân viên trực tiếp một dòng —
+- [x] **Phiếu** `/my/tasks/...` → `FormDetailPage` với thân mới `WorkPlanFormBody.tsx` (cạnh `GoalPlanFormBody`).
+- [x] **Quản lý** `/team/work` "Công việc tháng của đội" (nhóm *Đội nhóm*): mỗi nhân viên trực tiếp một dòng —
   trạng thái kế hoạch, số việc, % hoàn thành bình quân có trọng số, trạng thái phiếu đánh giá, Hsht; bấm vào xem
   kế hoạch.
-- [ ] Hook: `src/hooks/queries/useWorkPlans.ts` (key bắt đầu bằng tenant; mutation `invalidateQueries`).
-- [ ] Chi tiết tuyến thêm vào bảng route ở `.agents/knowledge/architecture.md`.
+- [x] Hook: `src/hooks/queries/useWorkPlans.ts` (đặt ở `src/hooks/queries/work.ts`, B1) (key bắt đầu bằng tenant; mutation `invalidateQueries`).
+- [x] Chi tiết tuyến thêm vào bảng route ở `.agents/knowledge/architecture.md`.
 
 **Kiểm thử.** Gửi khi tổng ≠ 100 → ERR (dùng mã sẵn có trong `errorCatalog.ts`, thêm mã mới nếu cần); quản lý trả
 về → bước 1, kế hoạch *Bị trả lại*; quá hạn bước 1 → chuyển quản lý, ghi `AUTO_FORWARD`; nhân viên sửa việc sau

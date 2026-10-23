@@ -39,6 +39,8 @@ interface FormActionBarProps {
   onFocusIssue?: (issue: RuleIssue) => void;
   /** Called after a successful action. */
   onActed?: () => void;
+  /** The blocker sentences in the body's own words (a monthly plan counts tasks, not "chỉ tiêu"). Default `blockerSentences`. */
+  describeBlockers?: (issues: readonly RuleIssue[]) => string[];
   /**
    * The user has started on the form (an edit, the blocker link, a refusal): blockers read as
    * errors only from then on — an untouched form shows the reason in a neutral tone (ui-ux, T5).
@@ -66,6 +68,7 @@ export function FormActionBar({
   onFocusIssue,
   onActed,
   engaged = false,
+  describeBlockers = blockerSentences,
 }: FormActionBarProps) {
   const act = useActOnForm();
   const [dialog, setDialog] = useState<'RETURN' | 'CANCEL' | null>(null);
@@ -104,7 +107,7 @@ export function FormActionBar({
 
   const returnTo = standing.returnTarget;
   const showStale = staleAt !== null;
-  const sentences = blockerSentences(blockers);
+  const sentences = describeBlockers(blockers);
   const firstWithRow = blockers.find((b) => b.ref !== null);
 
   if (standing.actions.length === 0 && !saveDraft && !summary) return null;
@@ -183,7 +186,7 @@ export function FormActionBar({
         open={dialog === 'CANCEL'}
         onOpenChange={(open) => setDialog(open ? 'CANCEL' : null)}
         title="Hủy phiếu"
-        body={`Hủy phiếu "${formTitle}"? Phiếu đóng lại và không thể mở lại.${form.formType === 'GOAL_SETTING' ? ' Goal Plan trở về trạng thái Nháp.' : ''}`}
+        body={`Hủy phiếu "${formTitle}"? Phiếu đóng lại và không thể mở lại.${form.formType === 'GOAL_SETTING' ? ' Goal Plan trở về trạng thái Nháp.' : form.formType === 'WORK_PLAN' ? ' Kế hoạch công việc tháng trở về trạng thái Nháp, các việc đã nhập được giữ lại.' : ''}`}
         label="Lý do hủy phiếu"
         confirmLabel={STEP_ACTION_LABEL.CANCEL}
         destructive

@@ -112,10 +112,13 @@ the tenant).
 | `/my/kpi` | KPI của tôi — the own plan in `?cycle=`; goals open on the plan's goal pages | Của tôi · — (all) | 4.3.2–4.3.5 (T3), 4.4.2 (T4) |
 | `/my/kpi/plans/:planId` · `…/goals/:goalId` (`new`; `?tab=info\|split\|link`) | One own Goal Plan · one goal | under KPI của tôi · record: owner is me | T3 |
 | `/my/tasks/inbox` · `/forms` · `/delegations` | Việc cần xử lý › Chờ tôi xử lý · Phiếu của tôi · Ủy quyền | Của tôi · — (all) | 4.5.5 (T5) |
+| `/my/work` | Công việc tháng — own month's tasks: write and send the plan, then progress in place (`?month=`) | Của tôi · — (all) | PEND-14 8.2 (Plan B) |
 | `/my/results` | Kết quả của tôi — own results by cycle (BR-KPI-82) | Của tôi · — (all) | 4.6.4 (T6), 4.7.2 |
 | `/team/kpi/members` (+ `/:planId`, `/:planId/goals/:goalId`) | KPI đội nhóm › KPI nhân viên — reports' plans | Đội nhóm · `team.view` (MANAGER) | 4.3.4 (T3) |
 | `/team/kpi/unit` (+ `/:planId`, `/:planId/goals/:goalId`) | KPI đội nhóm › KPI bộ phận — the headed unit's plan, cascade | Đội nhóm · `team.view` | 4.3.4 (T3) |
 | `/team/reviews` | Duyệt & đánh giá | Đội nhóm · `team.view` | 4.5.2–4.5.4 (T5) |
+| `/team/work` | Công việc tháng của đội — direct reports' month: plan status, tasks, weighted progress, plan form (`?month=`) | Đội nhóm · `team.view` | PEND-14 8.2 (Plan B) |
+| `/team/work/:workPlanId` | One person's month — the plan with its form's actions (approve / return, cancel a task) | detail of `/team/work` | PEND-14 8.2 (Plan B) |
 | `/dashboard/overview` · `/operations` | Dashboard › Tổng quan · Vận hành; `?cycle=&period=&unit=` | Điều hành · `dashboard.view` (BOD, MANAGER, HR) | 4.7.1–4.7.4 |
 | `/admin/cycles/list` · `/list/:cycleId` (`?tab=periods\|plans`) · `/admin/cycles/periods` · `/admin/cycles/plans` · `/plans/:cycleId/:planId` (+ goals) | Chu kỳ › Kỳ đánh giá (cycle list · one cycle) · Đợt đánh giá (periods, `?cycle=`) · Goal Plan (plans, `?cycle=` · one plan) | Quản trị KPI · `cycle.manage` (HR, CNB) | 4.3.1, 4.3.6 (T3) |
 | `/admin/library/definitions` · `/perspectives` · `/units` · `/calc-methods` | Thư viện KPI › Chỉ tiêu mẫu · Viễn cảnh BSC · Đơn vị đo · Phương pháp tính | Quản trị KPI · `library.manage` (HR, CNB) | 4.2.1–4.2.3, 4.2.5 (T2) |
@@ -337,9 +340,10 @@ is **2027-04-06 09:00 +07**; the scheduler last ran 2027-04-01 09:00. Ids come f
 
 **Frozen at Gate 1 (2026-10-19)** as the contract between tracks: `src/data/fixtures/freeze.test.ts` pins
 the seed hash, the gateway surface (`group.method:kind[:permission]`) and the entity count (55);
-`SEED_VERSION` is `2027-04-06.A1.B1.A2` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
+`SEED_VERSION` is `2027-04-06.A1.B1.A2.B2` (bumped from `G1` by Plan A's A1, 2026-10-23: evaluation items and their
 results; then by Plan B 8.1: the `work` group, six monthly-work entities, the Kinh doanh monthly-work pilot; then
-by Plan A's A2: `startStepNo`, `autoApprove`, HR's RETURN at registration step 4). A
+by Plan A's A2: `startStepNo`, `autoApprove`, HR's RETURN at registration step 4; then by Plan B 8.2: the 3-step
+WORK_PLAN workflow, the seed's plans launched at the employee's step). A
 failing freeze test is a **Large** change: system-architect
 reviews it, every track is told, `SEED_VERSION` is bumped, `FROZEN` updated, `/log-decision`. The seed
 still leaves to the tracks only the states T1 `Tenant:Suspended`, T3 `Cycle:Evaluating`, T4

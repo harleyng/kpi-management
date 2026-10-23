@@ -23,6 +23,13 @@ import {
   type TaskScore,
   type WeightedTask,
   type WorkScoring,
+  copyFromPreviousMonth,
+  currentMonthForm,
+  defaultWorkMonth,
+  followProgress,
+  previousMonth,
+  weightedProgress,
+  workPlanStatusOnEnterStep,
 } from './workRules';
 
 const task = (id: string, weight: number, cancelledAt: string | null = null): WeightedTask => ({ id, weight, cancelledAt });
@@ -300,7 +307,7 @@ describe('taskEditBlockers — who may change a task, when (plan §6)', () => {
 
   it('after approval: the list is fixed — no ADD, UPDATE or REMOVE, even for the manager', () => {
     for (const edit of ['ADD', 'UPDATE', 'REMOVE'] as const) {
-      expect(blockers(ctx({ planStatus: 'Locked', isManager: true, isSubject: false }), edit)).toEqual(['ERR-KPI-04:PLAN_LOCKED']);
+      expect(blockers(ctx({ planStatus: 'Locked', isManager: true, isSubject: false }), edit)).toEqual(['ERR-KPI-04:WORK_PLAN_LOCKED']);
     }
   });
 
@@ -317,6 +324,12 @@ describe('taskEditBlockers — who may change a task, when (plan §6)', () => {
     const forManager = ctx({ planStatus: 'Locked', isSubject: false, mayActForManager: true });
     expect(blockers(forManager, 'CANCEL', live, 'Lý do')).toEqual([]);
     expect(blockers(forManager, 'PROGRESS')).toEqual([]);
+  });
+
+  it('the last live task cannot be cancelled — the month would have nothing to score', () => {
+    const manager = ctx({ planStatus: 'Locked', isSubject: false, isManager: true, liveTaskCount: 1 });
+    expect(blockers(manager, 'CANCEL', live, 'Lý do')).toEqual(['ERR-KPI-04:LAST_LIVE_TASK']);
+    expect(blockers({ ...manager, liveTaskCount: 2 }, 'CANCEL', live, 'Lý do')).toEqual([]);
   });
 
   it('a cancelled task is never removed, even before a review exists', () => {
@@ -468,5 +481,106 @@ describe('workResultOf — the month\'s snapshot from the FINAL column', () => {
   it('a 60 / 40 tenant weighs KQcv and KLcv its way (Q62)', () => {
     const { review, items } = final([100, 100, 100], 50);
     expect(workResultOf(review, items, tasks, { ...cfg, resultWeight: 60, disciplineWeight: 40 }).hsht).toBeCloseTo(80, 9);
+  });
+});
+
+// ─── Step 8.2 ──────────────────────────────────────────────────────────────────────────────────
+
+describe('workPlanStatusOnEnterStep — the plan follows its form; approval is the lock', () => {
+  const s = (stepNo: number, actorRule: 'SELF' | 'DIRECT_MANAGER' | 'HR') => ({ stepNo, actorRule });
+  it('bottom-up (employee → manager): Draft, Submitted; Returned back at step 1', () => {
+    const steps = [s(1, 'SELF'), s(2, 'DIRECT_MANAGER')];
+    expect([1, 2].map((n) => workPlanStatusOnEnterStep(n, steps, false))).toEqual(['Draft', 'Submitted']);
+    expect(workPlanStatusOnEnterStep(1, steps, true)).toBe('Returned');
+  });
+  it('top-down (manager → employee → manager): Draft, Draft, Submitted', () => {
+    const steps = [s(1, 'DIRECT_MANAGER'), s(2, 'SELF'), s(3, 'DIRECT_MANAGER')];
+    expect([1, 2, 3].map((n) => workPlanStatusOnEnterStep(n, steps, false))).toEqual(['Draft', 'Draft', 'Submitted']);
+  });
+  it('never Approved — a longer route stays Submitted until its last step completes', () => {
+    const steps = [s(1, 'SELF'), s(2, 'DIRECT_MANAGER'), s(3, 'HR')];
+    expect(workPlanStatusOnEnterStep(3, steps, false)).toBe('Submitted');
+  });
+});
+
+describe('copyFromPreviousMonth — "Sao chép tháng trước"', () => {
+  const april = { startDate: '2027-04-01', endDate: '2027-04-30' };
+  const prev = (name: string, o: Partial<Parameters<typeof copyFromPreviousMonth>[0][number]> = {}) => ({
+    name, product: null, description: 'mô tả', unitText: 'cái', weight: 25, visibility: 'PUBLIC' as const, linkedGoalId: 'g1', progressStatus: 'InProgress' as const, cancelledAt: null, ...o,
+  });
+  it('copies the open tasks with the new month\'s dates; skips Done and cancelled', () => {
+    const r = copyFromPreviousMonth([prev('A'), prev('B', { progressStatus: 'Done' }), prev('C', { cancelledAt: '2027-03-10T00:00:00Z' }), prev('D', { visibility: 'PRIVATE' })], [], april, true);
+    expect(r.tasks.map((t) => [t.name, t.startDate, t.dueDate, t.visibility, t.weight])).toEqual([
+      ['A', '2027-04-01', '2027-04-30', 'PUBLIC', 25],
+      ['D', '2027-04-01', '2027-04-30', 'PRIVATE', 25],
+    ]);
+    expect(r.skipped).toBe(0);
+  });
+  it('skips a task already in the list (same name and product, any case) — a second click adds nothing', () => {
+    const r = copyFromPreviousMonth([prev('Báo cáo tuần'), prev('Gọi khách', { product: 'CRM' })], [{ name: ' báo cáo TUẦN', product: null }, { name: 'Gọi khách', product: 'Khác' }], april, true);
+    expect(r.tasks.map((t) => t.name)).toEqual(['Gọi khách']);
+    expect(r.skipped).toBe(1);
+  });
+  it('a task listed twice last month is copied once; a blank product matches no product; the total may pass 100', () => {
+    const r = copyFromPreviousMonth([prev('A', { weight: 70 }), prev('A', { weight: 70 }), prev('B', { product: '', weight: 70 })], [{ name: 'B', product: null }], april, true);
+    expect(r.tasks.map((t) => [t.name, t.weight])).toEqual([['A', 70]]);
+    expect(r.skipped).toBe(2);
+  });
+
+  it('keeps a KPI link only inside the same cycle', () => {
+    expect(copyFromPreviousMonth([prev('A')], [], april, true).tasks[0].linkedGoalId).toBe('g1');
+    expect(copyFromPreviousMonth([prev('A')], [], april, false).tasks[0].linkedGoalId).toBeNull();
+  });
+});
+
+describe('previousMonth / defaultWorkMonth', () => {
+  const m = (id: string, startDate: string, endDate: string) => ({ id, periodType: 'Month' as const, startDate, endDate });
+  const periods = [m('2027-01', '2027-01-01', '2027-01-31'), m('2026-12', '2026-12-01', '2026-12-31'), { ...m('Q1', '2027-01-01', '2027-03-31'), periodType: 'Quarter' as const }, m('2027-02', '2027-02-01', '2027-02-28')];
+  it('the month before, across cycles; none before the first', () => {
+    expect(previousMonth(periods, { startDate: '2027-01-01' })?.id).toBe('2026-12');
+    expect(previousMonth(periods, { startDate: '2026-12-01' })).toBeNull();
+  });
+  it('opens on the month of today, else the last started, else the first', () => {
+    expect(defaultWorkMonth(periods, '2027-01-15')?.id).toBe('2027-01');
+    expect(defaultWorkMonth(periods, '2027-06-01')?.id).toBe('2027-02');
+    expect(defaultWorkMonth(periods, '2020-01-01')?.id).toBe('2026-12');
+    expect(defaultWorkMonth([], '2027-01-01')).toBeNull();
+  });
+});
+
+describe('weightedProgress — tracking, never a score', () => {
+  const t = (id: string, weight: number, progressPct: number, cancelledAt: string | null = null) => ({ id, weight, progressPct, cancelledAt });
+  it('Σ % × weight; a cancelled task drops out and the rest are normalised', () => {
+    expect(weightedProgress([t('a', 50, 100), t('b', 50, 0)])).toBe(50);
+    expect(weightedProgress([t('a', 50, 100), t('b', 25, 0), t('c', 25, 40, '2027-03-10T00:00:00Z')])).toBeCloseTo(66.667, 3);
+  });
+  it('no live task, or weights that cannot be shares (NaN, negative, all zero) → null, never 0', () => {
+    expect(weightedProgress([])).toBeNull();
+    expect(weightedProgress([t('a', Number.NaN, 50)])).toBeNull();
+    expect(weightedProgress([t('a', -10, 50), t('b', 110, 50)])).toBeNull();
+    expect(weightedProgress([t('a', 0, 50), t('b', 0, 50)])).toBeNull();
+    expect(weightedProgress([t('a', 100, 50, '2027-03-10T00:00:00Z')])).toBeNull();
+  });
+});
+
+describe('followProgress — % and status kept consistent (progressIssues)', () => {
+  it('picking a status sets its %', () => {
+    expect(followProgress({ progressPct: 40, progressStatus: 'InProgress' }, { progressStatus: 'Done' })).toEqual({ progressPct: 100, progressStatus: 'Done' });
+    expect(followProgress({ progressPct: 40, progressStatus: 'InProgress' }, { progressStatus: 'NotStarted' })).toEqual({ progressPct: 0, progressStatus: 'NotStarted' });
+    expect(followProgress({ progressPct: 40, progressStatus: 'Done' }, { progressStatus: 'InProgress' })).toEqual({ progressPct: 40, progressStatus: 'InProgress' });
+  });
+  it('typing a % moves Done / NotStarted to InProgress when it no longer fits', () => {
+    expect(followProgress({ progressPct: 100, progressStatus: 'Done' }, { progressPct: 80 })).toEqual({ progressPct: 80, progressStatus: 'InProgress' });
+    expect(followProgress({ progressPct: 0, progressStatus: 'NotStarted' }, { progressPct: 10 })).toEqual({ progressPct: 10, progressStatus: 'InProgress' });
+    expect(followProgress({ progressPct: 50, progressStatus: 'InProgress' }, { progressPct: 100 })).toEqual({ progressPct: 100, progressStatus: 'InProgress' });
+  });
+});
+
+describe('currentMonthForm', () => {
+  it('the latest form not cancelled, else the latest one, else none', () => {
+    const f = (id: string, status: string, launchedAt: string) => ({ id, status, launchedAt });
+    expect(currentMonthForm([f('a', 'Cancelled', '2027-04-05'), f('b', 'Completed', '2027-04-01')])?.id).toBe('b');
+    expect(currentMonthForm([f('a', 'Cancelled', '2027-04-01'), f('c', 'Cancelled', '2027-04-05')])?.id).toBe('c');
+    expect(currentMonthForm([])).toBeNull();
   });
 });

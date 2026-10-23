@@ -13,6 +13,7 @@ import {
   GOAL_PLAN_STATUS_TONE,
   PERIOD_RESULT_STATUS_TONE,
   RECORD_STATUS_TONE,
+  WORK_TASK_STATUS_TONE,
   formTone,
 } from './statusTones';
 
@@ -29,6 +30,10 @@ describe('status tones match design-system.md', () => {
       Approved: 'positive',
       Locked: 'positive',
     });
+  });
+
+  it('Monthly task (PEND-14)', () => {
+    expect(WORK_TASK_STATUS_TONE).toEqual({ NotStarted: 'muted', InProgress: 'info', Done: 'positive', Cancelled: 'muted' });
   });
 
   it('Form', () => {

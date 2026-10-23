@@ -15,6 +15,7 @@ import {
   RECORD_STATUS_LABEL,
   SYNC_RUN_STATUS_LABEL,
   FORM_STATUS_LABEL,
+  WORK_TASK_STATUS_LABEL,
   type CycleStatus,
   type DelegationState,
   type EmploymentStatus,
@@ -28,6 +29,7 @@ import {
   type PeriodResultStatus,
   type RecordStatus,
   type SyncRunStatus,
+  type WorkTaskStatus,
 } from '@/data/types';
 import {
   ATTENTION_LABEL,
@@ -36,6 +38,7 @@ import {
   DELEGATION_STATE_TONE,
   EMPLOYMENT_STATUS_TONE,
   GOAL_PLAN_STATUS_TONE,
+  WORK_TASK_STATUS_TONE,
   GOAL_STATUS_TONE,
   IMPORT_BATCH_STATUS_TONE,
   LAUNCH_STATUS_TONE,
@@ -176,4 +179,9 @@ export function PlanAdjustingBadge() {
 /** A dashboard attention flag (BR-KPI-86) — always with its words, never a coloured dot alone. */
 export function AttentionBadge({ kind }: { kind: keyof typeof ATTENTION_LABEL }) {
   return <StatusBadge tone={ATTENTION_TONE[kind]}>{ATTENTION_LABEL[kind]}</StatusBadge>;
+}
+
+/** A monthly task's progress status (PEND-14). */
+export function WorkTaskStatusBadge({ status }: { status: WorkTaskStatus }) {
+  return <StatusBadge tone={WORK_TASK_STATUS_TONE[status]}>{WORK_TASK_STATUS_LABEL[status]}</StatusBadge>;
 }

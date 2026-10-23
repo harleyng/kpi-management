@@ -14,7 +14,7 @@ import type { SchedulerGateway, SchedulerReport } from '../../types';
 import { clockOf } from '../authorize';
 import { newId } from '../rows';
 import type { Runtime } from '../runtime';
-import { applyColumnEntry, assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf } from '../workflowContext';
+import { applyColumnEntry, assigneesFor, fireLaunch, planOfForm, setPlanStatus, stepOf, stepsOf, syncWorkPlan } from '../workflowContext';
 
 /**
  * `scheduler.runDue` — one tick of the clock-driven jobs, as of the gateway clock, in ONE system
@@ -98,6 +98,7 @@ export function schedulerGroup(rt: Runtime): SchedulerGateway {
             tx.insert('FormStepAction', history);
             const plan = planOfForm(tx, form);
             if (moved.planStatus && plan) setPlanStatus(tx, plan, moved.planStatus, due.action);
+            syncWorkPlan(tx, form, moved.workPlanStatus, null, due.action);
             if (due.action === 'AUTO_FORWARD') {
               tx.emit({
                 type: 'form.stepActed',

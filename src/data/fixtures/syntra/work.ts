@@ -94,8 +94,8 @@ export function buildWork(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals,
   for (const code of ['E015', 'E016', 'E017']) {
     w.plan(code, 'T02', 'Locked', { at: vn('2027-02-03 15:00'), by: MANAGER }, tasksFor(code, true));
     const p = w.form(`WP:T02:${code}`, { type: 'WORK_PLAN', code, month: 'T02', launch: planT02, due: '2027-02-08', status: 'Completed', step: null, enteredAt: null });
-    w.act(p, 1, code, 'SUBMIT', vn('2027-02-02 10:00'));
-    w.act(p, 2, MANAGER, 'APPROVE', vn('2027-02-03 15:00'));
+    w.act(p, 2, code, 'SUBMIT', vn('2027-02-02 10:00'));
+    w.act(p, 3, MANAGER, 'APPROVE', vn('2027-02-03 15:00'));
     const r = w.form(`WR:T02:${code}`, { type: 'WORK_REVIEW', code, month: 'T02', launch: reviewT02, due: '2027-03-13', status: 'Completed', step: null, enteredAt: null });
     w.act(r, 1, code, 'SUBMIT', vn('2027-03-03 10:00'));
     w.act(r, 2, MANAGER, 'SUBMIT', vn('2027-03-05 15:00'));
@@ -112,8 +112,8 @@ export function buildWork(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals,
     if (code === 'E016') specs[2] = { ...specs[2], progressPct: 10, cancelled: { at: vn('2027-03-15 10:00'), by: MANAGER, reason: 'Khách hàng dừng gói thầu, không còn cần hồ sơ.' } };
     w.plan(code, 'T03', 'Locked', { at: vn('2027-03-03 15:00'), by: MANAGER }, specs);
     const p = w.form(`WP:T03:${code}`, { type: 'WORK_PLAN', code, month: 'T03', launch: planT03, due: '2027-03-08', status: 'Completed', step: null, enteredAt: null });
-    w.act(p, 1, code, 'SUBMIT', vn('2027-03-02 10:00'));
-    w.act(p, 2, MANAGER, 'APPROVE', vn('2027-03-03 15:00'));
+    w.act(p, 2, code, 'SUBMIT', vn('2027-03-02 10:00'));
+    w.act(p, 3, MANAGER, 'APPROVE', vn('2027-03-03 15:00'));
   }
   const at = reviewT03.launchedAt as string;
   const e015 = w.form('WR:T03:E015', { type: 'WORK_REVIEW', code: 'E015', month: 'T03', launch: reviewT03, due: '2027-04-13', status: 'Open', step: 1, enteredAt: at });
@@ -133,8 +133,8 @@ export function buildWork(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals,
   for (const code of ['E015']) {
     w.plan(code, 'T04', 'Locked', { at: vn('2027-04-03 15:00'), by: MANAGER }, tasksFor(code, false));
     const p = w.form(`WP:T04:${code}`, { type: 'WORK_PLAN', code, month: 'T04', launch: planT04, due: dueT04, status: 'Completed', step: null, enteredAt: null });
-    w.act(p, 1, code, 'SUBMIT', vn('2027-04-02 10:00'));
-    w.act(p, 2, MANAGER, 'APPROVE', vn('2027-04-03 15:00'));
+    w.act(p, 2, code, 'SUBMIT', vn('2027-04-02 10:00'));
+    w.act(p, 3, MANAGER, 'APPROVE', vn('2027-04-03 15:00'));
   }
   const fresh = (code: string) => tasksFor(code, false).map((t) => ({ ...t, progressPct: 0, progressStatus: 'NotStarted' as const }));
   // E018 (new hire): like her registration, HR launched her April plan on its own on 04-05; she is
@@ -153,13 +153,13 @@ export function buildWork(s: SeedRows, id: IdFn, org: SyntraOrg, g: SyntraGoals,
     { name: 'Học quy trình bán hàng và sản phẩm', weight: 40, progressPct: 0, progressStatus: 'NotStarted' },
     { name: 'Đi cùng trưởng nhóm gặp khách hàng', weight: 20, unitText: 'buổi', progressPct: 0, progressStatus: 'NotStarted' },
   ]);
-  w.form('WP:T04:E018', { type: 'WORK_PLAN', code: 'E018', month: 'T04', launch: planT04NewHire, due: '2027-04-12', status: 'Open', step: 1, enteredAt: T.newHireLaunch });
+  w.form('WP:T04:E018', { type: 'WORK_PLAN', code: 'E018', month: 'T04', launch: planT04NewHire, due: '2027-04-12', status: 'Open', step: 2, enteredAt: T.newHireLaunch });
   w.plan('E016', 'T04', 'Submitted', null, fresh('E016'));
   // Sent on 04-04, the last day of step 1's SLA; the manager's step runs to 04-07 (reminded from 04-06).
-  const e016p = w.form('WP:T04:E016', { type: 'WORK_PLAN', code: 'E016', month: 'T04', launch: planT04, due: dueT04, status: 'InProgress', step: 2, enteredAt: vn('2027-04-04 10:00') });
-  w.act(e016p, 1, 'E016', 'SUBMIT', vn('2027-04-04 10:00'));
+  const e016p = w.form('WP:T04:E016', { type: 'WORK_PLAN', code: 'E016', month: 'T04', launch: planT04, due: dueT04, status: 'InProgress', step: 3, enteredAt: vn('2027-04-04 10:00') });
+  w.act(e016p, 2, 'E016', 'SUBMIT', vn('2027-04-04 10:00'));
   w.plan('E017', 'T04', 'Returned', null, fresh('E017'));
-  const e017p = w.form('WP:T04:E017', { type: 'WORK_PLAN', code: 'E017', month: 'T04', launch: planT04, due: dueT04, status: 'InProgress', step: 1, enteredAt: vn('2027-04-05 15:00') });
-  w.act(e017p, 1, 'E017', 'SUBMIT', vn('2027-04-03 10:00'));
-  w.act(e017p, 2, MANAGER, 'RETURN', vn('2027-04-05 15:00'), 'Bổ sung việc kèm số lượng cụ thể cho từng khách hàng tồn.');
+  const e017p = w.form('WP:T04:E017', { type: 'WORK_PLAN', code: 'E017', month: 'T04', launch: planT04, due: dueT04, status: 'InProgress', step: 2, enteredAt: vn('2027-04-05 15:00') });
+  w.act(e017p, 2, 'E017', 'SUBMIT', vn('2027-04-03 10:00'));
+  w.act(e017p, 3, MANAGER, 'RETURN', vn('2027-04-05 15:00'), 'Bổ sung việc kèm số lượng cụ thể cho từng khách hàng tồn.');
 }
