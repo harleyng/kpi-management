@@ -52,6 +52,7 @@ Bảng lý do của từng lượt: `KPI_plan_A_kpi.md` §2.
 | Bước | Nội dung | Chi tiết | Chờ trước khi merge | Xong khi |
 |---|---|---|---|---|
 | B0 | **8.0** chốt Q59–Q66 + tài liệu (PEND-14, đảo Q10); `src/lib/workRules.ts` + test (chỉ phần tính); `src/lib/cumulativeRules.ts` + test (**PEND-05**) | Plan công việc tháng §4, §5 (bảng quy tắc); plan 22/10 §6 (PEND-05) | Không — file mới và tài liệu, merge lúc nào cũng được | Q59 có câu trả lời; hai file rules xanh test; PEND-14 có trong `business-rules.md` §12 |
+| | *B0 xong 23/10/2026:* `workRules.ts`, `cumulativeRules.ts` + test (chỉ phần tính); Q59–Q66 ghi `ASSUMPTION` theo đề xuất (chưa có câu trả lời của product owner / HR); tài liệu 8.0. ERD để 8.1 | | | |
 | B1 | **8.1** thực thể, contract `DataGateway`, mock, seed, test cách ly tenant | Plan công việc tháng §5 | Lượt 2 — chờ Plan A merge Đợt 1 | Gate xanh; `system-architect` duyệt contract + fixture |
 | B2 | **8.2** phiếu WORK_PLAN, `/my/work`, `/team/work`, cập nhật tiến độ | Plan công việc tháng §6 | Lượt 4 — chờ Plan A merge Đợt 2 (`startStepNo`) | Lập → duyệt → khóa chạy trên dev server 8082 |
 | B3 | **8.3** phiếu WORK_REVIEW, KQcv / KLcv / Hsht / Hsnv | Plan công việc tháng §7 | Lượt 6 — chờ Plan A merge PEND-09; **Q60, Q61 đã chốt** | E2E NV → QL → HR, `WorkResult` khớp tính tay |

@@ -44,6 +44,9 @@ They live in the product owner's folder:
 | 75–80 | Actuals import: pp. 75–76 export "Báo cáo danh sách mục tiêu"; pp. 77–80 the template — the key is the goal ID (col L of the export → col C "ID"), numeric (N) and text (O) results, one value per goal row; no period and no note column | Plan §5.3; BR-KPI-53 |
 | 88–95 | Launching forms: type, template, timing (now / date / recurring), period, due date, recipients | Plan §5.4; BR-KPI-19; D5 |
 | 150–155 | Workflow routing: steps, actors | BR-KPI-20 |
+| 13 | Item 4 — assigning, receiving and evaluating monthly work | PEND-14; Q59 |
+| 25–26 | The fields of a "Kế hoạch công việc tháng" item: visibility, type, name, product / process, description, unit, weight in the month, dates, % done, status, note | PEND-14 (`WorkTask`, monthly plan §5) |
+| 141–150 | Importing the monthly overall score in bulk, then routing the forms to completion | PEND-14 (step 8.4) |
 
 ### CMC PMGM — Manager user guide
 
@@ -52,6 +55,13 @@ They live in the product owner's folder:
 | 20–29 | The goal table and its buttons; 25–29 the actions (submit blocked when weights ≠ 100% or items unscored, p. 26; "Lấy ý kiến", "Thêm người duyệt", collaboration step) | BR-KPI-04, 18; D6; Q7 |
 | 51, 98, 105 | Process overviews (registration, adjustment, evaluation) | `docs/flows/new-flow.md` |
 | 98–109 | The evaluation form from the manager's side | Plan §5.5; BR-KPI-16, 17 |
+| 120–136 | Monthly work: proposing tasks for an employee, editing / adding / removing them, sending on or back (121–127, 131–134); scoring each task and discipline, Hsht = 70% × KQcv + 30% × KLcv, Hsnv with a reason below 80 (128–130); the employee's self-assessment as the manager sees it (135–136) | PEND-14; `workRules.ts`; Q61, Q62 |
+
+### CMC PMGM — Employee user guide
+
+| Pages | Topic | Feeds |
+|---|---|---|
+| 67–73 | Monthly work: adding tasks to "Kế hoạch tháng N" (68–71), self-assessing each task and the % done at the month's end (72–73), the KQcv / KLcv weights (73) | PEND-14; `workRules.ts` |
 
 ### SF4C — PMGM process catalogue
 
@@ -61,8 +71,8 @@ They live in the product owner's folder:
 | PMGM.03 | Create an employee's Goal Plan (HR imports, then locks) | **P1** |
 | PMGM.04–05 | Create Goal Plans for blocks/departments and for the company | **P1** |
 | PMGM.06–07 | Edit an employee's / a department's Goal Plan (then lock) | **P1** (adjustment) |
-| PMGM.08 | Monthly work plan for employees | Out (Q10) |
-| PMGM.09 | Monthly result evaluation — **an employee who misses the deadline is auto-forwarded to the direct manager** | Overdue behaviour (BR-KPI-13); the monthly plan itself is out (Q10) |
+| PMGM.08 | Monthly work plan for employees | **In** — P1 item 4 (PEND-14, `ASSUMPTION Q59`; was out under Q10) |
+| PMGM.09 | Monthly result evaluation — **an employee who misses the deadline is auto-forwarded to the direct manager** | Overdue behaviour (BR-KPI-13); the monthly work review (PEND-14, `ASSUMPTION Q59`) |
 | PMGM.10 | Continuous performance | P2 |
 | PMGM.11 | Update KPI results (departments send results; HR imports; the import is final) | **P1** (actuals) |
 | PMGM.12 | KPI result evaluation | **P1** |
@@ -86,7 +96,7 @@ Syntra decision (priority 1). Its points are recorded as pending changes until t
 | 2.5 | The employee enters the actual with evidence; the system computes the %; the manager decides; HR records, edits ad hoc | BR-KPI-16, 17; PEND-06, 07, 08; Q47, Q48, Q49 |
 | 2.6 | Historical data import (e.g. 10 years of Excel) by C&B / HR, low priority | PEND-12; Q57 |
 | 2.7 | Dashboards for leadership (BSC by company / Khối / unit), managers (direct reports), HR (forms, overdue, results); filters by month, quarter, 6 months; cumulative | BR-KPI-83…88; PEND-13; Q58 |
-| 2.8 | Phase 1 = item 1 (quarterly and annual KPI), item 4 (monthly continuous evaluation + dashboard), item 3 (probation evaluation); Phase 2 = 360, Bell Curve, OD, competency; pilot at two companies | BR-KPI-22; PEND-09, 10; Q3, Q52, Q53 |
+| 2.8 | Phase 1 = item 1 (quarterly and annual KPI), item 4 (monthly continuous evaluation + dashboard), item 3 (probation evaluation); Phase 2 = 360, Bell Curve, OD, competency; pilot at two companies | BR-KPI-22; PEND-09, 10, 14; Q3, Q52, Q53, Q59 |
 | 4 | Action items: job-title list and payout conversion table from chị Phương (Q2); direct vs Khối manager (Trang, Q56); Phase 1 estimate and timeline; study the Udu (VinAIA) system | Q2, Q44, Q56 |
 
 ### Email template for KPI

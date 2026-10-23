@@ -362,7 +362,11 @@ sequenceDiagram
 
 - KPI giao **cho cả năm** (ví dụ doanh thu 15 tỷ), rồi phân bổ cho từng **quý** (hoặc tháng) trong cùng chu
   kỳ — **chia đều** hoặc **nhập tay** từng quý (ví dụ Q1 500 triệu, Q2 2 tỷ, Q3 5 tỷ, Q4 10 tỷ — xem Q50).
-- Chỉ tiêu quý / tháng được theo dõi **lũy kế** (từ đầu chu kỳ đến kỳ đang xem) so với kế hoạch năm (Q51).
+- Chỉ tiêu quý / tháng được theo dõi **lũy kế** (từ đầu chu kỳ đến kỳ đang xem) so với kế hoạch năm (Q51):
+  cộng (SUM) thì cộng dồn, trung bình (AVG) thì trung bình các tháng có số, cuối kỳ (LAST) thì lấy số mới nhất.
+  Tháng thiếu số không tính là 0 — số lũy kế ghi "chưa đủ". Hai cách so: với **mục tiêu lũy kế** (đúng tiến độ
+  chưa) và với **mục tiêu năm** (đi được bao nhiêu phần của năm). *Đã làm 23/10 (B0):* phần tính
+  (`cumulativeRules.ts`); chưa hiện trên màn hình (Đợt 4).
 
 ### Đánh giá KPI: nhân viên nhập kết quả, hệ thống tính % (PEND-06, 07, 08)
 
@@ -400,6 +404,42 @@ sequenceDiagram
 - **Thứ tự**: cơ cấu tổ chức (công ty, phòng ban, nhân sự) → thư viện KPI → chu kỳ và các đợt đánh giá.
 - **Triển khai thử nghiệm** đồng thời cho công ty Sinh Cha và công ty chị Vinh (tên theo biên bản), sau đó mở
   rộng ra các công ty thành viên.
+
+### Quy trình 4 — Công việc tháng (WORK_PLAN, WORK_REVIEW) (PEND-14)
+
+> Mục 4 của P1 = nghiệp vụ công việc tháng của CMC (PMGM.08–09; HR tr. 13, 25–26, 88–95, 141–150; Nhân viên
+> tr. 67–73; Quản lý tr. 120–136), theo `ASSUMPTION Q59`. Kế hoạch chi tiết: `docs/plans/KPI_monthly_work_plan.md`.
+
+```mermaid
+sequenceDiagram
+  participant SYS as Hệ thống
+  participant NV as Nhân viên
+  participant QL as Quản lý trực tiếp
+  participant HR as HR / C&B
+  SYS->>NV: Ngày 1 tháng M: khởi chạy phiếu "Kế hoạch công việc tháng M"
+  NV->>QL: B1. Lập danh sách việc, trọng số đủ 100% (hoặc sao chép tháng trước)
+  Note over NV,QL: Top-down: đợt khởi chạy chọn "Quản lý giao trước" (PEND-01)
+  QL-->>NV: B2. Trả lại kèm nhận xét
+  QL->>SYS: B2. Sửa / thêm / xóa, duyệt → kế hoạch khóa
+  NV->>NV: Trong tháng: cập nhật % hoàn thành, trạng thái (không qua phiếu)
+  SYS->>NV: Ngày 1 tháng M+1: khởi chạy phiếu "Đánh giá công việc tháng M"
+  NV->>QL: B1. Tự chấm từng việc 0–100 + kỷ luật + ý kiến
+  Note over NV,QL: Quá hạn → tự chuyển cho quản lý (BR-KPI-13)
+  QL->>HR: B2. Chấm từng việc + kỷ luật; Hsht < 80 → bắt buộc Hsnv + giải trình
+  QL-->>NV: (hoặc trả lại B1)
+  HR->>SYS: B3. Ghi nhận (hoặc tự động — PEND-02); import điểm hàng loạt
+  SYS->>SYS: Chốt kết quả tháng → Kết quả của tôi, đội nhóm, dashboard
+```
+
+- **Hai phiếu**: *Kế hoạch công việc tháng* (đầu tháng M) và *Đánh giá công việc tháng* (đầu tháng M+1). Phiếu
+  đánh giá công việc tháng **là** đánh giá liên tục hằng tháng; phiếu đánh giá KPI chỉ còn cho quý và năm (Q60).
+- **Điểm**: KQcv = Σ điểm việc × trọng số (70%); KLcv = điểm ý thức kỷ luật (30%);
+  **Hsht = 70% × KQcv + 30% × KLcv**. Hsht **dưới** 80 (80 thì không) → quản lý bắt buộc nhập **Hsnv** kèm giải
+  trình, Hsnv thay Hsht làm điểm cuối (Q61). Tỷ lệ và ngưỡng cấu hình theo công ty (Q62).
+- **Việc bị hủy giữa tháng** (quản lý hủy kèm lý do) không tính vào KQcv; trọng số các việc còn lại chia lại
+  cho đủ 100% (Q64). Liên kết việc với KPI là tùy chọn, không ảnh hưởng điểm (Q63).
+- Kết quả tháng **chỉ theo dõi, không vào lương** (Q52).
+- *Đã làm 23/10 (B0):* phần tính điểm (`workRules.ts`). Chưa có màn hình, phiếu hay dữ liệu.
 
 ### Dashboard theo vai trò (PEND-13)
 
@@ -441,6 +481,7 @@ Lọc theo kỳ **tháng, quý, 6 tháng** và hiển thị số **lũy kế** (
 | PEND-11 | Nhập tay và Excel; đồng bộ API gắn nhãn "Phase sau" (đã làm 21/10) | P1 chỉ nhập tay; 5 phương pháp tính | Phạm vi P1 | Còn lại: số phương pháp tính (Q55). Product owner giữ import Excel (Q54) |
 | PEND-12 | Chưa có import dữ liệu lịch sử | Có, do C&B / HR, ưu tiên thấp | Dữ liệu tham chiếu | Tính năng mới |
 | PEND-13 | Dashboard: Tổng quan + Vận hành | Ba góc nhìn lãnh đạo / quản lý / HR; lọc tháng, quý, 6 tháng; lũy kế | Mỗi vai trò cần số khác nhau | `dashboardRules`, màn hình Dashboard |
+| PEND-14 | Không có công việc tháng (Q10); kế hoạch việc tháng làm trên Excel / email | Phiếu kế hoạch và phiếu đánh giá công việc tháng tự khởi chạy, điểm KQcv / KLcv / Hsht tự tính, Hsnv khi dưới ngưỡng | Mục 4 của P1 (Q59) | Module mới: `workRules` (đã có phần tính), thực thể, hai mẫu quy trình, `/my/work`, `/team/work` |
 
 ## 6. Câu hỏi mở
 
@@ -500,11 +541,17 @@ trực tiếp đến quy trình:
 | Q58 | Dashboard "6 tháng" là nửa năm của chu kỳ hay 6 tháng gần nhất? | Nửa năm của chu kỳ (kỳ Half) | Product owner |
 | Q59 | Mục 4 của P1 là "công việc tháng" của CMC (PMGM.08–09) hay chỉ theo dõi KPI tháng? (mở lại Q10) | Công việc tháng của CMC — `docs/plans/KPI_monthly_work_plan.md` | Product owner |
 | Q60 | Phiếu đánh giá công việc tháng thay phiếu KPI_EVAL tháng, hay hai phiếu song song? | Thay: phiếu công việc tháng là đánh giá liên tục hằng tháng; KPI_EVAL chỉ khởi chạy cho kỳ quý và năm | Product owner + HR |
+| Q61 | Hsnv là điểm hay xếp hạng; thang giá trị? (CMC chỉ ghi "Hsnv – Ranking") | Điểm 0–100, thay Hsht làm điểm cuối; chỉ bắt buộc khi Hsht dưới ngưỡng | HR |
+| Q62 | Tỷ lệ 70/30 và ngưỡng 80 cố định hay theo công ty? | Theo công ty, mặc định 70 / 30 / 80; một thang 0–100 cho điểm việc, kỷ luật và Hsnv | HR |
+| Q63 | Việc tháng có liên kết KPI không, có bắt buộc không? | Tùy chọn, không ảnh hưởng điểm | Product owner |
+| Q64 | Việc bị hủy giữa tháng: bỏ khỏi KQcv và chia lại trọng số, hay giữ với điểm 0? | Quản lý hủy kèm lý do; bỏ khỏi KQcv, trọng số còn lại chuẩn hóa về 100 | HR |
+| Q65 | Hạn lập kế hoạch và hạn đánh giá? | Lập: nhân viên đến ngày 3, quản lý duyệt đến ngày 5 tháng M; đánh giá: cùng hạn đánh giá đang có (ngày 13 tháng sau) | HR |
+| Q66 | Nhân viên vào làm / nghỉ giữa tháng có phiếu không? | Có, nếu còn làm việc ngày khởi chạy; không chia theo ngày công | HR |
 | Q67 | Chỉ tiêu chỉ phân bổ theo quý: mục tiêu tháng là bao nhiêu? (Hiện dùng mục tiêu năm — sai với chỉ tiêu cộng) | Cộng (SUM): mục tiêu quý chia số tháng của quý; trung bình / cuối kỳ: bằng mục tiêu quý | HR |
 
-**Sau Đợt 0 (23/10/2026):** Q2, Q44–Q60 và Q67 chưa có câu trả lời. Mỗi thay đổi làm theo cột "Đề xuất" và ghi
+**Sau Đợt 0 (23/10/2026):** Q2, Q44–Q67 chưa có câu trả lời. Mỗi thay đổi làm theo cột "Đề xuất" và ghi
 `ASSUMPTION Qn` trong quy tắc nó viết, để không phải chờ; câu trả lời khác đề xuất là một thay đổi quy tắc. Q2 vẫn
-dùng thang mẫu cho tới khi chị Phương gửi bảng quy đổi thật. Q61–Q66: `KPI_monthly_work_plan.md` §4 (Plan B).
+dùng thang mẫu cho tới khi chị Phương gửi bảng quy đổi thật. Q59–Q66 chặn bước nào: `KPI_monthly_work_plan.md` §4 (Plan B).
 
 ## 7. Quyết định đã chốt
 

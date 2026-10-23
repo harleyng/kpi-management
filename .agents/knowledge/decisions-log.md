@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-10-23 — Plan B, B0: monthly work scoring and cumulative tracking as pure rules, ahead of their entities
+
+**Decision.** `src/lib/workRules.ts` (PEND-14) and `src/lib/cumulativeRules.ts` (PEND-05) land before any
+entity, hook or screen, reading structural types so they merge at any turn of the shared order. Q61–Q66 run on
+their proposals. Three choices differ from a literal reading of the plan: `finalWorkScore` is **not**
+`hsnv ?? hsht` — a Hsnv is used only while Hsht is below the threshold (a stale one is ignored) and a required
+Hsnv not yet set gives `null`; a cumulative SUM target is never prorated (month splits, else quarter / half
+splits that tile the window, else the annual target for the whole cycle only, else `null`); a cumulative figure
+with a month missing is computed from the months that have data and every achievement on it is `provisional`,
+unlike `aggregatePeriodActuals`, which stays `null` on a gap. KQcv uses weights normalised after a cancelled task
+(Q64); Hsnv is required strictly below the threshold, compared with a 1e-9 tolerance. hr-performance-expert:
+approved with changes (provisional flag, boundary tests), applied.
+
+**Why.** The formulas are the part that must be right before anyone trusts the screens, and they depend on
+nothing that is still moving in Plan A. Not fabricating numbers (no proration, no 0 for a missing month, no Hsnv
+that no longer applies) follows BR-KPI-32.
+
+**Updated alongside.** `business-rules.md` §8 (Q51, Q61–Q66), §12 (PEND-05, 14); `new-flow.md` §4G
+(Quy trình 4, lũy kế), §5, §6; `source-map.md` (PMGM.08–09, HR / Manager / Employee guide pages);
+`component-registry.md`; `KPI_plan_B_monthly_work.md` §3.
+
+---
+
 ## 2026-10-23 — Đợt 0: open questions run on their proposals; PEND-04 is half built; FORMULA is the extra method
 
 **Decision.** No answer came back for Q2 and Q44–Q60, so each change builds on the proposal in
