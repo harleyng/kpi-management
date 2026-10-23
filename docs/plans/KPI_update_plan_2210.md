@@ -211,14 +211,34 @@ vai trò bước HR.
 - **Hiện trạng (cần xác nhận trước).** `PeriodSplitPanel` đã chọn được loại kỳ (Quý); `resultRules` dùng mục tiêu
   riêng của quý nếu có (dòng "own split") và chỉ cộng từ tháng khi không có; `evenSplit` chia theo cách tổng hợp.
   Rất có thể **phần lớn đã chạy được** — việc đầu tiên là kiểm chứng.
+- **Kết quả kiểm chứng (Đợt 0, 23/10/2026)** — chạy thử bằng Vitest, không sửa code.
+  - **Đã chạy:** `goalPlanRules.evenSplit` chia 15 tỷ thành 4 × 3,75 tỷ (SUM; phần dư dồn vào quý cuối), AVG / LAST
+    giữ 15 tỷ mỗi quý; nhập tay lệch tổng (17,5 tỷ) → `SPLIT_MISMATCH`, chỉ cảnh báo, vẫn lưu được; thiếu quý →
+    `SPLIT_INCOMPLETE`, quý thiếu dùng mục tiêu năm; kết quả quý của Goal Plan công ty / đơn vị (`actualLines`)
+    dùng đúng mục tiêu riêng của quý, kể cả khi có cả phân bổ tháng.
+  - **Chưa chạy:** phiếu KPI_EVAL kỳ quý hiện mục tiêu **năm** (`GoalTarget.tsx` đọc `goal.targetValue`, không gọi
+    `calcRules.targetForPeriod`; `EvaluationItem` không lưu mục tiêu kỳ); số thực tế chụp lúc khởi chạy chỉ lấy số
+    nhập trực tiếp cho kỳ quý, không cộng các tháng (`mock/workflowContext.ts`), khác `resultRules.actualFor`.
+  - **Sai với KPI cộng (SUM):** chỉ phân bổ quý thì tháng dùng mục tiêu năm (`targetForPeriod(T04)` = 15 tỷ → tháng
+    1 tỷ ra 6,67%) — ảnh hưởng kết quả tháng, nhập số và cảnh báo import. Cần chốt `ASSUMPTION Q67`.
+  - **Nhãn:** chỉ có "Phân bổ mục tiêu theo kỳ"; ô chọn mặc định Tháng; dòng chỉ tiêu không cho biết đã phân bổ
+    theo gì. Ghi chú "chỉ áp dụng theo tháng" cho KPI ngoài thư viện (`PeriodSplitPanel.tsx`, `goalCopy.ts`
+    `SPLIT_NO_AGGREGATION`) sai — phân bổ quý riêng vẫn được dùng.
 - **Việc cần làm.**
-  - [ ] Kiểm chứng: chia 15 tỷ thành 4 quý (đều và nhập tay) → kết quả quý dùng đúng mục tiêu quý; cảnh báo
-    `SPLIT_MISMATCH` khi tổng ≠ năm (Q50).
-  - [ ] Nếu phiếu đánh giá kỳ quý chưa đọc mục tiêu quý: sửa trong `calcRules.targetForPeriod` (KPI Rules).
-  - [ ] Nhãn giao diện "Phân bổ theo quý" rõ ràng trên Goal Plan.
+  - [x] Kiểm chứng (ở trên).
+  - [ ] Phiếu kỳ quý dùng mục tiêu quý: chụp mục tiêu kỳ lên `EvaluationItem` lúc khởi chạy, hoặc gọi
+    `calcRules.targetForPeriod` trên phiếu — làm cùng `formRules.computedItemPct` của PEND-07 (KPI Rules + Workflow).
+  - [ ] Số thực tế của phiếu kỳ quý: không có số riêng thì tổng hợp các tháng theo cách tổng hợp, như
+    `resultRules.actualFor`.
+  - [ ] Tháng khi chỉ phân bổ quý (Q67, đề xuất: SUM → quý / số tháng của quý; AVG / LAST → số của quý) — sửa
+    `calcRules.targetForPeriod`, cập nhật BR-KPI-11 (KPI Rules).
+  - [ ] Nhãn "Phân bổ theo quý" / "theo tháng" trên dòng chỉ tiêu và tiêu đề panel; ô chọn mặc định theo loại đã lưu.
+  - [ ] Sửa ghi chú "chỉ áp dụng theo tháng" cho KPI ngoài thư viện.
+  - [ ] (PEND-05) Năm không có số tháng thì cộng số quý.
 - **Kiểm thử.** Chia đều SUM / AVG / LAST; nhập tay lệch tổng → cảnh báo, không chặn; quý thiếu → dùng mục tiêu
   năm (`SPLIT_INCOMPLETE`).
-- **Cỡ.** Small → KPI Rules nếu phải sửa hàm tính.
+- **Cỡ.** KPI Rules (sửa `targetForPeriod` cho tháng) + Workflow (chụp mục tiêu kỳ lên phiếu) — làm ở A3 cùng PEND-09,
+  phần phiếu gộp với PEND-07 ở A1.
 
 ### PEND-05 — Theo dõi lũy kế
 
@@ -286,6 +306,12 @@ vai trò bước HR.
 - **Đã làm 21/10.** Nhập tay + import Excel, đồng bộ API gắn "Phase sau" (Q54 đã chốt).
 - **Còn lại (Q55).** Đối chiếu tài liệu PMGM, xác định phương pháp thừa. **Không xóa**: ẩn khỏi danh sách chọn
   (giống Lưu trữ, BR-KPI-78), chỉ tiêu đang dùng vẫn tính được.
+- **Kết quả đối chiếu (Đợt 0, 23/10/2026).** Không tài liệu nào có danh sách 5 phương pháp; ánh xạ nguồn → prototype:
+  chỉ tiêu xuôi / "% thực tế / mục tiêu" → RATIO_UP; chỉ tiêu ngược / "% mục tiêu / thực tế" → RATIO_DOWN; định
+  mức L1–L3 → LEVELS; mục tiêu chữ Đạt / Không đạt → BINARY; quy tắc đứt hàng 70 / 40 / 0 (DATX E65) → TIERED.
+  **FORMULA không có nguồn**, seed không có phương pháp hay chỉ tiêu nào dùng. Việc còn lại: hàm thuần
+  "phương pháp được chọn" trong `libraryRules` + test, lọc ở `CalcMethodSheet.tsx`; phương pháp FORMULA đã có vẫn
+  hiện và tính được (`ASSUMPTION Q55`).
 - **Chuyên gia.** `hr-performance-expert`.
 
 ---

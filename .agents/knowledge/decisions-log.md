@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-10-23 — Đợt 0: open questions run on their proposals; PEND-04 is half built; FORMULA is the extra method
+
+**Decision.** No answer came back for Q2 and Q44–Q60, so each change builds on the proposal in
+`business-rules.md` §8 and cites `ASSUMPTION Qn`; Q53 and Q57 got concrete proposals; Q67 is new (a month's
+target when a goal is split by quarter only). PEND-04 was checked in code: the split, `SPLIT_MISMATCH` /
+`SPLIT_INCOMPLETE` and Company / OrgUnit quarter results work; a quarterly KPI_EVAL form still shows the annual
+target and a month under a quarter-only split takes the annual target. PEND-11: no source lists five methods;
+mapped onto the sources, FORMULA is the one without a counterpart and no seed uses it — hide it from the picker.
+
+**Why.** Waiting for HR would stall both plans; proposals are easy to reverse. Verifying before building
+PEND-04 turned "probably done" into a short, concrete fix list.
+
+**Updated alongside.** `business-rules.md` §8 (Q10, Q53, Q55, Q57, Q59, Q60, Q67), §12 (PEND-04, 11, 14);
+`new-flow.md` §6; `KPI_repo_plan.md` §1, §9; `KPI_update_plan_2210.md` §6, §8; `KPI_plan_A_kpi.md` §3.
+
+---
+
 ## 2026-10-22 — The 22/10 meeting's decisions are recorded as pending changes, not as current rules
 
 **Decision.** (product owner) The system design / Phase 1 scope meeting (NoteX, 22/10/2026) is

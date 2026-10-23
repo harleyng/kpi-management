@@ -451,7 +451,7 @@ trực tiếp đến quy trình:
 |---|---|---|---|
 | Q3 | Đánh giá chính theo tháng hay quý? | Tháng — **buổi họp 22/10 đã trả lời: quý và năm, tháng là đánh giá liên tục** (PEND-09; chi tiết còn mở ở Q52) | HR |
 | Q7 | P1 có "Lấy ý kiến", "Thêm người duyệt", bước hợp tác không? | Không (để P2) | Product owner + HR |
-| Q10 | "Kế hoạch công việc tháng" (PMGM.08) có thuộc P1 không? | Không | Product owner |
+| Q10 | "Kế hoạch công việc tháng" (PMGM.08) có thuộc P1 không? | Không — **22/10: mở lại**, xem Q59 | Product owner |
 | — | Goal Plan có trạng thái "Bị trả lại" riêng không? (Plan có, ERD chưa có) | Có — chốt ở Phase 1.1 | System architect + HR |
 | — | Bước nào khóa khi quá hạn, bước nào tự chuyển? | Đăng ký: khóa; đánh giá: tự chuyển | HR |
 | Q12 | Danh mục quyền, quyền mặc định của từng vai trò và phạm vi dữ liệu? (Các tài liệu nguồn không nêu) | Như `business-rules.md` §9 | Product owner + HR |
@@ -492,12 +492,19 @@ trực tiếp đến quy trình:
 | Q50 | Ví dụ phân bổ quý (500 tr + 2 tỷ + 5 tỷ + 10 tỷ = 17,5 tỷ) không bằng mục tiêu năm 15 tỷ — số quý là riêng từng quý hay lũy kế? | Riêng từng quý; lệch tổng chỉ cảnh báo (như BR-KPI-11) | HR |
 | Q51 | Lũy kế tính thế nào cho chỉ tiêu tỷ lệ hay tồn kho? | Cộng dồn với chỉ tiêu cộng (SUM); trung bình (AVG) và số cuối kỳ (LAST) theo cách tổng hợp của KPI | HR |
 | Q52 | Đánh giá liên tục hằng tháng có chấm điểm và tính lương không? Kỳ nào ra % lương? | Tháng chỉ theo dõi, không ra % lương; quý và năm chấm điểm và ra % lương | HR + C&B |
-| Q53 | Đánh giá thử việc: các bước, tiêu chí (KPI hay năng lực), khi nào khởi chạy? | Chưa có — cần thiết kế riêng | Product owner + HR |
+| Q53 | Đánh giá thử việc: các bước, tiêu chí (KPI hay năng lực), khi nào khởi chạy? | Ba bước như đánh giá KPI: nhân viên tự đánh giá → quản lý trực tiếp quyết định → HR ghi nhận; tiêu chí chỉ là KPI thử việc (năng lực để P2); kết quả Đạt / Không đạt / Gia hạn, quản lý chọn kèm nhận xét; tự khởi chạy 7 ngày trước ngày hết thử việc; Đạt thì HR ghi nhận xong nhân viên chuyển sang *Chính thức*. Chốt với HR trước Đợt 6 | Product owner + HR |
 | Q54 | "Chỉ nhập tay" có bỏ cả import Excel số thực tế không? | **Đã chốt 21/10:** không — P1 nhập tay và import Excel; đồng bộ API để Phase sau | Product owner |
-| Q55 | Tài liệu PMGM có 5 phương pháp tính; prototype có 6 — bỏ phương pháp nào? | Giữ cả 6 cho tới khi đối chiếu tài liệu | HR + BA |
+| Q55 | Tài liệu PMGM có 5 phương pháp tính; prototype có 6 — bỏ phương pháp nào? | **Đã đối chiếu 23/10:** không tài liệu nào liệt kê 5 phương pháp. PMGM mô tả một cơ chế định mức (mục tiêu số hoặc Đạt / Không đạt, chỉ tiêu xuôi / ngược, L1–L3 có % từng mức; HR tr. 23, 28; Quản lý tr. 54); DATX có "% thực tế / mục tiêu", "% mục tiêu / thực tế" và một quy tắc bậc. Năm phương pháp có nguồn: Càng cao càng tốt, Càng thấp càng tốt, Bậc thang, Đạt / Không đạt, Định mức L1–L3. **Công thức** không có nguồn, seed không dùng → ẩn khỏi danh sách chọn, không xóa | HR + BA |
 | Q56 | Khối có Goal Plan riêng không? Quản lý trực tiếp khác quản lý theo khối thế nào? | Khối có Goal Plan khi giám đốc khối nhận KPI; vẫn chờ BA làm rõ (action item của Trang) | BA + HR |
-| Q57 | Import dữ liệu lịch sử: dữ liệu gì (số thực tế, kết quả, xếp loại), bao nhiêu năm, hiển thị ở đâu? | Chưa làm — ưu tiên thấp | HR + C&B |
+| Q57 | Import dữ liệu lịch sử: dữ liệu gì (số thực tế, kết quả, xếp loại), bao nhiêu năm, hiển thị ở đâu? | Chỉ kết quả kỳ (nhân viên, kỳ, điểm %, xếp loại), không có số thực tế, không tính lại; bao nhiêu năm cũng được, mỗi năm vào một chu kỳ lịch sử đã đóng, kết quả *Đã khóa*, chỉ đọc; hiện ở lịch sử kết quả của nhân viên và kỳ trước trên dashboard. C&B / HR import bằng khung import chung. Ưu tiên thấp | HR + C&B |
 | Q58 | Dashboard "6 tháng" là nửa năm của chu kỳ hay 6 tháng gần nhất? | Nửa năm của chu kỳ (kỳ Half) | Product owner |
+| Q59 | Mục 4 của P1 là "công việc tháng" của CMC (PMGM.08–09) hay chỉ theo dõi KPI tháng? (mở lại Q10) | Công việc tháng của CMC — `docs/plans/KPI_monthly_work_plan.md` | Product owner |
+| Q60 | Phiếu đánh giá công việc tháng thay phiếu KPI_EVAL tháng, hay hai phiếu song song? | Thay: phiếu công việc tháng là đánh giá liên tục hằng tháng; KPI_EVAL chỉ khởi chạy cho kỳ quý và năm | Product owner + HR |
+| Q67 | Chỉ tiêu chỉ phân bổ theo quý: mục tiêu tháng là bao nhiêu? (Hiện dùng mục tiêu năm — sai với chỉ tiêu cộng) | Cộng (SUM): mục tiêu quý chia số tháng của quý; trung bình / cuối kỳ: bằng mục tiêu quý | HR |
+
+**Sau Đợt 0 (23/10/2026):** Q2, Q44–Q60 và Q67 chưa có câu trả lời. Mỗi thay đổi làm theo cột "Đề xuất" và ghi
+`ASSUMPTION Qn` trong quy tắc nó viết, để không phải chờ; câu trả lời khác đề xuất là một thay đổi quy tắc. Q2 vẫn
+dùng thang mẫu cho tới khi chị Phương gửi bảng quy đổi thật. Q61–Q66: `KPI_monthly_work_plan.md` §4 (Plan B).
 
 ## 7. Quyết định đã chốt
 

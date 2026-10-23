@@ -1,6 +1,7 @@
 # Kế hoạch dựng repo `kpi-management` — Syntra KPI (prototype Phase 1)
 
-> Phiên bản 1.0 · 19/10/2026 · Người lập: Claude cho @harleyng
+> Phiên bản 1.1 · 23/10/2026 · Người lập: Claude cho @harleyng · 1.1: phạm vi P1 theo buổi họp 22/10/2026 (mục 1,
+> câu Q3, Q10 ở mục 9)
 > **Repo:** `kpi-management`, đặt tại `/Users/m116gb/Downloads/Syntra/Internal/KPI/kpi-management/` (tên package `kpi-management`; tên hiển thị trên giao diện "Syntra KPI").
 > Phạm vi: **prototype chạy được toàn bộ vòng đời KPI của P1**, dữ liệu giả lập trong trình duyệt.
 > **Chưa nối database**, **chưa đa ngôn ngữ**, đăng nhập giả lập. Thiết kế sẵn **multi-tenant** từ đầu.
@@ -11,7 +12,7 @@
 
 | | Có trong repo này | Chưa làm |
 |---|---|---|
-| Nghiệp vụ | Toàn bộ 42 work package của WBS 4.0 Phase 1 (mục 7) | Tính năng P2/P3: hiệu suất liên tục, năng lực & 360, thử việc/HĐLĐ, calibration, thương mại hóa |
+| Nghiệp vụ | Toàn bộ 42 work package của WBS 4.0 Phase 1 (mục 7). **Từ buổi họp 22/10/2026**, P1 gồm: **mục 1** — giao nhận và đánh giá KPI chính thức **theo quý / năm**; **mục 4** — đánh giá liên tục hằng tháng (= nghiệp vụ công việc tháng của CMC, PMGM.08–09, theo `ASSUMPTION Q59`) và dashboard; **mục 3** — **đánh giá thử việc** (PEND-10). Làm mục 1 và 4 trước, mục 3 sau. Kế hoạch: `KPI_update_plan_2210.md`, `KPI_plan_A_kpi.md`, `KPI_plan_B_monthly_work.md` | Tính năng P2/P3: năng lực & 360, Bell Curve, đào tạo và phát triển (OD), đánh giá hết hạn HĐLĐ, calibration, thương mại hóa |
 | Dữ liệu | Gateway dữ liệu giả lập (in-memory + localStorage), seed từ biểu mẫu DATX | Supabase/Postgres, migration, RLS |
 | Đăng nhập | Chọn công ty, người dùng, vai trò từ seed (giả lập) | SSO, mật khẩu |
 | Tích hợp | **Phase 1 không tích hợp hệ thống khác hay API** (product owner, 21/10/2026): số thực tế chỉ nhập tay và import Excel. Connector ERP Sale **giả lập** (WBS 4.4.4–4.4.5) giữ trong bản thử nghiệm, gắn nhãn "Phase sau" | Gọi API thật, mọi tích hợp hệ thống |
@@ -296,14 +297,14 @@ HR tạo chu kỳ 2027 → giao KPI công ty → TP Sale cascade xuống 2 NV �
 |---|---|---|---|
 | Q1 | Kiểu LEVELS có nội suy tuyến tính giữa L1–L2–L3 không? | 1.5 | Có nội suy, chặn trần ở mức cao nhất |
 | Q2 | Thang xếp loại và bảng quy đổi % lương KPI? Sheet "TH KQ" của DATX đang lỗi `#REF!` | 1.5, T6 | Dùng thang A+/A/B/C/D mẫu, ghi rõ là giả định |
-| Q3 | Đánh giá chính theo tháng hay quý? | T5, seed | Tháng (theo biên bản họp) |
+| Q3 | Đánh giá chính theo tháng hay quý? | T5, seed | Tháng (theo biên bản họp). **22/10/2026: quý và năm là chính thức, tháng là đánh giá liên tục** (PEND-09, Q52) |
 | Q4 | "Tỉ lệ KH cũ" là càng cao càng tốt? File DATX ghi hai kiểu khác nhau | Seed | Càng cao càng tốt |
 | Q5 | Thống nhất phân loại theo BSC hay theo "Hiệu quả / Khối lượng / Chi phí"? | T2, seed | BSC là chính, phân loại kia làm nhãn phụ |
 | Q6 | KRItc và KRIpt nghĩa là gì, Syntra có cần không? | D4 | Ẩn trường này cho tới khi có trả lời |
 | Q7 | P1 có cần "Lấy ý kiến", "Thêm người duyệt", bước hợp tác không? | T5 | Không, để P2 |
 | Q8 | Số thực tế của KPI cha: đo độc lập hay cộng dồn từ con? | 1.5, Phase 3 | Đo độc lập; cộng dồn chỉ khi bật cờ trên từng KPI |
 | Q9 | KGI có mục tiêu bằng số không? | 1.1 | Có trường nhưng không bắt buộc, không chấm điểm |
-| Q10 | "Kế hoạch công việc tháng" của CMC (HR tr. 25–26, PMGM.08/09) có thuộc P1 không? | Phạm vi | Không. P1 chỉ có KPI |
+| Q10 | "Kế hoạch công việc tháng" của CMC (HR tr. 25–26, PMGM.08/09) có thuộc P1 không? | Phạm vi | Không. P1 chỉ có KPI. **22/10/2026: mở lại** — mục 4 của P1 là công việc tháng (`ASSUMPTION Q59`, PEND-14) |
 
 ---
 
